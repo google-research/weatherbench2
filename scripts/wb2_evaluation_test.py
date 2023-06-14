@@ -1,0 +1,106 @@
+# Copyright 2023 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+import os
+
+from absl.testing import absltest
+from absl.testing import flagsaver
+from weatherbench2 import schema
+from weatherbench2.scripts import wb2_evaluation
+import xarray
+
+
+class WB2Evaluation(absltest.TestCase):
+
+  def _test(self, use_beam=True):
+    variables_3d = [
+        'geopotential',
+        'u_component_of_wind',
+        'v_component_of_wind',
+    ]
+    variables_2d = ['2m_temperature']
+    truth = schema.mock_truth_data(
+        variables_3d=variables_3d,
+        variables_2d=variables_2d,
+        time_start='2020-01-01',
+        time_stop='2021-01-01',
+    )
+    forecast = schema.mock_forecast_data(
+        variables_3d=variables_3d,
+        variables_2d=variables_2d,
+        time_start='2019-12-01',
+        time_stop='2021-01-01',
+        lead_stop='3 days',
+    )
+    climatology = schema.mock_hourly_climatology_data(
+        variables_3d=variables_3d,
+        variables_2d=variables_2d,
+    )
+    climatology = climatology.assign(
+        wind_speed=climatology['u_component_of_wind']
+    )
+
+    truth_path = self.create_tempdir('truth').full_path
+    forecast_path = self.create_tempdir('forecast').full_path
+    climatology_path = self.create_tempdir('climatology').full_path
+    output_dir = self.create_tempdir('output_dir').full_path
+
+    truth.chunk().to_zarr(truth_path)
+    forecast.chunk().to_zarr(forecast_path)
+    climatology.chunk().to_zarr(climatology_path)
+
+    eval_configs = [
+        'deterministic',
+        'deterministic_vs_analysis',
+    ]
+
+    with flagsaver.flagsaver(
+        forecast_path=forecast_path,
+        obs_path=truth_path,
+        climatology_path=climatology_path,
+        output_dir=output_dir,
+        time_start='2020-01-01',
+        time_stop='2020-12-31',
+        beam_runner='DirectRunner',
+        input_chunks='time=-1',
+        eval_configs=','.join(eval_configs),
+        use_beam=use_beam,
+        variables=variables_3d + variables_2d,
+        derived_variables=['wind_speed'],
+    ):
+      wb2_evaluation.main([])
+
+    for config_name in eval_configs:
+      expected_sizes_2d = {'metric': 3, 'lead_time': 4, 'region': 4}
+      expected_sizes_3d = {'metric': 3, 'lead_time': 4, 'region': 4, 'level': 3}
+
+      with self.subTest(config_name):
+        results_path = os.path.join(output_dir, f'{config_name}.nc')
+        actual = xarray.open_dataset(results_path)
+        self.assertEqual(
+            set(actual),
+            set(variables_3d + variables_2d + ['wind_speed', 'wind_vector']),
+        )
+        self.assertEqual(actual['geopotential'].sizes, expected_sizes_3d)
+        self.assertEqual(actual['2m_temperature'].sizes, expected_sizes_2d)
+
+  def test_in_memory(self):
+    self._test(use_beam=False)
+
+  def test_beam(self):
+    self._test(use_beam=True)
+
+
+if __name__ == '__main__':
+  absltest.main()
