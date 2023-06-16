@@ -107,13 +107,23 @@ class ZonalPowerSpectrum(DerivedVariable):
 
   Given dataset with longitude dimension, this class computes spectral power as
   a function of wavenumber and frequency. Only non-negative frequencies are
-  included (with units of "1 / km"). Power is the squared modulus of the DFT
-  value (multiplied by 2 for positive frequencies, since they account for both
-  negative and positive values).
+  included (with units of "1 / km").
 
   At latitude α, where the circle of latitude has radius
   R(α) = R₀ Cos(α π / 180), the kth wavenumber corresponds to frequency
     f(k, α) = 1 / (2π R(α) longitude[k] / 360)
+
+  Here, the DFT of a signal x[n], n = 0,..., N-1 is computed as
+    X[k] = (1 / N) Σₙ x[n] exp(-2πink/N)
+  The power spectrum is then
+    S[0] = |X[0]|²,
+    S[k] = 2 |X[k]|², k > 0, to account for positive and negative frequencies.
+
+  This choice of normalization ensures that spectrum viewed as a function of
+  frequency f(k, α) (see above) is independent of discretization N (up to
+  discretization error, so long as N is high enough that f(k, α) can be
+  resolved). If power spectral *density* is desired, the user should divide S[k]
+  by the difference f(k, α) - f(k - 1, α).
 
   Attributes:
     variable_name: Name to use as base and also store output in.
@@ -141,7 +151,7 @@ class ZonalPowerSpectrum(DerivedVariable):
     spacing = self._lon_spacing_km(dataset)
 
     def simple_power(f_x):
-      f_k = np.fft.rfft(f_x, axis=-1)
+      f_k = np.fft.rfft(f_x, axis=-1, norm='forward')
       # freq > 0 should be counted twice in power since it accounts for both
       # positive and negative complex values.
       one_and_many_twos = np.concatenate(([1], [2] * (f_k.shape[-1] - 1)))

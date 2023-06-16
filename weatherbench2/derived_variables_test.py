@@ -134,6 +134,12 @@ class DerivedVariablesTest(absltest.TestCase):
 
 class ZonalPowerSpectrumTest(parameterized.TestCase):
 
+  def _wavelength_km(self, wavelength_lon: float, latitude: float) -> float:
+    """Wavelength in km from wavelength in longitude units."""
+    return (wavelength_lon / 360) * (
+        2 * np.pi * derived_variables._EARTH_RADIUS_KM
+    ) * np.cos(np.pi * latitude / 180)
+
   def test_data_has_right_shape_and_dims(self):
     dataset = get_random_weather(variables=['geopotential'], ensemble_size=None)
     spectrum = ZonalPowerSpectrum(
@@ -193,15 +199,112 @@ class ZonalPowerSpectrumTest(parameterized.TestCase):
     )
     spectrum = ZonalPowerSpectrum(variable_name='geopotential').compute(dataset)
 
-    wavelength_km = (wavelength_lon / 360) * (
-        2 * np.pi * derived_variables._EARTH_RADIUS_KM
-    ) * np.cos(np.pi * latitude / 180)
+    wavelength_km = self._wavelength_km(wavelength_lon, latitude)
 
-    # Assert there is a spectral peak at the expected frequency.
+    # Assert there is a spectral peak at the expected frequency, which is
+    # = 1 / wavelength_km.
     np.testing.assert_array_equal(
         spectrum.argmax('wavenumber'),
         np.abs(spectrum.frequency - 1 / wavelength_km).argmin('wavenumber'),
     )
+
+  @parameterized.named_parameters(
+      # Since frequency 0 is treated special (we double its value in the power
+      # spectrum), test adding a constant to the values specially.
+      dict(testcase_name='NoAddConstant', add_constant=False),
+      dict(testcase_name='YesAddConstant', add_constant=True),
+  )
+  def test_resolved_frequencies_are_mostly_independent_of_discretization(
+      self, add_constant
+  ):
+    np.random.seed(802701)
+
+    # Confine the wave to a single latitude, so we can use frequency as a
+    # dimension to select with.
+    latitude = 30
+
+    # Min/max wavelengths that we will add spectral content for.
+    min_wavelength_lon = 50
+    max_wavelength_lon = 100
+
+    def compute_frequency_spectrum(spatial_resolution_in_degrees):
+      """Compute spectrum with 'frequency' as a dim."""
+      # Initialize dataset without random noise, so we can insert smooth
+      # functions of lat/lon consistently for different resolutions.
+      dataset = 0 * get_random_weather(
+          variables=['geopotential'],
+          ensemble_size=None,
+          spatial_resolution_in_degrees=spatial_resolution_in_degrees,
+      ).sel(
+          latitude=latitude,
+      )
+      # Add signal at the many wavelengths to create a smooth spectra
+      # Ensure all are long enough for this spatial resolution to resolve
+      assert spatial_resolution_in_degrees < min_wavelength_lon / 2
+      n_signals = 100
+      for wavelength_lon in np.linspace(
+          min_wavelength_lon, max_wavelength_lon, num=n_signals
+      ):
+        dataset['geopotential'] += (
+            np.cos(2 * np.pi * dataset.longitude / wavelength_lon)
+            * np.exp(-wavelength_lon / max_wavelength_lon)
+            * np.sin(dataset['level'] / 500)
+        ) / n_signals
+      if add_constant:
+        dataset += 50 * np.abs(dataset).mean()
+      return (
+          ZonalPowerSpectrum(variable_name='geopotential')
+          .compute(dataset)
+          .swap_dims({'wavenumber': 'frequency'})
+      )
+
+    spectrum_5 = compute_frequency_spectrum(spatial_resolution_in_degrees=5)
+    spectrum_20 = compute_frequency_spectrum(spatial_resolution_in_degrees=20)
+
+    # Test around the wavelengths we've added signal at, but not at the
+    # boundary, since we expect boundary effects.
+    test_frequencies = sorted(
+        1
+        / self._wavelength_km(
+            np.random.uniform(
+                low=1.1 * min_wavelength_lon,
+                high=0.9 * max_wavelength_lon,
+                size=30,
+            ),
+            latitude,
+        )
+    )
+
+    # frequency=0 is well defined (and not a boundary case) at both resolutions.
+    test_frequencies.append(0)
+
+    # Assert spectrum_5 and spectrum_20 are close at all frequencies.
+    # This fails if a different normalization of the DFT is used.
+    for i, f in enumerate(test_frequencies):
+      err = np.abs(
+          spectrum_5.sel(frequency=f, method='nearest')
+          - spectrum_20.sel(frequency=f, method='nearest')
+      )
+
+      # The difference in the low resolution spectra should provide an error
+      # bound.
+      def _select(da, where, f_):
+        """Select `da` at frequency value above or below `f_`."""
+        idx = int(np.argmin(np.abs(da.frequency.data - f_)))
+        if where == 'below':
+          idx = max(0, idx - 1)
+        elif where == 'above':
+          idx = min(da.frequency.size - 1, idx + 1)
+        return da.isel(frequency=idx)
+
+      expected_err_bound = np.abs(
+          _select(spectrum_20, 'below', f) - _select(spectrum_20, 'above', f)
+      )
+      np.testing.assert_array_less(
+          err.data,
+          expected_err_bound.data,
+          err_msg=f'Failed at {i=} {f=}',
+      )
 
 
 if __name__ == '__main__':
