@@ -31,6 +31,7 @@ import fsspec
 import numpy as np
 from weatherbench2 import schema
 from weatherbench2.config import DataConfig, EvalConfig, Selection  # pylint: disable=g-multiple-import
+from weatherbench2.utils import make_probabilistic_climatology
 import xarray as xr
 import xarray_beam as xbeam
 
@@ -389,6 +390,18 @@ def _evaluate_all_metrics(
         dayofyear=forecast[time_dim].dt.dayofyear,
         hour=forecast[time_dim].dt.hour,
     )
+  if eval_config.evaluate_probabilistic_climatology:
+    probabilistic_climatology = make_probabilistic_climatology(
+        truth,
+        eval_config.probabilistic_climatology_start_year,
+        eval_config.probabilistic_climatology_end_year,
+        eval_config.probabilistic_climatology_hour_interval,
+    )
+    time_dim = 'valid_time' if data_config.by_init else 'time'
+    forecast = probabilistic_climatology[list(forecast.keys())].sel(
+        dayofyear=forecast[time_dim].dt.dayofyear,
+        hour=forecast[time_dim].dt.hour,
+    )
 
   if eval_config.evaluate_persistence:
     forecast = create_persistence_forecast(forecast, truth)
@@ -527,6 +540,7 @@ class _EvaluateAllMetrics(beam.PTransform):
   ) -> beam.PCollection:
     if (
         self.eval_config.evaluate_climatology
+        or self.eval_config.evaluate_probabilistic_climatology
         or self.eval_config.evaluate_persistence
     ):
       variables = list(forecast.keys())
@@ -551,6 +565,18 @@ class _EvaluateAllMetrics(beam.PTransform):
       forecast_pipeline = forecast_pipeline | beam.MapTuple(
           lambda k, v: self._climatology_like_forecast_chunk(  # pylint: disable=g-long-lambda
               k, v, climatology, variables, by_init
+          ),
+      )
+    if self.eval_config.evaluate_probabilistic_climatology:
+      probabilistic_climatology = make_probabilistic_climatology(
+          truth,
+          self.eval_config.probabilistic_climatology_start_year,
+          self.eval_config.probabilistic_climatology_end_year,
+          self.eval_config.probabilistic_climatology_hour_interval,
+      )
+      forecast_pipeline = forecast_pipeline | beam.MapTuple(
+          lambda k, v: self._climatology_like_forecast_chunk(  # pylint: disable=g-long-lambda
+              k, v, probabilistic_climatology, variables, by_init
           ),
       )
     elif self.eval_config.evaluate_persistence:

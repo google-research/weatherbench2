@@ -42,6 +42,32 @@ def select_hour(ds: xr.Dataset, hour: int) -> xr.Dataset:
   return ds
 
 
+def make_probabilistic_climatology(
+    ds: xr.Dataset, start_year: int, end_year: int, hour_interval: int
+) -> xr.Dataset:
+  """Stack years as ensemble. Day 366 will only contain data for leap years."""
+  hours = np.arange(0, 24, hour_interval)
+  years = np.arange(start_year, end_year + 1)
+  out = []
+  for hour in hours:
+    datasets = []
+    for year in years:
+      tmp = ds.isel(time=ds.time.dt.hour == hour).sel(time=str(year))
+      tmp = tmp.assign_coords(dayofyear=tmp.time.dt.dayofyear).swap_dims(
+          {'time': 'dayofyear'}
+      )
+      datasets.append(tmp)
+    ds_per_hour = xr.concat(
+        datasets,
+        dim=xr.DataArray(
+            np.arange(len(years)), coords={'number': np.arange(len(years))}
+        ),
+    )
+    out.append(ds_per_hour)
+  out = xr.concat(out, dim=xr.DataArray(hours, dims=['hour']))
+  return out
+
+
 def create_window_weights(window_size: int) -> xr.DataArray:
   """Create linearly decaying window weights."""
   assert window_size % 2 == 1, 'Window size must be odd.'

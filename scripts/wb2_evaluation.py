@@ -68,6 +68,18 @@ EVALUATE_CLIMATOLOGY = flags.DEFINE_bool(
     False,
     'Evaluate climatology forecast specified in climatology path',
 )
+EVALUATE_PROBABILISTIC_CLIMATOLOGY = flags.DEFINE_bool(
+    'evaluate_probabilistic_climatology', False, ''
+)
+PROBABILISTIC_CLIMATOLOGY_START_YEAR = flags.DEFINE_integer(
+    'probabilistic_climatology_start_year', None, ''
+)
+PROBABILISTIC_CLIMATOLOGY_END_YEAR = flags.DEFINE_integer(
+    'probabilistic_climatology_end_year', None, ''
+)
+PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL = flags.DEFINE_integer(
+    'probabilistic_climatology_hour_interval', 6, ''
+)
 ADD_LAND_REGION = flags.DEFINE_bool(
     'add_land_region',
     False,
@@ -293,6 +305,10 @@ def main(_: t.Sequence[str]) -> None:
           },
           against_analysis=False,
           derived_variables=derived_variables,
+          evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
+          probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
+          probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
+          probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
       ),
       'ensemble_forecast_vs_era_experimental_metrics': EvalConfig(
           metrics={

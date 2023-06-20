@@ -67,6 +67,10 @@ class EvalConfig:
   ] = None
   evaluate_persistence: t.Optional[bool] = False
   evaluate_climatology: t.Optional[bool] = False
+  evaluate_probabilistic_climatology: t.Optional[bool] = False
+  probabilistic_climatology_start_year: t.Optional[int] = None
+  probabilistic_climatology_end_year: t.Optional[int] = None
+  probabilistic_climatology_hour_interval: t.Optional[int] = None
   against_analysis: t.Optional[bool] = False
   derived_variables: list[DerivedVariable] = dataclasses.field(
       default_factory=list

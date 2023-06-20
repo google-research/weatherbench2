@@ -45,6 +45,27 @@ class UtilsTest(absltest.TestCase):
     )
     xarray.testing.assert_allclose(explicit, fast)
 
+  def testProbabilisticClimatology(self):
+    truth = schema.mock_truth_data(
+        variables_3d=[],
+        variables_2d=['2m_temperature'],
+        time_start='2000-01-01',
+        time_stop='2005-01-01',
+        time_resolution='6h',
+        spatial_resolution_in_degrees=90,
+    ).drop('level')
+    clim = utils.make_probabilistic_climatology(
+        truth, start_year=2000, end_year=2004, hour_interval=6
+    )
+    expected_sizes = {
+        'latitude': 3,
+        'longitude': 4,
+        'dayofyear': 366,
+        'hour': 4,
+        'number': 5,
+    }
+    self.assertEqual(clim['2m_temperature'].sizes, expected_sizes)
+
 
 if __name__ == '__main__':
   absltest.main()
