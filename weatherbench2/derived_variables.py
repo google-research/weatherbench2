@@ -15,12 +15,11 @@
 # pyformat: mode=pyink
 """Classes for computing derived variables dynamically for evaluation."""
 import dataclasses
+import typing as t
 
 import numpy as np
+from weatherbench2 import schema
 import xarray as xr
-
-
-_EARTH_RADIUS_KM = 6378
 
 
 @dataclasses.dataclass
@@ -102,28 +101,40 @@ class PrecipitationAccumulation(DerivedVariable):
 
 
 @dataclasses.dataclass
-class ZonalPowerSpectrum(DerivedVariable):
-  """Power spectrum along zonal direction.
+class ZonalEnergySpectrum(DerivedVariable):
+  """Energy spectrum along the zonal direction.
 
-  Given dataset with longitude dimension, this class computes spectral power as
-  a function of wavenumber and frequency. Only non-negative frequencies are
-  included (with units of "1 / km").
+  Given dataset with longitude dimension, this class computes spectral energy as
+  a function of wavenumber (as a dim). wavelength and frequency are also present
+  as coords with units "1 / m" and "m" respectively. Only non-negative
+  frequencies are included.
 
-  At latitude α, where the circle of latitude has radius
-  R(α) = R₀ Cos(α π / 180), the kth wavenumber corresponds to frequency
-    f(k, α) = 1 / (2π R(α) longitude[k] / 360)
+  Let f[l], l = 0,..., L - 1, be dataset values along a zonal circle of constant
+  latitude, with circumference C (m).  The DFT is
+    F[k] = (1 / L) Σₗ f[l] exp(-i2πkl/L)
+  The energy spectrum is then set to
+    S[0] = C |F[0]|²,
+    S[k] = 2 C |F[k]|², k > 0, to account for positive and negative frequencies.
 
-  Here, the DFT of a signal x[n], n = 0,..., N-1 is computed as
-    X[k] = (1 / N) Σₙ x[n] exp(-2πink/N)
-  The power spectrum is then
-    S[0] = |X[0]|²,
-    S[k] = 2 |X[k]|², k > 0, to account for positive and negative frequencies.
+  With C₀ the equatorial circumference, the ith zonal circle has circumference
+    C(i) = C₀ Cos(π latitude[i] / 180).
+  Since data points occur at longitudes longitude[l], l = 0, ..., L - 1, the DFT
+  will measure spectra at zonal sampling frequencies
+    f(k, i) = longitude[k] / (C(i) 360), k = 0, ..., L // 2,
+  and corresponding wavelengths
+    λ(k, i) = 1 / f(k, i).
 
-  This choice of normalization ensures that spectrum viewed as a function of
-  frequency f(k, α) (see above) is independent of discretization N (up to
-  discretization error, so long as N is high enough that f(k, α) can be
-  resolved). If power spectral *density* is desired, the user should divide S[k]
-  by the difference f(k, α) - f(k - 1, α).
+  This choice of normalization ensures Parseval's relation for energy holds:
+  Supposing f[l] are sampled values of f(ℓ), where 0 < ℓ < C (meters) is a
+  coordinate on the circle. Then (C / L) is the spacing of longitudinal samples,
+  whence
+    ∫|f(ℓ)|² dℓ ≈ (C / L) Σₗ |f[l]|² = Σₖ S[k].
+
+  If f has units β, then S has units of m β². For example, if f is
+  `u_component_of_wind`, with units (m / s), then S has units (m³ / s²). In
+  air with mass density ρ (kg / m³), this gives energy density at wavenumber k
+    ρ S[k] ~ (kg / m³) (m³ / s²) = kg / s²,
+  which is energy density (per unit area).
 
   Attributes:
     variable_name: Name to use as base and also store output in.
@@ -135,20 +146,23 @@ class ZonalPowerSpectrum(DerivedVariable):
   def base_variables(self) -> list[str]:
     return [self.variable_name]
 
-  def _lon_spacing_km(self, dataset: xr.Dataset) -> xr.DataArray:
-    """Spacing between longitudinal values in `dataset`."""
-    circum_at_equator = 2 * np.pi * _EARTH_RADIUS_KM
-    circum_at_lat = np.cos(dataset.latitude * np.pi / 180) * circum_at_equator
+  def _circumference(self, dataset: xr.Dataset) -> xr.DataArray:
+    """Earth's circumference as a function of latitude."""
+    circum_at_equator = 2 * np.pi * schema.EARTH_RADIUS_M
+    return np.cos(dataset.latitude * np.pi / 180) * circum_at_equator
+
+  def lon_spacing_m(self, dataset: xr.Dataset) -> xr.DataArray:
+    """Spacing (meters) between longitudinal values in `dataset`."""
     diffs = dataset.longitude.diff('longitude')
     if np.max(np.abs(diffs - diffs[0])) > 1e-3:
       raise ValueError(
           f'Expected uniform longitude spacing. {dataset.longitude.values=}'
       )
-    return circum_at_lat * diffs[0].data / 360
+    return self._circumference(dataset) * diffs[0].data / 360
 
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
     """Computes zonal power at wavenumber and frequency."""
-    spacing = self._lon_spacing_km(dataset)
+    spacing = self.lon_spacing_m(dataset)
 
     def simple_power(f_x):
       f_k = np.fft.rfft(f_x, axis=-1, norm='forward')
@@ -164,19 +178,78 @@ class ZonalPowerSpectrum(DerivedVariable):
         output_core_dims=[['longitude']],
         exclude_dims={'longitude'},
     ).rename_dims(
-        {'longitude': 'wavenumber'}
+        {'longitude': 'zonal_wavenumber'}
     )[self.variable_name]
     spectrum = spectrum.assign_coords(
-        wavenumber=('wavenumber', spectrum.wavenumber.data)
+        zonal_wavenumber=('zonal_wavenumber', spectrum.zonal_wavenumber.data)
     )
     base_frequency = xr.DataArray(
         np.fft.rfftfreq(len(dataset.longitude)),
-        dims='wavenumber',
-        coords={'wavenumber': spectrum.wavenumber},
+        dims='zonal_wavenumber',
+        coords={'zonal_wavenumber': spectrum.zonal_wavenumber},
     )
     spectrum = spectrum.assign_coords(frequency=base_frequency / spacing)
-    spectrum['frequency'] = spectrum.frequency.assign_attrs(units='1 / km')
-    return spectrum
+    spectrum['frequency'] = spectrum.frequency.assign_attrs(units='1 / m')
+
+    spectrum = spectrum.assign_coords(wavelength=1 / spectrum.frequency)
+    spectrum['wavelength'] = spectrum.wavelength.assign_attrs(units='m')
+
+    # This last step ensures the sum of spectral components is equal to the
+    # (discrete) integral of data around a line of latitude.
+    return spectrum * self._circumference(spectrum)
+
+
+def interpolate_spectral_frequencies(
+    spectrum: xr.DataArray,
+    wavenumber_dim: str,
+    frequencies: t.Optional[t.Sequence[float]] = None,
+    method: str = 'linear',
+    **interp_kwargs: t.Optional[dict[str, t.Any]],
+) -> xr.DataArray:
+  """Interpolate frequencies in `spectrum` to common values.
+
+  Args:
+    spectrum: Data as produced by ZonalEnergySpectrum.compute.
+    wavenumber_dim: Dimension that indexes wavenumber, e.g. 'zonal_wavenumber'
+      if `spectrum` is produced by ZonalEnergySpectrum.
+    frequencies: Optional 1-D sequence of frequencies to interpolate to. By
+      default, use the most narrow range of frequencies in `spectrum`.
+    method: Interpolation method passed on to DataArray.interp.
+    **interp_kwargs: Additional kwargs passed on to DataArray.interp.
+
+  Returns:
+    New DataArray with dimension "frequency" replacing the "wavenumber" dim in
+      `spectrum`.
+  """
+
+  if set(spectrum.frequency.dims) != set((wavenumber_dim, 'latitude')):
+    raise ValueError(
+        f'{spectrum.frequency.dims=} was not a permutation of '
+        f'("{wavenumber_dim}", "latitude")'
+    )
+
+  if frequencies is None:
+    freq_min = spectrum.frequency.max('latitude').min(wavenumber_dim).data
+    freq_max = spectrum.frequency.min('latitude').max(wavenumber_dim).data
+    frequencies = np.linspace(
+        freq_min, freq_max, num=spectrum.sizes[wavenumber_dim]
+    )
+  frequencies = np.asarray(frequencies)
+  if frequencies.ndim != 1:
+    raise ValueError(f'Expected 1-D frequencies, found {frequencies.shape=}')
+
+  def interp_at_one_lat(da: xr.DataArray) -> xr.DataArray:
+    da = (
+        da.swap_dims({wavenumber_dim: 'frequency'})
+        .drop_vars(wavenumber_dim)
+        .interp(frequency=frequencies, method=method, **interp_kwargs)
+    )
+    # Interp didn't deal well with the infinite wavelength, so just reset λ as..
+    da['wavelength'] = 1 / da.frequency
+    da['wavelength'] = da['wavelength'].assign_attrs(units='m')
+    return da
+
+  return spectrum.groupby('latitude').apply(interp_at_one_lat)
 
 
 @dataclasses.dataclass

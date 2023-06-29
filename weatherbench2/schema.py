@@ -55,6 +55,10 @@ ALL_3D_VARIABLES = (
 ALL_2D_VARIABLES = ('2m_temperature',)
 
 
+# Mean of equitorial and polar radius
+EARTH_RADIUS_M = 1000 * (6357 + 6378) / 2
+
+
 def mock_truth_data(
     *,
     variables_3d: abc.Sequence[str] = ALL_3D_VARIABLES,

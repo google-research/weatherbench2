@@ -13,13 +13,13 @@
 # limitations under the License.
 # ==============================================================================
 # pyformat: mode=pyink
-"""Compute ZonalPowerSpectrum derived variables."""
+"""Compute ZonalEnergySpectrum derived variables."""
 import typing as t
 
 from absl import app
 from absl import flags
 import apache_beam as beam
-from weatherbench2.derived_variables import ZonalPowerSpectrum  # pylint: disable=g-line-too-long,g-multiple-import
+from weatherbench2.derived_variables import ZonalEnergySpectrum  # pylint: disable=g-line-too-long,g-multiple-import
 import xarray as xr
 import xarray_beam as xbeam
 
@@ -77,7 +77,7 @@ RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 def _make_derived_variables_ds(
     source: xr.Dataset,
-    derived_variables: t.Sequence[ZonalPowerSpectrum],
+    derived_variables: t.Sequence[ZonalEnergySpectrum],
 ) -> xr.Dataset:
   """Dataset with power spectrum for BASE_VARIABLES before averaging."""
   arrays = []
@@ -90,7 +90,7 @@ def _make_derived_variables_ds(
 
 def _make_template(
     source: xr.Dataset,
-    derived_variables: t.Sequence[ZonalPowerSpectrum],
+    derived_variables: t.Sequence[ZonalEnergySpectrum],
 ) -> xr.DataArray:
   """Makes a template with shape equivalent to making derived ds on source."""
   # Shorten source along these dims.
@@ -124,7 +124,7 @@ def _output_dims(source: xr.Dataset, include_averaging_dims: bool) -> list[str]:
   dims = []
   for d in source.dims:
     if d == 'longitude':
-      dims.append('wavenumber')
+      dims.append('zonal_wavenumber')
     elif include_averaging_dims or d not in AVERAGING_DIMS.value:
       dims.append(d)
   return dims
@@ -150,7 +150,7 @@ def _strip_offsets(
 
 def main(_: t.Sequence[str]) -> None:
   derived_variables = [
-      ZonalPowerSpectrum(varname) for varname in BASE_VARIABLES.value
+      ZonalEnergySpectrum(varname) for varname in BASE_VARIABLES.value
   ]
 
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
@@ -160,7 +160,7 @@ def main(_: t.Sequence[str]) -> None:
   }
   output_chunks = {}
   for d in _output_dims(source_dataset, include_averaging_dims=False):
-    if d == 'wavenumber':
+    if d == 'zonal_wavenumber':
       output_chunks[d] = source_chunks['longitude']
     else:
       output_chunks[d] = source_chunks[d]

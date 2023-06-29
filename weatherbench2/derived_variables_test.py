@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+import typing as t
+
 from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
@@ -19,7 +21,7 @@ from weatherbench2 import derived_variables
 from weatherbench2 import schema
 from weatherbench2 import test_utils
 from weatherbench2 import utils
-from weatherbench2.derived_variables import WindSpeed, PrecipitationAccumulation, AggregatePrecipitationAccumulation, ZonalPowerSpectrum  # pylint: disable=g-multiple-import
+from weatherbench2.derived_variables import WindSpeed, PrecipitationAccumulation, AggregatePrecipitationAccumulation, ZonalEnergySpectrum  # pylint: disable=g-multiple-import
 import xarray as xr
 
 
@@ -41,6 +43,42 @@ def get_random_weather(
       ),
       seed=seed + 1,
   )
+
+
+def make_multispectral_dataset(
+    spatial_resolution_in_degrees: int = 5,
+    latitude: t.Optional[int | t.Sequence[int]] = None,
+    min_wavelength_lon: int = 50,
+    max_wavelength_lon: int = 100,
+    constant_to_add: float = 0,
+    seed: int = 802701,
+):
+  """Makes a dataset with smooth (in spectral space) data."""
+  # Initialize dataset without random noise, so we can insert smooth
+  # functions of lat/lon consistently for different resolutions.
+  dataset = 0 * get_random_weather(
+      variables=['geopotential'],
+      ensemble_size=None,
+      spatial_resolution_in_degrees=spatial_resolution_in_degrees,
+      seed=seed,
+  )
+  if latitude is not None:
+    dataset = dataset.sel(latitude=latitude)
+  # Add signal at the many wavelengths to create a smooth spectra
+  # Ensure all are long enough for this spatial resolution to resolve
+  assert spatial_resolution_in_degrees < min_wavelength_lon / 2
+  n_signals = 100
+  for wavelength_lon in np.linspace(
+      min_wavelength_lon, max_wavelength_lon, num=n_signals
+  ):
+    dataset['geopotential'] += (
+        np.cos(2 * np.pi * dataset.longitude / wavelength_lon)
+        * np.exp(-wavelength_lon / max_wavelength_lon)
+        * np.sin(dataset['level'] / 500)
+        * np.cos(dataset['latitude'] / 100)
+    ) / n_signals
+  dataset += constant_to_add * np.abs(dataset).mean()
+  return dataset
 
 
 class DerivedVariablesTest(absltest.TestCase):
@@ -132,49 +170,73 @@ class DerivedVariablesTest(absltest.TestCase):
     xr.testing.assert_allclose(result, expected)
 
 
-class ZonalPowerSpectrumTest(parameterized.TestCase):
+class ZonalEnergySpectrumTest(parameterized.TestCase):
 
-  def _wavelength_km(self, wavelength_lon: float, latitude: float) -> float:
-    """Wavelength in km from wavelength in longitude units."""
-    return (wavelength_lon / 360) * (
-        2 * np.pi * derived_variables._EARTH_RADIUS_KM
-    ) * np.cos(np.pi * latitude / 180)
+  def _wavelength_m(self, wavelength_lon: float, latitude: float) -> float:
+    """Wavelength in m from wavelength in longitude units."""
+    return (
+        (wavelength_lon / 360)
+        * (2 * np.pi * schema.EARTH_RADIUS_M)
+        * np.cos(np.pi * latitude / 180)
+    )
+
+  def test_lon_spacing_m_correct_at_equator(self):
+    spatial_resolution_in_degrees = 30
+    dataset = get_random_weather(
+        variables=['geopotential'],
+        spatial_resolution_in_degrees=spatial_resolution_in_degrees,
+    )
+    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+    circum_at_equator = schema.EARTH_RADIUS_M * 2 * np.pi
+    np.testing.assert_allclose(
+        derived_variable._circumference(dataset).sel(latitude=0).data,
+        circum_at_equator,
+    )
+    np.testing.assert_allclose(
+        derived_variable.lon_spacing_m(dataset).sel(latitude=0).data,
+        circum_at_equator * spatial_resolution_in_degrees / 360,
+    )
 
   def test_data_has_right_shape_and_dims(self):
     dataset = get_random_weather(variables=['geopotential'], ensemble_size=None)
-    spectrum = ZonalPowerSpectrum(
+    spectrum = ZonalEnergySpectrum(
         variable_name='geopotential',
     ).compute(dataset)
 
     # 'longitude' gets changed to 'wavenumber', whose length is shorter (as we
     # store only the positive frequencies).
     expected_dims = dict(dataset.dims)
-    expected_dims['wavenumber'] = dataset.dims['longitude'] // 2 + 1
+    expected_dims['zonal_wavenumber'] = dataset.dims['longitude'] // 2 + 1
     del expected_dims['longitude']
     spectrum_dims = dict(zip(spectrum.dims, spectrum.shape))
     self.assertEqual(expected_dims, spectrum_dims)
 
     # A new coordinate is 'frequency'
-    self.assertEqual(('wavenumber', 'latitude'), spectrum.frequency.dims)
-    self.assertEqual('1 / km', spectrum.frequency.units)
+    self.assertEqual(('zonal_wavenumber', 'latitude'), spectrum.frequency.dims)
+    self.assertEqual('1 / m', spectrum.frequency.units)
 
     # Frequency is increasing along wavenumber direction.
-    test_utils.assert_positive(spectrum.frequency.diff('wavenumber'))
+    test_utils.assert_positive(spectrum.frequency.diff('zonal_wavenumber'))
+    np.testing.assert_array_equal(
+        0, spectrum.frequency.isel(zonal_wavenumber=0)
+    )
 
-    np.testing.assert_array_equal(0, spectrum.frequency.isel(wavenumber=0))
+    # Wavelength is equal to 1 / frequency
+    np.testing.assert_array_equal(spectrum.wavelength, 1 / spectrum.frequency)
+    self.assertEqual('m', spectrum.wavelength.units)
 
     # Along the latitude direction, the smaller slice radius means frequency is
     # increasing, except of course the starting frequency which is always 0.
     lat_mid_idx = spectrum_dims['latitude'] // 2
     test_utils.assert_positive(
         spectrum.frequency.isel(
-            wavenumber=slice(1, None), latitude=slice(lat_mid_idx, None)
+            zonal_wavenumber=slice(1, None), latitude=slice(lat_mid_idx, None)
         ).diff('latitude'),
         err_msg='Implies frequency not increasing along latitude',
     )
     test_utils.assert_negative(
         spectrum.frequency.isel(
-            wavenumber=slice(1, None), latitude=slice(0, lat_mid_idx)
+            zonal_wavenumber=slice(1, None), latitude=slice(0, lat_mid_idx)
         ).diff('latitude'),
         err_msg='Implies frequency not decreasing along latitude',
     )
@@ -197,19 +259,23 @@ class ZonalPowerSpectrumTest(parameterized.TestCase):
     dataset['geopotential'] += 10 * np.cos(
         2 * np.pi * dataset.longitude / wavelength_lon
     )
-    spectrum = ZonalPowerSpectrum(variable_name='geopotential').compute(dataset)
+    spectrum = ZonalEnergySpectrum(variable_name='geopotential').compute(
+        dataset
+    )
 
-    wavelength_km = self._wavelength_km(wavelength_lon, latitude)
+    wavelength_m = self._wavelength_m(wavelength_lon, latitude)
 
     # Assert there is a spectral peak at the expected frequency, which is
-    # = 1 / wavelength_km.
+    # = 1 / wavelength_m.
     np.testing.assert_array_equal(
-        spectrum.argmax('wavenumber'),
-        np.abs(spectrum.frequency - 1 / wavelength_km).argmin('wavenumber'),
+        spectrum.argmax('zonal_wavenumber'),
+        np.abs(spectrum.frequency - 1 / wavelength_m).argmin(
+            'zonal_wavenumber'
+        ),
     )
 
   @parameterized.named_parameters(
-      # Since frequency 0 is treated special (we double its value in the power
+      # Since frequency 0 is treated special (we double its value in the energy
       # spectrum), test adding a constant to the values specially.
       dict(testcase_name='NoAddConstant', add_constant=False),
       dict(testcase_name='YesAddConstant', add_constant=True),
@@ -217,8 +283,6 @@ class ZonalPowerSpectrumTest(parameterized.TestCase):
   def test_resolved_frequencies_are_mostly_independent_of_discretization(
       self, add_constant
   ):
-    np.random.seed(802701)
-
     # Confine the wave to a single latitude, so we can use frequency as a
     # dimension to select with.
     latitude = 30
@@ -227,45 +291,35 @@ class ZonalPowerSpectrumTest(parameterized.TestCase):
     min_wavelength_lon = 50
     max_wavelength_lon = 100
 
-    def compute_frequency_spectrum(spatial_resolution_in_degrees):
-      """Compute spectrum with 'frequency' as a dim."""
-      # Initialize dataset without random noise, so we can insert smooth
-      # functions of lat/lon consistently for different resolutions.
-      dataset = 0 * get_random_weather(
-          variables=['geopotential'],
-          ensemble_size=None,
-          spatial_resolution_in_degrees=spatial_resolution_in_degrees,
-      ).sel(
-          latitude=latitude,
-      )
-      # Add signal at the many wavelengths to create a smooth spectra
-      # Ensure all are long enough for this spatial resolution to resolve
-      assert spatial_resolution_in_degrees < min_wavelength_lon / 2
-      n_signals = 100
-      for wavelength_lon in np.linspace(
-          min_wavelength_lon, max_wavelength_lon, num=n_signals
-      ):
-        dataset['geopotential'] += (
-            np.cos(2 * np.pi * dataset.longitude / wavelength_lon)
-            * np.exp(-wavelength_lon / max_wavelength_lon)
-            * np.sin(dataset['level'] / 500)
-        ) / n_signals
-      if add_constant:
-        dataset += 50 * np.abs(dataset).mean()
-      return (
-          ZonalPowerSpectrum(variable_name='geopotential')
-          .compute(dataset)
-          .swap_dims({'wavenumber': 'frequency'})
-      )
+    dataset_5 = make_multispectral_dataset(
+        spatial_resolution_in_degrees=5,
+        latitude=latitude,
+        min_wavelength_lon=min_wavelength_lon,
+        max_wavelength_lon=max_wavelength_lon,
+        constant_to_add=50 if add_constant else 0,
+    )
+    dataset_20 = make_multispectral_dataset(
+        spatial_resolution_in_degrees=20,
+        latitude=latitude,
+        min_wavelength_lon=min_wavelength_lon,
+        max_wavelength_lon=max_wavelength_lon,
+        constant_to_add=50 if add_constant else 0,
+    )
 
-    spectrum_5 = compute_frequency_spectrum(spatial_resolution_in_degrees=5)
-    spectrum_20 = compute_frequency_spectrum(spatial_resolution_in_degrees=20)
+    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+
+    spectrum_5 = derived_variable.compute(dataset_5).swap_dims(
+        {'zonal_wavenumber': 'frequency'}
+    )
+    spectrum_20 = derived_variable.compute(dataset_20).swap_dims(
+        {'zonal_wavenumber': 'frequency'}
+    )
 
     # Test around the wavelengths we've added signal at, but not at the
     # boundary, since we expect boundary effects.
     test_frequencies = sorted(
         1
-        / self._wavelength_km(
+        / self._wavelength_m(
             np.random.uniform(
                 low=1.1 * min_wavelength_lon,
                 high=0.9 * max_wavelength_lon,
@@ -305,6 +359,126 @@ class ZonalPowerSpectrumTest(parameterized.TestCase):
           expected_err_bound.data,
           err_msg=f'Failed at {i=} {f=}',
       )
+
+  @parameterized.named_parameters(
+      # Since frequency 0 is treated special (we double its value in the energy
+      # spectrum), test adding a constant to the values specially.
+      dict(testcase_name='NoAddConstant', add_constant=False),
+      dict(testcase_name='YesAddConstant', add_constant=True),
+  )
+  def test_parsevals_relation(self, add_constant):
+    dataset = make_multispectral_dataset(
+        spatial_resolution_in_degrees=5,
+        latitude=slice(-30, 30),
+        constant_to_add=50 if add_constant else 0,
+    )
+
+    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+
+    energy = (
+        (derived_variable.lon_spacing_m(dataset) * dataset**2)
+        .sum('longitude')
+        .geopotential
+    )
+
+    spectrum = derived_variable.compute(dataset)
+    spectral_energy = spectrum.sum('zonal_wavenumber')
+
+    xr.testing.assert_allclose(
+        spectral_energy.transpose(*energy.dims), energy, rtol=2e-3
+    )
+
+  def test_interpolate_frequencies_default_args(self):
+    dataset = make_multispectral_dataset(
+        spatial_resolution_in_degrees=5,
+        latitude=slice(-30, 30),
+    )
+    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+    spectrum = derived_variable.compute(dataset)
+
+    interpolated = derived_variables.interpolate_spectral_frequencies(
+        spectrum, wavenumber_dim='zonal_wavenumber')
+
+    self.assertEqual(
+        {'frequency'} | set(spectrum.dims) - {'zonal_wavenumber'},
+        set(interpolated.dims),
+    )
+
+    # Since we had a latitude=0 point, and all frequencies started at 0, this
+    # point must have the most narrow frequency range, which will be used as the
+    # default.  In fact, all data at this range should be unchanged.
+    xr.testing.assert_allclose(
+        spectrum.sel(latitude=0)
+        .swap_dims({'zonal_wavenumber': 'frequency'})
+        .drop_vars('zonal_wavenumber'),
+        interpolated.sel(latitude=0),
+    )
+
+    # Results at latitude = +- 5 deg should be barely changed.
+    xr.testing.assert_allclose(
+        spectrum.sel(latitude=5)
+        .swap_dims({'zonal_wavenumber': 'frequency'})
+        .drop_vars('zonal_wavenumber'),
+        interpolated.sel(latitude=5),
+        rtol=0.15,
+    )
+
+    # Check wavelength
+    np.testing.assert_allclose(
+        interpolated.wavelength, 1 / interpolated.frequency
+    )
+    self.assertEqual(interpolated.wavelength.units, 'm')
+
+  def test_interpolate_frequencies_use_5_degree_values(self):
+    dataset = make_multispectral_dataset(
+        spatial_resolution_in_degrees=1.0,
+        latitude=slice(-30, 30),
+    )
+    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+    spectrum = derived_variable.compute(dataset)
+
+    reference_lat = 5
+    reference_wavenumbers = slice(3, 8)
+
+    interpolated = derived_variables.interpolate_spectral_frequencies(
+        spectrum,
+        wavenumber_dim='zonal_wavenumber',
+        frequencies=spectrum.frequency.sel(
+            latitude=reference_lat, zonal_wavenumber=reference_wavenumbers
+        ),
+    )
+
+    self.assertEqual(
+        {'frequency'} | set(spectrum.dims) - {'zonal_wavenumber'},
+        set(interpolated.dims),
+    )
+
+    # At the reference latitude point, data should be unchanged.
+    xr.testing.assert_allclose(
+        spectrum.sel(
+            latitude=reference_lat, zonal_wavenumber=reference_wavenumbers
+        )
+        .swap_dims({'zonal_wavenumber': 'frequency'})
+        .drop_vars('zonal_wavenumber'),
+        interpolated.sel(latitude=reference_lat),
+    )
+
+    # Results at reference_latitude = +- 1 deg should be barely changed.
+    xr.testing.assert_allclose(
+        spectrum.sel(
+            latitude=reference_lat + 1, zonal_wavenumber=reference_wavenumbers
+        )
+        .swap_dims({'zonal_wavenumber': 'frequency'})
+        .drop_vars('zonal_wavenumber'),
+        interpolated.sel(latitude=reference_lat + 1),
+        rtol=0.1,
+    )
+
+    # Check wavelength
+    np.testing.assert_allclose(
+        interpolated.wavelength, 1 / interpolated.frequency
+    )
+    self.assertEqual(interpolated.wavelength.units, 'm')
 
 
 if __name__ == '__main__':
