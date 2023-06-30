@@ -38,10 +38,10 @@ class Selection:
   time_slice: slice
   levels: t.Optional[t.Sequence[int]] = None
   lat_slice: t.Optional[slice] = dataclasses.field(
-      default_factory=lambda: slice(None, None)
+    default_factory=lambda: slice(None, None)
   )
   lon_slice: t.Optional[slice] = dataclasses.field(
-      default_factory=lambda: slice(None, None)
+    default_factory=lambda: slice(None, None)
   )
 
 
