@@ -58,8 +58,12 @@ class Region:
 class SliceRegion(Region):
   """Latitude-longitude box selection."""
 
-  lat_slice: t.Optional[t.Union[slice, list[slice]]] = slice(None, None)
-  lon_slice: t.Optional[t.Union[slice, list[slice]]] = slice(None, None)
+  lat_slice: t.Optional[t.Union[slice, list[slice]]] = dataclasses.field(
+      default_factory=lambda: slice(None, None)
+  )
+  lon_slice: t.Optional[t.Union[slice, list[slice]]] = dataclasses.field(
+      default_factory=lambda: slice(None, None)
+  )
 
   def apply(
       self, dataset: xr.Dataset, weights: xr.DataArray
