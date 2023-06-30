@@ -22,7 +22,7 @@ base_requires = [
     'scipy',
     'zarr',
     'xarray',
-    'pandas==1.1.5',
+    'pandas<1.4',
     'xarray-beam',
     'scipy',
 ]
