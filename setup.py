@@ -24,6 +24,7 @@ base_requires = [
     'xarray',
     'pandas',
     'xarray-beam',
+    'scipy',
 ]
 # TODO(b/286936524): Set up docs soon...
 docs_requires = [
