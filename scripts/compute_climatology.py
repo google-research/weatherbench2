@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""CLI to compute and save climatology."""
+r"""CLI to compute and save climatology.
+
+Example Usage:
+  ```
+  export BUCKET=my-bucket
+  python scripts/compute_climatology.py \
+    --input_path='gs://weatherbench2/datasets/era5/1959-2022-full_37-1h-0p25deg-chunk-1.zarr-v2' \
+    --output_path='gs://$BUCKET/datasets/ear5-hourly-climatology/1990-2019_6h_1440x721.zarr' \
+    --by_hour=False
+  ```
+"""
 
 import typing as t
 

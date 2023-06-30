@@ -12,7 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""CLI to compute and save climatology."""
+r"""CLI to compute and save climatology.
+
+Example Usage:
+  ```
+  export MODE=mean
+  export START_YEAR=1959
+  export END_YEAR=2015
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/compute_hourly_climatology_beam.py \
+    --mode=$MODE \
+    --start_year=$START_YEAR \
+    --end_year=$END_YEAR \
+    --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/clim_${MODE}_${START_YEAR}_to_${END_YEAR}_64x32_equiangular_conservative.zarr \
+    --working_chunks="level=1,longitude=4,latitude=4" \
+    --output_chunks="level=1,hour=3" \
+    --beam_runner=DataflowRunner \
+    -- \
+    --project $PROJECT \
+    --region $REGION \
+    --temp_location gs://$BUCKET/tmp/ \
+    --job_name compute-hourly-climatology-$USER
+  ```
+"""
 from collections import abc
 import functools
 
