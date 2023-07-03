@@ -118,7 +118,7 @@ def compute_relative_metrics(
 
   def relative_percent(fc, baseline, metric):
     fc = fc.where(fc.lead_time > np.timedelta64(0))
-    if metric == 'rmse':
+    if metric in ['rmse', 'seeps']:
       return (fc - baseline) / baseline * 100
     elif metric == 'acc':
       return (fc - baseline) / (1 - baseline) * 100
@@ -173,7 +173,7 @@ def plot_timeseries(
 
   for name, r in results.items():
     # Hack to get rid of climatology for relative and ACC plots
-    if (relative is not None or metric == 'acc') and (
+    if (relative is not None or metric in ['acc', 'spread/skill']) and (
         'climatology_' in name or 'persistence_' in name
     ):
       continue
@@ -185,6 +185,8 @@ def plot_timeseries(
     elif metric == 'spread/skill':
       da = compute_spread_skill_ratio(r[variable])
       ax.axhline(1, color='k')
+    elif metric == '1-seeps':
+      da = 1 - r[variable].sel(metric='seeps')
     else:
       da = r[variable].sel(metric=metric)
     if (
@@ -205,6 +207,7 @@ def plot_timeseries(
       da = da.sel(region=region)
     if 'climatology_' in name and average_climatology:
       da = da.mean()
+
     if 'lead_time' in da.coords:
       if metric == 'spread&skill':
         da.sel(metric='ensemble_mean_rmse').plot(
