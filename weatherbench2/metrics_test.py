@@ -340,5 +340,53 @@ class EnergyScoreTest(parameterized.TestCase):
     )
 
 
+class SEEPSTest(absltest.TestCase):
+
+  def testExpectedValues(self):
+    forecast = schema.mock_forecast_data(
+        variables_3d=[],
+        variables_2d=['total_precipitation_24hr'],
+        time_start='2022-01-01',
+        time_stop='2022-01-11',
+        lead_stop='0 day',
+    )
+    forecast = forecast.rename({'time': 'init_time'})
+    forecast.coords['valid_time'] = (
+        forecast.init_time + forecast.prediction_timedelta
+    )
+    truth = schema.mock_truth_data(
+        variables_3d=[],
+        variables_2d=['total_precipitation_24hr'],
+        time_start='2022-01-01',
+        time_stop='2022-01-11',
+    )
+    truth_like_forecast = truth.sel(time=forecast.valid_time)
+    climatology = truth.isel(time=0, drop=True).expand_dims(
+        dayofyear=366, hour=4
+    )
+    climatology['total_precipitation_24hr_seeps_dry_fraction'] = (
+        climatology['total_precipitation_24hr'] + 0.4
+    )
+    climatology['total_precipitation_24hr_seeps_threshold'] = (
+        climatology['total_precipitation_24hr'] + 1.0
+    )
+
+    seeps = metrics.SEEPS(climatology=climatology)
+
+    # Test that perfect forecast results in SEEPS = 0
+    result1 = seeps.compute(forecast, truth_like_forecast)
+    np.testing.assert_allclose(
+        result1['total_precipitation_24hr'].values, 0, atol=1e-4
+    )
+
+    # Test that obs_cat = dry and fc_cat = light = 1/p1 = 0.5 * 1 / 0.4 = 1.25
+    # This means the scoring matrix is correctly oriented
+    forecast = forecast + 0.5
+    result2 = seeps.compute(forecast, truth_like_forecast)
+    np.testing.assert_allclose(
+        result2['total_precipitation_24hr'].values, 1.25, atol=1e-4
+    )
+
+
 if __name__ == '__main__':
   absltest.main()

@@ -50,7 +50,7 @@ class DataConfig:
 
   selection: Selection
   paths: Paths
-  by_init: t.Optional[bool] = False
+  by_init: t.Optional[bool] = True
   rename_variables: t.Optional[dict[str, str]] = None
   pressure_level_suffixes: t.Optional[bool] = False
 
@@ -61,9 +61,7 @@ class EvalConfig:
 
   metrics: t.Dict[str, Metric]
   regions: t.Optional[
-      t.Dict[
-          str, t.Union[Region, ExtraTropicalRegion, SliceRegion, LandRegion]
-      ]
+      t.Dict[str, t.Union[Region, ExtraTropicalRegion, SliceRegion, LandRegion]]
   ] = None
   evaluate_persistence: t.Optional[bool] = False
   evaluate_climatology: t.Optional[bool] = False

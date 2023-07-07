@@ -593,8 +593,14 @@ class _EvaluateAllMetrics(beam.PTransform):
       forecast_pipeline = forecast_pipeline | 'TemporalMean' >> xbeam.Mean(
           dim='init_time' if by_init else 'time', fanout=self.fanout
       )
+
+    def log(x):
+      logging.info(f'Logging test {x}')
+      return x
+
     forecast_pipeline = (
         forecast_pipeline
+        | 'Log' >> beam.Map(log)
         | 'DropKey' >> beam.MapTuple(lambda k, v: v)
         | beam.combiners.ToList()
         | beam.Map(self._write_netcdf)

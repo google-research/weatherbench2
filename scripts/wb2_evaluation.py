@@ -22,7 +22,7 @@ from weatherbench2 import evaluation
 from weatherbench2 import flag_utils
 from weatherbench2.config import DataConfig, EvalConfig, Paths, Selection  # pylint: disable=g-multiple-import
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
-from weatherbench2.metrics import ACC, Bias, CRPS, CRPSSkill, CRPSSpread, EnergyScore, EnergyScoreSkill, EnergyScoreSpread, EnsembleMeanRMSE, EnsembleStddev, RMSE, MSE, SpatialBias, SpatialMSE, WindVectorRMSE  # pylint: disable=g-multiple-import,unused-import
+from weatherbench2.metrics import ACC, Bias, CRPS, CRPSSkill, CRPSSpread, EnergyScore, EnergyScoreSkill, EnergyScoreSpread, EnsembleMeanRMSE, EnsembleStddev, RMSE, MSE, SEEPS, SpatialBias, SpatialMSE, SpatialSEEPS, WindVectorRMSE  # pylint: disable=g-multiple-import,unused-import
 from weatherbench2.regions import SliceRegion, LandRegion  # pylint: disable=g-multiple-import
 import xarray as xr
 
@@ -87,6 +87,9 @@ ADD_LAND_REGION = flags.DEFINE_bool(
         'Add land-only evaluation. `land_sea_mask` must be in observation'
         'dataset.'
     ),
+)
+COMPUTE_SEEPS = flags.DEFINE_bool(
+    'compute_seeps', False, 'Compute SEEPS for total_precipitation_24hr.'
 )
 EVAL_CONFIGS = flags.DEFINE_string(
     'eval_configs',
@@ -254,6 +257,10 @@ def main(_: t.Sequence[str]) -> None:
       'mse': MSE(),
       'acc': ACC(climatology=climatology),
   }
+  spatial_metrics = {'bias': SpatialBias(), 'mse': SpatialMSE()}
+  if COMPUTE_SEEPS.value:
+    deterministic_metrics['seeps'] = SEEPS(climatology=climatology)
+    spatial_metrics['seeps'] = SpatialSEEPS(climatology=climatology)
 
   derived_variables = [
       DERIVED_VARIABLE_DICT[derived_variable]
@@ -270,7 +277,7 @@ def main(_: t.Sequence[str]) -> None:
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
       ),
       'deterministic_spatial': EvalConfig(
-          metrics={'bias': SpatialBias(), 'mse': SpatialMSE()},
+          metrics=spatial_metrics,
           against_analysis=False,
           derived_variables=derived_variables,
           evaluate_persistence=EVALUATE_PERSISTENCE.value,
