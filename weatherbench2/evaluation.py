@@ -450,6 +450,35 @@ def evaluate_in_memory(
 
 
 @dataclasses.dataclass
+class _SaveOutputs(beam.PTransform):
+  """Save outputs to Zarr or netCDF."""
+
+  eval_name: str
+  data_config: DataConfig
+
+  def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:
+    combined = xr.combine_by_coords(datasets)
+    output_path = _get_output_path(self.data_config, self.eval_name)
+    _to_netcdf(combined, output_path)
+
+  def expand(self, pcoll: beam.PCollection) -> beam.PCollection:
+    if self.data_config.paths.output_format == 'netcdf':
+      return (
+          pcoll
+          | 'DropKey' >> beam.MapTuple(lambda k, v: v)
+          | beam.combiners.ToList()
+          | beam.Map(self._write_netcdf)
+      )
+    elif self.data_config.paths.output_format == 'zarr':
+      output_path = _get_output_path(self.data_config, self.eval_name)
+      return pcoll | xbeam.ChunksToZarr(output_path)
+    else:
+      raise ValueError(
+          f'unrecogonized data format: {self.data_config.paths.output_format}'
+      )
+
+
+@dataclasses.dataclass
 class _EvaluateAllMetrics(beam.PTransform):
   """Evaluate a set of eval metrics using a Beam pipeline."""
 
@@ -472,11 +501,6 @@ class _EvaluateAllMetrics(beam.PTransform):
     dropped_dims = [dim for dim in key.offsets if dim not in results.dims]
     result_key = key.with_offsets(**{dim: None for dim in dropped_dims})
     return result_key, results
-
-  def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:
-    combined = xr.combine_by_coords(datasets)
-    output_path = _get_output_path(self.data_config, self.eval_name)
-    _to_netcdf(combined, output_path)
 
   def _sel_corresponding_truth_chunk(
       self, key: xbeam.Key, forecast_chunk: xr.Dataset, truth: xr.Dataset
@@ -594,16 +618,9 @@ class _EvaluateAllMetrics(beam.PTransform):
           dim='init_time' if by_init else 'time', fanout=self.fanout
       )
 
-    def log(x):
-      logging.info(f'Logging test {x}')
-      return x
-
     forecast_pipeline = (
         forecast_pipeline
-        | 'Log' >> beam.Map(log)
-        | 'DropKey' >> beam.MapTuple(lambda k, v: v)
-        | beam.combiners.ToList()
-        | beam.Map(self._write_netcdf)
+        | 'SaveOutputs' >> _SaveOutputs(self.eval_name, self.data_config)
     )
     return pcoll | forecast_pipeline
 

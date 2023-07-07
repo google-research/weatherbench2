@@ -41,6 +41,9 @@ class Paths:
   obs: str
   output_dir: str
   output_file_prefix: t.Optional[str] = ''
+  # output_format='zarr' is also supported, but may be buggy due to
+  # https://github.com/google/xarray-beam/issues/85
+  output_format: str = 'netcdf'
   climatology: t.Optional[str] = None
 
 
