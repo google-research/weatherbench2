@@ -16,6 +16,7 @@
 
 import dataclasses
 import typing as t
+from typing import Dict
 
 from weatherbench2.derived_variables import DerivedVariable
 from weatherbench2.metrics import Metric
@@ -29,8 +30,12 @@ class Selection:
   variables: t.Sequence[str]
   time_slice: slice
   levels: t.Optional[t.Sequence[int]] = None
-  lat_slice: t.Optional[slice] = slice(None, None)
-  lon_slice: t.Optional[slice] = slice(None, None)
+  lat_slice: t.Optional[slice] = dataclasses.field(
+      default_factory=lambda: slice(None, None)
+  )
+  lon_slice: t.Optional[slice] = dataclasses.field(
+      default_factory=lambda: slice(None, None)
+  )
 
 
 @dataclasses.dataclass
