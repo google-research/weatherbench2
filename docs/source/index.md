@@ -17,6 +17,7 @@ For WeatherBench 2 results, see the official website [LINK].
 :maxdepth: 1
 installation.md
 evaluation.ipynb
+init-vs-valid-time.md
 data-guide.ipynb
 command-line-scripts.md
 beam-in-the-cloud.md
