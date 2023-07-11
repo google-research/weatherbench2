@@ -1,6 +1,16 @@
+![logo](assets/wb2-logo-wide.png)
 # WeatherBench 2
 
-This repository contains the WeatherBench 2 evaluation code. The repository is currently work-in-progress and not yet ready for use.
+This repository contains the code for **WeatherBench 2: A benchmark for the next generation of data-driven global weather models**. 
+
+Paper: LINK
+Website with latest scores: LINK
+
+Here, you will find (almost) all code used to process the forecast and ground-truth data and compute the metrics shown in the paper and on the website. 
+
+Please refer to the documentation (LINK) for details on how to use the code.
+
+We welcome any feedback (via issues) or contributions (via pull requests). 
 
 ## License
 

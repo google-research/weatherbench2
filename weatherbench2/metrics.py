@@ -50,7 +50,7 @@ def _cell_area_from_latitude(points: np.ndarray) -> np.ndarray:
 
 
 def get_lat_weights(ds: xr.Dataset) -> xr.DataArray:
-  """Computes latitude weights from latitude coordinate of dataset."""
+  """Computes latitude/area weights from latitude coordinate of dataset."""
   weights = _cell_area_from_latitude(np.deg2rad(ds.latitude.data))
   weights /= np.mean(weights)
   weights = ds.latitude.copy(data=weights)
@@ -111,9 +111,9 @@ def _spatial_average(
   """Compute spatial average after applying region mask.
 
   Args:
-    dataset: Metric dataset as a function of latitude/longitude
-    region: Region object (optional)
-    skipna: Skip NaNs in spatial mean
+    dataset: Metric dataset as a function of latitude/longitude.
+    region: Region object (optional).
+    skipna: Skip NaNs in spatial mean.
 
   Returns:
     dataset: Spatially averaged metric.
@@ -129,12 +129,19 @@ def _spatial_average(
 def _spatial_average_l2_norm(
     dataset: xr.Dataset, region: t.Optional[Region] = None, skipna: bool = False
 ) -> xr.Dataset:
+  """Helper function to compute sqrt(spatial_average(ds**2))."""
   return np.sqrt(_spatial_average(dataset**2, region=region, skipna=skipna))
 
 
 @dataclasses.dataclass
 class WindVectorRMSE(Metric):
-  """Compute wind vector RMSE."""
+  """Compute wind vector RMSE. See WB2 paper for definition.
+
+  Attributes:
+    u_name: Name of U component.
+    v_name: Name of v component.
+    vector_name: Name of wind vector to be computed.
+  """
 
   u_name: str
   v_name: str
@@ -158,7 +165,12 @@ class WindVectorRMSE(Metric):
 
 @dataclasses.dataclass
 class RMSE(Metric):
-  """Root mean squared error."""
+  """Root mean squared error.
+
+  Attributes:
+    wind_vector_rmse: Optionally provide list of WindVectorRMSE instances to
+      compute.
+  """
 
   wind_vector_rmse: t.Optional[list[WindVectorRMSE]] = None
 
@@ -257,7 +269,11 @@ class SpatialBias(Metric):
 
 @dataclasses.dataclass
 class ACC(Metric):
-  """Anomaly correlation coefficient."""
+  """Anomaly correlation coefficient.
+
+  Attribute:
+    climatology: Climatology for computing anomalies.
+  """
 
   climatology: xr.Dataset
 
@@ -297,13 +313,13 @@ class SpatialSEEPS(Metric):
 
   Attributes:
     climatology: climatology dataset containing seeps_threshold [meters] and
-      seeps_dry_fraction [0-1] for given precip_name
+      seeps_dry_fraction [0-1] for given precip_name.
     dry_threshold_mm: Dry threhsold in mm, same as used to compute
-      climatological values
-    precip_name: Name of precipitation variable, e.g. total_precipitation_24hr
-    min_p1: Mask out values with smaller average dry fraction
-    max_p1: Mask out values with larger average dry fraction
-    p1: Average dry fraction
+      climatological values.
+    precip_name: Name of precipitation variable, e.g. total_precipitation_24hr.
+    min_p1: Mask out values with smaller average dry fraction.
+    max_p1: Mask out values with larger average dry fraction.
+    p1: Average dry fraction.
   """
 
   climatology: xr.Dataset

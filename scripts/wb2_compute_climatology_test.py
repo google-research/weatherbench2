@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 from absl.testing import absltest
-from weatherbench2.scripts.compute_climatology_beam import SEEPSThreshold
+from weatherbench2.scripts.wb2_compute_climatology import SEEPSThreshold
 import xarray as xr
 
 

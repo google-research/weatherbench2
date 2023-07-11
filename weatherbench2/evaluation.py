@@ -63,6 +63,7 @@ def _ensure_aligned_grid(
 
 
 def _ensure_nonempty(dataset: xr.Dataset, message: str = '') -> None:
+  """Make sure dataset is nonempty."""
   if not min(dataset.dims.values()):
     raise ValueError(f'`dataset` was empty: {dataset.dims=}.  {message}')
 
@@ -95,7 +96,22 @@ def open_source_files(
     rename_variables: Optional[dict[str, str]] = None,
     pressure_level_suffixes: bool = False,
 ) -> tuple[xr.Dataset, xr.Dataset]:
-  """Open forecast and ground obs Zarr files and slice them."""
+  """Open forecast and ground obs Zarr files and standardize them.
+
+  Args:
+    forecast_path: Path to forecast files.
+    obs_path: Path to groud-truth file.
+    by_init: Specifies whether forecast is in by-init or by-valid convention.
+    use_dask: Specifies whether to use dask to open Zarr store. Otherwise load
+      lazy numpy array.
+    rename_variables: Rename dimensions and variables according to given
+      dictionary.
+    pressure_level_suffixes: Whether to decide variables with pressure levels as
+      suffixes.
+
+  Returns:
+    (forecast, obs): Tuple containing forecast and ground-truth datasets.
+  """
   obs = xr.open_zarr(obs_path, chunks='auto' if (use_dask or by_init) else None)
   forecast = xr.open_zarr(
       forecast_path,
@@ -125,7 +141,7 @@ def _impose_data_selection(
     select_time: bool = True,
     time_dim: Optional[str] = None,
 ) -> xr.Dataset:
-  """Returns dataset slice according to selection."""
+  """Returns selection of dataset specified in Selection instance."""
   dataset = dataset[selection.variables].sel(
       latitude=selection.lat_slice,
       longitude=selection.lon_slice,
@@ -142,10 +158,20 @@ def create_persistence_forecast(
     forecast: xr.Dataset,
     obs: xr.Dataset,
 ) -> xr.Dataset:
-  """Create persistence forecast from observation with same shape as forecast."""
-  # TODO(srasp): Truth has already been sliced in time, same as
-  # forecast.time. However, init_time will go back further.
-  # For now, select only available times and raise warning.
+  """Create persistence forecast from observation with same shape as forecast.
+
+  Warning: For by-valid this is not 100% correct. Truth has already been sliced
+  in time, same as forecast.time. However, init_time will go back further. For
+  now, select only available times and raise warning.
+
+  Args:
+    forecast: Forecast dataset with dimensions init_time and lead_time.
+    obs: Ground-truth dataset with time dimensions.
+
+  Returns:
+    persistence_forecast: Ground-truth dataset at forecast initialization time
+    with same dimensions as forecast.
+  """
   logging.warning('by-valid with evaluate_persistence is not 100% correct.')
   init_time = forecast.init_time
   init_time = init_time.sel(
@@ -160,6 +186,7 @@ def create_persistence_forecast(
 
 
 def _unique_step_size(data: np.ndarray) -> Any:
+  """Ensure all lead time steps are the same."""
   if data.ndim != 1:
     raise ValueError(f'array has wrong number of dimensions: {data.ndim}')
   if len(data) < 2:
@@ -201,12 +228,12 @@ def _add_base_variables(
   """Add required base variables for computing derived variables.
 
   Args:
-    data_config: Raw data config
-    eval_config: Eval config that contains derived variable objects
+    data_config: Raw data config.
+    eval_config: Eval config that contains derived variable objects.
 
   Returns:
     data_config: Deepcopied data_config with base variables added and derived
-    variables removed from data.config.selection.variables
+      variables removed from data_config.selection.variables.
   """
   data_config = copy.deepcopy(data_config)
 
@@ -263,7 +290,17 @@ def open_forecast_and_truth_datasets(
     eval_config: EvalConfig,
     use_dask: bool = False,
 ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset | None]:
-  """Open and slice datasets."""
+  """Open datasets and select desired slices.
+
+  Args:
+    data_config: DataConfig instance.
+    eval_config: EvalConfig instance.
+    use_dask: Specifies whether to open datasets using dask.
+
+  Returns:
+    (forecast, truth, climatology): Tuple containing datasets. Climatology is
+      None if not in data_config.
+  """
   data_config = _add_base_variables(data_config, eval_config)
 
   logging.info('Loading data')
@@ -442,8 +479,8 @@ def evaluate_in_memory(
   ```
 
   Args:
-    data_config: DataConfig object
-    eval_configs: Dictionary of EvalConfig objects
+    data_config: DataConfig instance.
+    eval_configs: Dictionary of EvalConfig instances.
   """
   for eval_name, eval_config in eval_configs.items():
     _evaluate_all_metrics(eval_name, eval_config, data_config)
@@ -480,7 +517,15 @@ class _SaveOutputs(beam.PTransform):
 
 @dataclasses.dataclass
 class _EvaluateAllMetrics(beam.PTransform):
-  """Evaluate a set of eval metrics using a Beam pipeline."""
+  """Evaluate a set of eval metrics using a Beam pipeline.
+
+  Attributes:
+    eval_name: Name of evaluation.
+    eval_config: EvalCongig instance.
+    data_config: DataConfig instance.
+    input_chunks: Chunks to use for input files.
+    fanout: Fanout parameter for Beam combiners.
+  """
 
   eval_name: str
   eval_config: EvalConfig
@@ -618,9 +663,8 @@ class _EvaluateAllMetrics(beam.PTransform):
           dim='init_time' if by_init else 'time', fanout=self.fanout
       )
 
-    forecast_pipeline = (
-        forecast_pipeline
-        | 'SaveOutputs' >> _SaveOutputs(self.eval_name, self.data_config)
+    forecast_pipeline = forecast_pipeline | 'SaveOutputs' >> _SaveOutputs(
+        self.eval_name, self.data_config
     )
     return pcoll | forecast_pipeline
 
@@ -663,11 +707,11 @@ def evaluate_with_beam(
   ```
 
   Args:
-    data_config: DataConfig object
-    eval_configs: Dictionary of EvalConfig objects
-    input_chunks: Chunking of input datasets
-    runner: Beam runner
-    fanout: Beam CombineFn fanout
+    data_config: DataConfig instance.
+    eval_configs: Dictionary of EvalConfig instances.
+    input_chunks: Chunking of input datasets.
+    runner: Beam runner.
+    fanout: Beam CombineFn fanout.
   """
 
   with beam.Pipeline(runner=runner) as root:

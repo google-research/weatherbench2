@@ -13,14 +13,14 @@
 # limitations under the License.
 # ==============================================================================
 """Utility function for WeatherBench2."""
-from typing import Callable
+from typing import Callable, Union
 import fsspec
 import numpy as np
 import xarray as xr
 
 
 def open_nc(filename: str) -> xr.Dataset:
-  """Open NetCDF file from e.g. CNS."""
+  """Open NetCDF file from filesystem."""
   with fsspec.open(filename, 'rb') as f:
     ds = xr.open_dataset(f)
   return ds
@@ -84,7 +84,7 @@ def create_window_weights(window_size: int) -> xr.DataArray:
 def compute_rolling_stat(
     ds: xr.Dataset,
     window_weights: xr.DataArray,
-    stat_fn: str | Callable[..., xr.Dataset] = 'mean',
+    stat_fn: Union[str, Callable[..., xr.Dataset]] = 'mean',
 ) -> xr.Dataset:
   """Compute rolling climatology."""
   window_size = len(window_weights)
@@ -124,7 +124,7 @@ def compute_daily_stat(
     obs: xr.Dataset,
     window_size: int,
     clim_years: slice,
-    stat_fn: str | Callable[..., xr.Dataset] = 'mean',
+    stat_fn: Union[str, Callable[..., xr.Dataset]] = 'mean',
 ) -> xr.Dataset:
   """Compute daily average climatology with running window."""
   # NOTE: Loading seems to be necessary, otherwise computation takes forever
@@ -141,7 +141,7 @@ def compute_hourly_stat(
     window_size: int,
     clim_years: slice,
     hour_interval: int,
-    stat_fn: str | Callable[..., xr.Dataset] = 'mean',
+    stat_fn: Union[str, Callable[..., xr.Dataset]] = 'mean',
 ) -> xr.Dataset:
   """Compute climatology by day of year and hour of day."""
   obs = obs.compute()

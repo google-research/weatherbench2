@@ -42,9 +42,15 @@ HOUR_INTERVAL = flags.DEFINE_integer(
     1,
     help='Which intervals to compute hourly climatology for.',
 )
-WINDOW_SIZE = flags.DEFINE_integer('window_size', 61, help='Window size')
-START_YEAR = flags.DEFINE_integer('start_year', 1990, help='Clim start year')
-END_YEAR = flags.DEFINE_integer('end_year', 2020, help='Clim end year (incl.)')
+WINDOW_SIZE = flags.DEFINE_integer(
+    'window_size', 61, help='Window size in days to average over.'
+)
+START_YEAR = flags.DEFINE_integer(
+    'start_year', 1990, help='Inclusive start year of climatology'
+)
+END_YEAR = flags.DEFINE_integer(
+    'end_year', 2020, help='Inclusive end year of climatology'
+)
 BEAM_RUNNER = flags.DEFINE_string(
     'beam_runner', None, help='beam.runners.Runner'
 )
@@ -52,14 +58,14 @@ WORKING_CHUNKS = flag_utils.DEFINE_chunks(
     'working_chunks',
     '',
     help=(
-        'chunk sizes overriding input chunks to use for computing climatology, '
+        'Chunk sizes overriding input chunks to use for computing climatology, '
         'e.g., "longitude=10,latitude=10".'
     ),
 )
 OUTPUT_CHUNKS = flag_utils.DEFINE_chunks(
     'output_chunks',
     '',
-    help='chunk sizes overriding input chunks to use for storing climatology',
+    help='Chunk sizes overriding input chunks to use for storing climatology',
 )
 RECHUNK_ITEMSIZE = flags.DEFINE_integer(
     'rechunk_itemsize', 4, help='Itemsize for rechunking.'

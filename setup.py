@@ -19,6 +19,7 @@ import setuptools
 base_requires = [
     'apache_beam>=2.31.0',
     'numpy',
+    'scipy',
     'zarr',
     'xarray',
     'pandas',

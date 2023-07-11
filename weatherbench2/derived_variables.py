@@ -24,7 +24,11 @@ import xarray as xr
 
 @dataclasses.dataclass
 class DerivedVariable:
-  """Derived variable base class."""
+  """Derived variable base class.
+
+  Attributes:
+    variable_name: Name of variable to compute.
+  """
 
   variable_name: str
 
@@ -40,7 +44,12 @@ class DerivedVariable:
 
 @dataclasses.dataclass
 class WindSpeed(DerivedVariable):
-  """Compute wind speed."""
+  """Compute wind speed.
+
+  Attributes:
+    u_name: Name of U component.
+    v_name: Name of V component.
+  """
 
   u_name: str
   v_name: str
@@ -56,12 +65,19 @@ class WindSpeed(DerivedVariable):
 
 @dataclasses.dataclass
 class PrecipitationAccumulation(DerivedVariable):
-  """Compute precipitation accumulation.
+  """Compute precipitation accumulation from hourly accumulations.
 
   Accumulation is computed for the time period leading up to the lead_time.
   E.g. 24h accumulation at lead_time=24h indicates 0-24h accumulation.
   Caution: Small negative values sometimes appear in model output.
   Here, we set them to zero.
+
+  Attributes:
+    total_precipitation_name: Name of hourly total_precipitation input.
+    accumulation_hours: Hours to accumulate precipitation over
+    lead_time_name: Name of lead_time dimension.
+    set_negative_to_zero: Specify whether to set negative temporal differences
+      to zero.
   """
 
   total_precipitation_name: str
@@ -135,9 +151,6 @@ class ZonalEnergySpectrum(DerivedVariable):
   air with mass density ρ (kg / m³), this gives energy density at wavenumber k
     ρ S[k] ~ (kg / m³) (m³ / s²) = kg / s²,
   which is energy density (per unit area).
-
-  Attributes:
-    variable_name: Name to use as base and also store output in.
   """
 
   variable_name: str
@@ -177,9 +190,7 @@ class ZonalEnergySpectrum(DerivedVariable):
         input_core_dims=[['longitude']],
         output_core_dims=[['longitude']],
         exclude_dims={'longitude'},
-    ).rename_dims(
-        {'longitude': 'zonal_wavenumber'}
-    )[self.variable_name]
+    ).rename_dims({'longitude': 'zonal_wavenumber'})[self.variable_name]
     spectrum = spectrum.assign_coords(
         zonal_wavenumber=('zonal_wavenumber', spectrum.zonal_wavenumber.data)
     )
@@ -256,8 +267,12 @@ def interpolate_spectral_frequencies(
 class AggregatePrecipitationAccumulation(DerivedVariable):
   """Compute longer aggregation periods from existing shorter accumulations.
 
-  Note: This is designed specifically for GraphCast forecasts for now. Assumes a
-  6h raw time step and prediction_timedelta starting at 6h.
+  Note: This assumes a 6h raw time step and prediction_timedelta starting at 6h.
+
+  Attributes:
+    accumulation_hours: Hours to accumulate precipitaiton over
+    raw_accumulation_name: Name of the 6hr accumulation
+    lead_time_name: Name of lead_time dimension
   """
 
   accumulation_hours: int
@@ -281,6 +296,7 @@ class AggregatePrecipitationAccumulation(DerivedVariable):
     return accumulation
 
 
+# Specify dictionary of common derived variables
 DERIVED_VARIABLE_DICT = {
     'wind_speed': WindSpeed(
         u_name='u_component_of_wind',

@@ -19,7 +19,7 @@ from absl.testing import flagsaver
 
 from weatherbench2 import schema
 from weatherbench2 import utils
-from weatherbench2.scripts import ensemble_mean
+from weatherbench2.scripts import wb2_ensemble_mean
 import xarray
 from xarray_beam._src import test_util
 
@@ -37,12 +37,12 @@ class EnsembleMeanTest(test_util.TestCase):
         input_path=input_path,
         output_path=output_path,
     ):
-      ensemble_mean.main([])
+      wb2_ensemble_mean.main([])
 
     output_ds = xarray.open_zarr(output_path)
 
     xarray.testing.assert_allclose(
-        output_ds, input_ds.mean(ensemble_mean.REALIZATION)
+        output_ds, input_ds.mean(wb2_ensemble_mean.REALIZATION)
     )
 
 

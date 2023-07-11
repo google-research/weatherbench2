@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 # pyformat: mode=pyink
-"""Add derived variables to dataset."""
+"""Add derived variables to dataset and save as new file."""
 import typing as t
 
 from absl import app
@@ -50,8 +50,7 @@ RAW_TP_NAME = flags.DEFINE_string(
     'total_precipitation',
     help=(
         'Raw name of total precipitation variables. Use'
-        ' "total_precipitation_6hr" for backwards compatibility. Rename raw to'
-        ' "total_precipitation".'
+        ' "total_precipitation_6hr" for backwards compatibility.'
     ),
 )
 WORKING_CHUNKS = flag_utils.DEFINE_chunks(
