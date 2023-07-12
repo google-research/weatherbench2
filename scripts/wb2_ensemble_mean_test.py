@@ -19,7 +19,7 @@ from absl.testing import flagsaver
 
 from weatherbench2 import schema
 from weatherbench2 import utils
-from weatherbench2.scripts import wb2_ensemble_mean
+from . import wb2_ensemble_mean
 import xarray
 from xarray_beam._src import test_util
 
