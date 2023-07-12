@@ -1,4 +1,4 @@
-# Valid vs. Init Time Conventions
+# Init vs Valid Time Conventions
 
 The WeatherBench 2 evaluation code can work with two forecast time conventions: init-time and valid-time. For all official WB2 evaluation, the init-time convention is used. You can switch between the conventions using the `by_init` parameter in the `DataConfig`.
 
