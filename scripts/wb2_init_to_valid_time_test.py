@@ -19,7 +19,6 @@ from absl.testing import flagsaver
 from absl.testing import parameterized
 import numpy as np
 import pandas as pd
-from weatherbench2.scripts import wb2_init_to_valid_time
 import xarray
 import xarray_beam
 
