@@ -16,8 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # TODO(#3): Support Python 3.10 and 3.11.
-        python-version: ["3.9"]
+        python-version: ["3.9", "3.10", "3.11"]
     steps:
     - name: Cancel previous
       uses: styfle/cancel-workflow-action@0.7.0
@@ -48,4 +47,4 @@ jobs:
     - name: Run scripts tests
       # The scripts define some of the same flags, so we run pytest in separate processes.
       run: |
-        for test in scripts/*_test.py; do pytest $test; done
+        pytest scripts/
