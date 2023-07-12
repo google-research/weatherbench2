@@ -404,7 +404,7 @@ class SEEPS(SpatialSEEPS):
       self,
       forecast: xr.Dataset,
       truth: xr.Dataset,
-      region: t.Optional[Region] = None,
+      region: Region | None = None,
   ) -> xr.Dataset:
     result = super().compute_chunk(forecast, truth, region)
     # Need skipna = True because of p1 mask
