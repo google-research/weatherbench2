@@ -298,6 +298,7 @@ def main(_: t.Sequence[str]) -> None:
           derived_variables=derived_variables,
           evaluate_persistence=EVALUATE_PERSISTENCE.value,
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
+          output_format='zarr',
       ),
       'deterministic_temporal': EvalConfig(
           metrics=deterministic_metrics,

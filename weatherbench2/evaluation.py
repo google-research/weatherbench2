@@ -354,10 +354,18 @@ def open_forecast_and_truth_datasets(
   return (forecast, eval_truth, climatology)
 
 
-def _get_output_path(data_config: DataConfig, eval_name: str) -> str:
+def _get_output_path(
+    data_config: DataConfig, eval_name: str, output_format: str
+) -> str:
+  if output_format == 'netcdf':
+    suffix = 'nc'
+  elif output_format == 'zarr':
+    suffix = 'zarr'
+  else:
+    raise ValueError(f'unrecogonized data format: {output_format}')
   return os.path.join(
       data_config.paths.output_dir,
-      f'{data_config.paths.output_file_prefix}{eval_name}.nc',
+      f'{data_config.paths.output_file_prefix}{eval_name}.{suffix}',
   )
 
 
@@ -450,7 +458,7 @@ def _evaluate_all_metrics(
 
   logging.info(f'Logging Evaluation complete:\n{results}')
 
-  output_path = _get_output_path(data_config, eval_name)
+  output_path = _get_output_path(data_config, eval_name, 'netcdf')
   _to_netcdf(results, output_path)
   logging.info(f'Logging Saved results to {output_path}')
 
@@ -492,27 +500,30 @@ class _SaveOutputs(beam.PTransform):
 
   eval_name: str
   data_config: DataConfig
+  output_format: str
 
   def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:
     combined = xr.combine_by_coords(datasets)
-    output_path = _get_output_path(self.data_config, self.eval_name)
+    output_path = _get_output_path(
+        self.data_config, self.eval_name, self.output_format
+    )
     _to_netcdf(combined, output_path)
 
   def expand(self, pcoll: beam.PCollection) -> beam.PCollection:
-    if self.data_config.paths.output_format == 'netcdf':
+    if self.output_format == 'netcdf':
       return (
           pcoll
           | 'DropKey' >> beam.MapTuple(lambda k, v: v)
           | beam.combiners.ToList()
           | beam.Map(self._write_netcdf)
       )
-    elif self.data_config.paths.output_format == 'zarr':
-      output_path = _get_output_path(self.data_config, self.eval_name)
+    elif self.output_format == 'zarr':
+      output_path = _get_output_path(
+          self.data_config, self.eval_name, self.output_format
+      )
       return pcoll | xbeam.ChunksToZarr(output_path)
     else:
-      raise ValueError(
-          f'unrecogonized data format: {self.data_config.paths.output_format}'
-      )
+      raise ValueError(f'unrecogonized data format: {self.output_format}')
 
 
 @dataclasses.dataclass
@@ -664,7 +675,7 @@ class _EvaluateAllMetrics(beam.PTransform):
       )
 
     forecast_pipeline = forecast_pipeline | 'SaveOutputs' >> _SaveOutputs(
-        self.eval_name, self.data_config
+        self.eval_name, self.data_config, self.eval_config.output_format
     )
     return pcoll | forecast_pipeline
 

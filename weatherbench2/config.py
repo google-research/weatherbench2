@@ -54,7 +54,6 @@ class Paths:
     obs: Path to ground-truth file.
     output_dir: Path to output directory.
     output_file_prefix: Prefix for output file name.
-    output_format: Wether to save to 'netcdf' or 'zarr'.
     climatology: Path to optional climatology file.
   """
 
@@ -62,9 +61,6 @@ class Paths:
   obs: str
   output_dir: str
   output_file_prefix: t.Optional[str] = ''
-  # output_format='zarr' is also supported, but may be buggy due to
-  # https://github.com/google/xarray-beam/issues/85
-  output_format: str = 'netcdf'
   climatology: t.Optional[str] = None
 
 
@@ -112,6 +108,7 @@ class EvalConfig:
       by-valid convention. For by-init, specify analysis dataset as obs.
     derived_variables: List of DerivedVariable instances to compute on the fly.
     temporal_mean: Compute temporal mean (over time/init_time) for metrics.
+    output_format: Wether to save to 'netcdf' or 'zarr'.
   """
 
   metrics: t.Dict[str, Metric]
@@ -129,6 +126,9 @@ class EvalConfig:
       default_factory=list
   )
   temporal_mean: t.Optional[bool] = True
+  # output_format='zarr' is also supported, but may be buggy due to
+  # https://github.com/google/xarray-beam/issues/85
+  output_format: str = 'netcdf'
 
 
 @dataclasses.dataclass
