@@ -47,7 +47,7 @@ def get_random_weather(
 
 def make_multispectral_dataset(
     spatial_resolution_in_degrees: int = 5,
-    latitude: t.Optional[int | t.Sequence[int]] = None,
+    latitude: t.Optional[t.Union[int, t.Sequence[int]]] = None,
     min_wavelength_lon: int = 50,
     max_wavelength_lon: int = 100,
     constant_to_add: float = 0,
