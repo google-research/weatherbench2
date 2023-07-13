@@ -13,8 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 from absl.testing import absltest
-from weatherbench2.scripts.wb2_compute_climatology import SEEPSThreshold
 import xarray as xr
+
+from . import wb2_compute_climatology as cc
 
 
 class SEEPSThresholdTest(absltest.TestCase):
@@ -24,7 +25,7 @@ class SEEPSThresholdTest(absltest.TestCase):
         'total_precipitation_6hr': xr.DataArray([0, 0.25, 2, 4, 6]) / 1000,
     })
 
-    result = SEEPSThreshold(0.25, 'total_precipitation_6hr').compute(
+    result = cc.SEEPSThreshold(0.25, 'total_precipitation_6hr').compute(
         dataset,
         dim=...,
     )
