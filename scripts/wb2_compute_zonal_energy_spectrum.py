@@ -148,7 +148,7 @@ def _strip_offsets(
   return key, dataset
 
 
-def main(argv[str]) -> None:
+def main(argv: list[str]) -> None:
   derived_variables = [
       ZonalEnergySpectrum(varname) for varname in BASE_VARIABLES.value
   ]
