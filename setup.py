@@ -18,13 +18,15 @@ import setuptools
 
 base_requires = [
     'apache_beam>=2.31.0',
+    'jax[cpu]',
     'numpy',
-    'scipy',
-    'zarr',
-    'xarray',
     'pandas<1.4',
+    'scipy',
+    'sklearn',
+    'xarray',
+    'pandas',
     'xarray-beam',
-    'absl-py',
+    'zarr',
 ]
 # TODO(b/286936524): Set up docs soon...
 docs_requires = [
