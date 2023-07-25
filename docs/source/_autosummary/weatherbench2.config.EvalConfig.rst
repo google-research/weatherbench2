@@ -27,6 +27,7 @@
       ~EvalConfig.evaluate_climatology
       ~EvalConfig.evaluate_persistence
       ~EvalConfig.evaluate_probabilistic_climatology
+      ~EvalConfig.output_format
       ~EvalConfig.probabilistic_climatology_end_year
       ~EvalConfig.probabilistic_climatology_hour_interval
       ~EvalConfig.probabilistic_climatology_start_year

@@ -1,7 +1,11 @@
+(cli)=
 # Command line scripts
 
+The `scripts/` directory contains a number of command line scripts for processing data and evaluating forecasts. All scripts are based on [Xarray-Beam](https://xarray-beam.readthedocs.io/en/latest/) to ensure scalability for large input files. The scripts can be run locally or on the cloud, e.g. using DataFlow (see [this guide](dataflow)).
+
+(evaluation-cli)=
 ## Evaluation
-Main evaluation script.
+Main evaluation script. To reproduce the official WeatherBench 2 evaluation, follow [these commands](LINK). The results files for the baseline models can be found HERE.
 
 ```
 usage: wb2_evaluation.py [-h] 
@@ -49,13 +53,11 @@ _Command options_:
       for probabilistic climatology
 * `--probabilistic_climatology_hour_interval`: Hour interval to compute 
       probabilistic climatology. Default: 6
-* `--add_land_region`: Add land-only evaluation. `land_sea_mask` must be in observation'
-        'dataset.
+* `--add_land_region`: Add land-only evaluation. `land_sea_mask` must be in observation dataset.
 * `--eval_configs`: Comma-separated list of evaluation configs to run. See details below. Default: `deterministic`
 * `--ensemble_dim`: Ensemble dimension name for ensemble metrics. Default: `number`.
 * `--rename_variables`: Dictionary of variable to rename to standard names. E.g. {"2t": "2m_temperature"}
-* `--pressure_level_suffixes`: 'Decode pressure levels as suffixes in forecast file. E.g.'
-        ' temperature_850'
+* `--pressure_level_suffixes`: 'Decode pressure levels as suffixes in forecast file. E.g. temperature_850'
 * `--levels`: Comma delimited list of pressure levels to select for evaluation. Default: `500,700,850`
 * `--variables`: Comma delimited list of variables to select from weather. Default: `geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity,2m_temperature,mean_sea_level_pressure`
 * `--derived_variables`: Comma delimited list of derived variables to dynamically compute during evaluation. Default: `None`
@@ -124,10 +126,6 @@ eval_configs = {
 
 *Example*
 
-Local evaluation.
-
-TODO
-
 ```bash
 python wb2_evaluation.py \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
@@ -142,9 +140,10 @@ python wb2_evaluation.py \
   --variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity,2m_temperature,10m_u_component_of_wind,10m_v_component_of_wind,mean_sea_level_pressure,total_precipitation_6hr,total_precipitation_24hr,10m_wind_speed,wind_speed
 ```
 
-TODO: Beam version
 
-## Climatology
+## Compute climatology
+
+This scripts computes a day-of-year, hour-of-day climatology with optional smoothing following the methodology proposed [here](https://www.ecmwf.int/en/elibrary/75101-scale-dependent-verification-ensemble-forecasts). 
 
 ```
 usage: wb2_compute_climatology.py [-h] 
@@ -183,10 +182,6 @@ _Command options_:
 * `--beam_runner`: Beam runner. Use `DirectRunner` for local execution.
 
 *Example*
-
-Local evaluation. 
-
-TODO
 
 ```bash
 python wb2_compute_climatology.py \
@@ -231,10 +226,6 @@ _Command options_:
 
 *Example*
 
-Local evaluation. 
-
-TODO
-
 ```bash
 python wb2_compute_derived_variables.py \
   --input_path=gs://weatherbench2/datasets/hres/2016-2022-12h-6h-0p25deg-chunk-1.zarr/ \
@@ -276,10 +267,6 @@ _Command options_:
 
 *Example*
 
-Local evaluation. 
-
-TODO
-
 ```bash
 python wb2_compute_zonal_power_spectrum.py \
   --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr  \
@@ -309,10 +296,6 @@ _Command options_:
 * `--runner`: Beam runner. Use `DirectRunner` for local execution.
 
 *Example*
-
-Local evaluation. 
-
-TODO
 
 ```bash
 python ensemble_mean.py -- \

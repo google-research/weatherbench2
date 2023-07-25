@@ -1,24 +1,25 @@
+(submit)=
 # Submit a new model to WeatherBench 2
 
-You have the latest and greatest new ML model? Awesome! Here are the steps required to evaluate it in the WeatherBench 2 framework. If there are any questions, please don't hesitate to ask them via a GitHub issue.
+You have the latest and greatest new ML model? Awesome! Here are the steps required to evaluate it in the WeatherBench 2 framework. If there are any questions, please don't hesitate to ask them via a [GitHub issue](https://github.com/google-research/weatherbench2/issues).
 
 ## Save forecasts in a standardized Zarr format
 
-The WeatherBench evaluation pipeline expects forecasts and ground truth to be stored as Zarr files. See the Quickstart [LINK] for a description of the format. Saving all variables is too much. You can also select specific levels and variables. See the Pangu forecasts for an example: [LINK]
+The WeatherBench evaluation pipeline expects forecasts and ground truth to be stored as Zarr files. See the Quickstart [LINK] for a description of the format. Saving all variables is too much? You can also select specific levels and variables. See the [Pangu forecasts](https://github.com/google-research/weatherbench2/issues) for an example.
 
 We recommend having single chunks in space (latitude and longitude) but small chunks in time to allow for efficient paralellization.
 
 ## Regrid
 
-The WeatherBench 2 code can be used to evaluate any resolution. However, we only provide ground truth data for a range of resolutions (see Data Guide [LINK]). The official reesolution used in the paper and the website is 1.5 degrees. Note that absolute values of metrics computed at different resolution are not necessarily comparable (see paper.)
+The WeatherBench 2 code can be used to evaluate any resolution. However, we only provide ground truth data for a range of resolutions (see Data Guide [LINK]). The official resolution used in the paper is 1.5 degrees but the website also contains scores for 0.25 and 5.625 degrees. Note that absolute values of metrics computed at different resolution are not necessarily comparable (see paper).
 
-We are still working to open-source the regridding code. Until then, alternatives are TODO.
+TODO: Regridding code
 
 Note that following the WMO standards we are using conservative regridding.
 
 ## Run the evaluation script
 
-
+Next, run the [evaluation command-line script](evaluation-cli) for your forecasts and save the results.
 
 ## "Submit" the results
 

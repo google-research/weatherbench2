@@ -1,3 +1,4 @@
+(api)=
 # API docs
 
 ```{eval-rst}
