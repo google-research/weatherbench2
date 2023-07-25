@@ -697,6 +697,7 @@ def evaluate_with_beam(
     input_chunks: abc.Mapping[str, int],
     runner: str,
     fanout: Optional[int] = None,
+    argv: Optional[list[str]] = None,
 ) -> None:
   """Run evaluation with a Beam pipeline.
 
@@ -723,9 +724,10 @@ def evaluate_with_beam(
     input_chunks: Chunking of input datasets.
     runner: Beam runner.
     fanout: Beam CombineFn fanout.
+    argv: Other arguments to pass into the Beam pipeline.
   """
 
-  with beam.Pipeline(runner=runner) as root:
+  with beam.Pipeline(runner=runner, argv=argv) as root:
     for eval_name, eval_config in eval_configs.items():
       logging.info(f'Logging Eval config: {eval_config}')
       _ = root | f'evaluate_{eval_name}' >> _EvaluateAllMetrics(

@@ -33,7 +33,6 @@ Example Usage:
   ```
 """
 import ast
-from collections import abc
 import functools
 from typing import Optional
 
@@ -201,7 +200,7 @@ def compute_hourly_stat_chunk(
   return clim_key, clim_chunk
 
 
-def main(argv: abc.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   obs, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
   # TODO(shoyer): slice obs in time using START_YEAR and END_YEAR. This would
   # require some care in order to ensure input_chunks['time'] remains valid.

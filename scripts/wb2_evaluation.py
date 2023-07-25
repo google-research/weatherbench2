@@ -14,7 +14,6 @@
 # ==============================================================================
 """Run WeatherBench 2 evaluation pipeline."""
 import ast
-import typing as t
 
 from absl import app
 from absl import flags
@@ -218,7 +217,7 @@ def _wind_vector_rmse():
   return wind_vector_rmse
 
 
-def main(_: t.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   """Run all WB2 metrics."""
   selection = Selection(
       variables=VARIABLES.value,

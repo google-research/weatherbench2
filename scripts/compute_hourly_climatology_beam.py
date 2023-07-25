@@ -39,7 +39,6 @@ Example Usage:
     --job_name compute-hourly-climatology-$USER
   ```
 """
-from collections import abc
 import functools
 
 from absl import app
@@ -121,7 +120,7 @@ def compute_hourly_climatology_std_chunk(
   return clim_key, clim_chunk
 
 
-def main(argv: abc.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   obs, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
   # TODO(shoyer): slice obs in time using START_YEAR and END_YEAR. This would
   # require some care in order to ensure input_chunks['time'] remains valid.

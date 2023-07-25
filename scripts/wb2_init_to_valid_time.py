@@ -70,7 +70,6 @@ Notes:
   realigns forecasts from "same_inits" to "same_verifs":
   https://climpred.readthedocs.io/en/stable/alignment.html
 """
-from collections import abc
 from typing import Iterable, Mapping
 
 from absl import app
@@ -193,7 +192,7 @@ def iter_padding_chunks(
         yield from make_chunks(time, delta)
 
 
-def main(_: abc.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   source_ds, chunks = xarray_beam.open_zarr(INPUT_PATH.value)
 
   # We'll use "time" only for "valid time" in this pipeline, so rename the
@@ -228,7 +227,7 @@ def main(_: abc.Sequence[str]) -> None:
       .astype(np.float32)  # ensure we can represent NaN
   )
 
-  with beam.Pipeline(runner=BEAM_RUNNER.value) as p:
+  with beam.Pipeline(runner=BEAM_RUNNER.value, argv=argv) as p:
     padding = (
         p
         | beam.Create([None])  # dummy input

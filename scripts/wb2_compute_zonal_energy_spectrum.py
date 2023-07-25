@@ -148,7 +148,7 @@ def _strip_offsets(
   return key, dataset
 
 
-def main(_: t.Sequence[str]) -> None:
+def main(argv[str]) -> None:
   derived_variables = [
       ZonalEnergySpectrum(varname) for varname in BASE_VARIABLES.value
   ]
@@ -167,7 +167,7 @@ def main(_: t.Sequence[str]) -> None:
 
   template = _make_template(source_dataset, derived_variables)
 
-  with beam.Pipeline(runner=RUNNER.value) as root:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     _ = (
         root
         | xbeam.DatasetToChunks(source_dataset, source_chunks, split_vars=False)

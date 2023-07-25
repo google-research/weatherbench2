@@ -14,8 +14,6 @@
 # ==============================================================================
 # pyformat: mode=pyink
 """Add derived variables to dataset and save as new file."""
-import typing as t
-
 from absl import app
 from absl import flags
 import apache_beam as beam
@@ -92,7 +90,7 @@ def _strip_offsets(
   return key, dataset
 
 
-def main(_: t.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   derived_variables = [
       DERIVED_VARIABLE_DICT[derived_variable]
       for derived_variable in DERIVED_VARIABLES.value
@@ -144,7 +142,7 @@ def main(_: t.Sequence[str]) -> None:
     (var,) = key.vars
     return var not in rechunk_variables
 
-  with beam.Pipeline(runner=RUNNER.value) as root:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     # Initial branch for computation without rechunking
     # TODO(srasp): Further optimize by splitting branches earlier
     # so that with and without rechunking can be computed in parallel

@@ -33,7 +33,7 @@ REALIZATION_NAME = flags.DEFINE_string(
 # pylint: disable=expression-not-assigned
 
 
-def main(argv):
+def main(argv: list[str]):
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
   template = xbeam.make_template(
       source_dataset.isel({REALIZATION_NAME.value: 0}, drop=True)

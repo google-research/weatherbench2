@@ -77,7 +77,7 @@ def select_climatology(
     yield key, chunk[[variable_name]]
 
 
-def main(_: abc.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   climatology, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
 
   if 'hour' not in climatology.coords:
@@ -111,7 +111,7 @@ def main(_: abc.Sequence[str]) -> None:
   # https://github.com/apache/beam/issues/24685
   beam.typehints.disable_type_annotations()
 
-  with beam.Pipeline(runner=BEAM_RUNNER.value) as root:
+  with beam.Pipeline(runner=BEAM_RUNNER.value, argv=argv) as root:
     _ = (
         root
         | beam.Create([i * time_chunk_size for i in range(time_chunk_count)])
