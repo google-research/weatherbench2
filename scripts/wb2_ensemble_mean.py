@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Ensemble mean (over REALIZATION dimension) of a weather dataset."""
+"""Ensemble mean (over REALIZATION dimension) of a forecast dataset."""
 from absl import app
 from absl import flags
 import apache_beam as beam

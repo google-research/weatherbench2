@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 # pyformat: mode=pyink
-"""Compute ZonalEnergySpectrum derived variables."""
+"""Compute ZonalEnergySpectrum derived variable."""
 import typing as t
 
 from absl import app

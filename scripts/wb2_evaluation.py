@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Run default WB2 evaluation."""
+"""Run WeatherBench 2 evaluation pipeline."""
 import ast
 import typing as t
 
@@ -22,46 +22,47 @@ from weatherbench2 import evaluation
 from weatherbench2 import flag_utils
 from weatherbench2.config import DataConfig, EvalConfig, Paths, Selection  # pylint: disable=g-multiple-import
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
-from weatherbench2.metrics import ACC, Bias, CRPS, CRPSSkill, CRPSSpread, EnergyScore, EnergyScoreSkill, EnergyScoreSpread, EnsembleMeanRMSE, EnsembleStddev, RMSE, MSE, SpatialBias, SpatialMSE, WindVectorRMSE  # pylint: disable=g-multiple-import,unused-import
+from weatherbench2.metrics import ACC, Bias, CRPS, CRPSSkill, CRPSSpread, EnergyScore, EnergyScoreSkill, EnergyScoreSpread, EnsembleMeanRMSE, EnsembleStddev, RMSE, MSE, SEEPS, SpatialBias, SpatialMSE, SpatialSEEPS, WindVectorRMSE  # pylint: disable=g-multiple-import,unused-import
 from weatherbench2.regions import SliceRegion, LandRegion  # pylint: disable=g-multiple-import
 import xarray as xr
 
 _DEFAULT_VARIABLES = [
     'geopotential',
     'temperature',
-    'u_component_of_wind',  # TODO(b/269598138)
+    'u_component_of_wind',
     'v_component_of_wind',
     'specific_humidity',
     '2m_temperature',
-    # 'mean_sea_level_pressure',
-    # 'total_precipitation_6hr'
+    'mean_sea_level_pressure',
 ]
-_DEFAULT_DERIVED_VARIABLES = ['wind_speed', '10m_wind_speed']
+_DEFAULT_DERIVED_VARIABLES = []
 
 _DEFAULT_LEVELS = ['500', '700', '850']
 
 FORECAST_PATH = flags.DEFINE_string(
     'forecast_path',
     None,
-    help='path to forecasts to evaluate in Zarr format',
+    help='Path to forecasts to evaluate in Zarr format',
 )
 OBS_PATH = flags.DEFINE_string(
     'obs_path',
     None,
-    help='path to observations to evaluate in Zarr format',
+    help='Path to ground-truth to evaluate in Zarr format',
 )
 CLIMATOLOGY_PATH = flags.DEFINE_string(
     'climatology_path',
     None,
-    help='path to climatology. Used to compute e.g. ACC.',
+    help='Path to climatology. Used to compute e.g. ACC.',
 )
 BY_INIT = flags.DEFINE_bool(
-    'by_init', False, help='Forecasts are in init-time format, not valid-time'
+    'by_init',
+    False,
+    help='Specifies whether forecasts are in by-init or by-valid format.',
 )
 EVALUATE_PERSISTENCE = flags.DEFINE_bool(
     'evaluate_persistence',
     False,
-    'Evaluate persistance forecast from truth --> lead_time=0',
+    'Evaluate persistence forecast, i.e. forecast at t=0',
 )
 EVALUATE_CLIMATOLOGY = flags.DEFINE_bool(
     'evaluate_climatology',
@@ -69,16 +70,25 @@ EVALUATE_CLIMATOLOGY = flags.DEFINE_bool(
     'Evaluate climatology forecast specified in climatology path',
 )
 EVALUATE_PROBABILISTIC_CLIMATOLOGY = flags.DEFINE_bool(
-    'evaluate_probabilistic_climatology', False, ''
+    'evaluate_probabilistic_climatology',
+    False,
+    'Evaluate probabilistic climatology,'
+    'derived from using each year of the ground-truth dataset as a member',
 )
 PROBABILISTIC_CLIMATOLOGY_START_YEAR = flags.DEFINE_integer(
-    'probabilistic_climatology_start_year', None, ''
+    'probabilistic_climatology_start_year',
+    None,
+    'First year of ground-truth to usefor probabilistic climatology',
 )
 PROBABILISTIC_CLIMATOLOGY_END_YEAR = flags.DEFINE_integer(
-    'probabilistic_climatology_end_year', None, ''
+    'probabilistic_climatology_end_year',
+    None,
+    'Last year of ground-truth to usefor probabilistic climatology',
 )
 PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL = flags.DEFINE_integer(
-    'probabilistic_climatology_hour_interval', 6, ''
+    'probabilistic_climatology_hour_interval',
+    6,
+    'Hour interval to computeprobabilistic climatology',
 )
 ADD_LAND_REGION = flags.DEFINE_bool(
     'add_land_region',
@@ -88,20 +98,26 @@ ADD_LAND_REGION = flags.DEFINE_bool(
         'dataset.'
     ),
 )
+COMPUTE_SEEPS = flags.DEFINE_bool(
+    'compute_seeps', False, 'Compute SEEPS for total_precipitation_24hr.'
+)
 EVAL_CONFIGS = flags.DEFINE_string(
     'eval_configs',
     'deterministic',
-    help='Comma separate list of evaluation configs to run',
+    help='Comma-separated list of evaluation configs to run.',
 )
 ENSEMBLE_DIM = flags.DEFINE_string(
     'ensemble_dim',
     'number',
-    help='Ensemble dimension name for ensemble metrics.',
+    help='Ensemble dimension name for ensemble metrics. Default = "number".',
 )
 RENAME_VARIABLES = flags.DEFINE_string(
     'rename_variables',
     None,
-    help='Dictionary of variable to rename to standard names.',
+    help=(
+        'Dictionary of variable to rename to standard names. E.g. {"2t":'
+        ' "2m_temperature"}'
+    ),
 )
 PRESSURE_LEVEL_SUFFIXES = flags.DEFINE_bool(
     'pressure_level_suffixes',
@@ -142,7 +158,7 @@ TIME_STOP = flags.DEFINE_string(
 OUTPUT_DIR = flags.DEFINE_string(
     'output_dir',
     None,
-    help='directory in which to save evaluation results in netCDF format',
+    help='Directory in which to save evaluation results in netCDF format',
 )
 OUTPUT_FILE_PREFIX = flags.DEFINE_string(
     'output_file_prefix',
@@ -166,14 +182,16 @@ USE_BEAM = flags.DEFINE_bool(
     False,
     'Run evaluation pipeline as beam pipeline. If False, run in memory.',
 )
-BEAM_RUNNER = flags.DEFINE_string(
-    'beam_runner', None, help='beam.runners.Runner'
+BEAM_RUNNER = flags.DEFINE_string('beam_runner', None, help='Beam runner')
+FANOUT = flags.DEFINE_integer(
+    'fanout',
+    None,
+    help='Beam CombineFn fanout. Might be required for large dataset.',
 )
-FANOUT = flags.DEFINE_integer('fanout', None, help='Beam CombineFn fanout')
 
 
 def _wind_vector_rmse():
-  """Defines Wind Vector RMSEs."""
+  """Defines Wind Vector RMSEs if U/V components are in variables."""
   wind_vector_rmse = []
   if (
       'u_component_of_wind' in VARIABLES.value
@@ -229,6 +247,7 @@ def main(_: t.Sequence[str]) -> None:
       pressure_level_suffixes=PRESSURE_LEVEL_SUFFIXES.value,
   )
 
+  # Default regions
   regions = {
       'global': SliceRegion(),
       'tropics': SliceRegion(lat_slice=slice(-20, 20)),
@@ -254,6 +273,10 @@ def main(_: t.Sequence[str]) -> None:
       'mse': MSE(),
       'acc': ACC(climatology=climatology),
   }
+  spatial_metrics = {'bias': SpatialBias(), 'mse': SpatialMSE()}
+  if COMPUTE_SEEPS.value:
+    deterministic_metrics['seeps'] = SEEPS(climatology=climatology)
+    spatial_metrics['seeps'] = SpatialSEEPS(climatology=climatology)
 
   derived_variables = [
       DERIVED_VARIABLE_DICT[derived_variable]
@@ -270,11 +293,12 @@ def main(_: t.Sequence[str]) -> None:
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
       ),
       'deterministic_spatial': EvalConfig(
-          metrics={'bias': SpatialBias(), 'mse': SpatialMSE()},
+          metrics=spatial_metrics,
           against_analysis=False,
           derived_variables=derived_variables,
           evaluate_persistence=EVALUATE_PERSISTENCE.value,
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
+          output_format='zarr',
       ),
       'deterministic_temporal': EvalConfig(
           metrics=deterministic_metrics,

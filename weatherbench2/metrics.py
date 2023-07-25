@@ -17,6 +17,7 @@
 Contains classes for all evaluation metrics used for WB2.
 """
 import dataclasses
+import functools
 import typing as t
 
 import numpy as np
@@ -49,7 +50,7 @@ def _cell_area_from_latitude(points: np.ndarray) -> np.ndarray:
 
 
 def get_lat_weights(ds: xr.Dataset) -> xr.DataArray:
-  """Computes latitude weights from latitude coordinate of dataset."""
+  """Computes latitude/area weights from latitude coordinate of dataset."""
   weights = _cell_area_from_latitude(np.deg2rad(ds.latitude.data))
   weights /= np.mean(weights)
   weights = ds.latitude.copy(data=weights)
@@ -110,9 +111,9 @@ def _spatial_average(
   """Compute spatial average after applying region mask.
 
   Args:
-    dataset: Metric dataset as a function of latitude/longitude
-    region: Region object (optional)
-    skipna: Skip NaNs in spatial mean
+    dataset: Metric dataset as a function of latitude/longitude.
+    region: Region object (optional).
+    skipna: Skip NaNs in spatial mean.
 
   Returns:
     dataset: Spatially averaged metric.
@@ -128,12 +129,19 @@ def _spatial_average(
 def _spatial_average_l2_norm(
     dataset: xr.Dataset, region: t.Optional[Region] = None, skipna: bool = False
 ) -> xr.Dataset:
+  """Helper function to compute sqrt(spatial_average(ds**2))."""
   return np.sqrt(_spatial_average(dataset**2, region=region, skipna=skipna))
 
 
 @dataclasses.dataclass
 class WindVectorRMSE(Metric):
-  """Compute wind vector RMSE."""
+  """Compute wind vector RMSE. See WB2 paper for definition.
+
+  Attributes:
+    u_name: Name of U component.
+    v_name: Name of v component.
+    vector_name: Name of wind vector to be computed.
+  """
 
   u_name: str
   v_name: str
@@ -157,7 +165,12 @@ class WindVectorRMSE(Metric):
 
 @dataclasses.dataclass
 class RMSE(Metric):
-  """Root mean squared error."""
+  """Root mean squared error.
+
+  Attributes:
+    wind_vector_rmse: Optionally provide list of WindVectorRMSE instances to
+      compute.
+  """
 
   wind_vector_rmse: t.Optional[list[WindVectorRMSE]] = None
 
@@ -256,7 +269,11 @@ class SpatialBias(Metric):
 
 @dataclasses.dataclass
 class ACC(Metric):
-  """Anomaly correlation coefficient."""
+  """Anomaly correlation coefficient.
+
+  Attribute:
+    climatology: Climatology for computing anomalies.
+  """
 
   climatology: xr.Dataset
 
@@ -285,6 +302,113 @@ class ACC(Metric):
         _spatial_average(forecast_anom**2, region=region)
         * _spatial_average(truth_anom**2, region=region)
     )
+
+
+@dataclasses.dataclass
+class SpatialSEEPS(Metric):
+  """Computes Stable Equitable Error in Probability Space.
+
+  Definition in Rodwell et al. (2010):
+  https://www.ecmwf.int/en/elibrary/76205-new-equitable-score-suitable-verifying-precipitation-nwp
+
+  Attributes:
+    climatology: climatology dataset containing seeps_threshold [meters] and
+      seeps_dry_fraction [0-1] for given precip_name.
+    dry_threshold_mm: Dry threhsold in mm, same as used to compute
+      climatological values.
+    precip_name: Name of precipitation variable, e.g. total_precipitation_24hr.
+    min_p1: Mask out values with smaller average dry fraction.
+    max_p1: Mask out values with larger average dry fraction.
+    p1: Average dry fraction.
+  """
+
+  climatology: xr.Dataset
+  dry_threshold_mm: float = 0.25
+  precip_name: str = 'total_precipitation_24hr'
+  min_p1: float = 0.01
+  max_p1: float = 0.85
+
+  @functools.cached_property
+  def p1(self) -> xr.DataArray:
+    dry_fraction = self.climatology[f'{self.precip_name}_seeps_dry_fraction']
+    return dry_fraction.mean(('hour', 'dayofyear')).compute()
+
+  def _convert_precip_to_seeps_cat(self, ds):
+    """Helper function for SEEPS computation. Converts values to categories."""
+    wet_threshold = self.climatology[f'{self.precip_name}_seeps_threshold']
+    # Convert to SI units [meters]
+    dry_threshold = self.dry_threshold_mm / 1000.0
+    da = ds[self.precip_name]
+    wet_threshold_for_valid_time = wet_threshold.sel(
+        dayofyear=da.valid_time.dt.dayofyear, hour=da.valid_time.dt.hour
+    ).load()
+
+    dry = da < dry_threshold
+    light = np.logical_and(
+        da > dry_threshold, da < wet_threshold_for_valid_time
+    )
+    heavy = da >= wet_threshold_for_valid_time
+    result = xr.concat(
+        [dry, light, heavy],
+        dim=xr.DataArray(['dry', 'light', 'heavy'], dims=['seeps_cat']),
+    )
+    # Convert NaNs back to NaNs
+    result = result.astype('int').where(da.notnull())
+    return result
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    forecast_cat = self._convert_precip_to_seeps_cat(forecast)
+    truth_cat = self._convert_precip_to_seeps_cat(truth)
+
+    # Compute contingency table
+    out = (
+        forecast_cat.rename({'seeps_cat': 'forecast_cat'})
+        * truth_cat.rename({'seeps_cat': 'truth_cat'})
+    ).compute()
+
+    # Compute scoring matrix
+    scoring_matrix = [
+        [xr.zeros_like(self.p1), 1 / (1 - self.p1), 4 / (1 - self.p1)],
+        [1 / self.p1, xr.zeros_like(self.p1), 3 / (1 - self.p1)],
+        [
+            1 / self.p1 + 3 / (2 + self.p1),
+            3 / (2 + self.p1),
+            xr.zeros_like(self.p1),
+        ],
+    ]
+    das = []
+    for mat in scoring_matrix:
+      das.append(xr.concat(mat, dim=out.truth_cat))
+    scoring_matrix = 0.5 * xr.concat(das, dim=out.forecast_cat)
+    scoring_matrix = scoring_matrix.compute()
+
+    # Take dot product
+    result = xr.dot(out, scoring_matrix, dims=('forecast_cat', 'truth_cat'))
+
+    # Mask out p1 thresholds
+    result = result.where(self.p1 < self.max_p1, np.NaN)
+    result = result.where(self.p1 > self.min_p1, np.NaN)
+    return xr.Dataset({f'{self.precip_name}': result})
+
+
+@dataclasses.dataclass
+class SEEPS(SpatialSEEPS):
+  """Spatially averaged SEEPS."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    result = super().compute_chunk(forecast, truth, region)
+    # Need skipna = True because of p1 mask
+    return _spatial_average(result, region=region, skipna=True)
 
 
 ################################################################################

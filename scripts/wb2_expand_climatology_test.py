@@ -17,8 +17,9 @@ from absl.testing import flagsaver
 import numpy as np
 import pandas as pd
 from weatherbench2 import schema
-from weatherbench2.scripts import wb2_expand_climatology
 import xarray
+
+from . import wb2_expand_climatology
 
 
 def random_like(dataset: xarray.Dataset, seed: int = 0) -> xarray.Dataset:

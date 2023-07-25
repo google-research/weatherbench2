@@ -38,7 +38,7 @@ class EvaluationTest(absltest.TestCase):
     truth = schema.mock_truth_data(
         variables_3d=['geopotential'],
         time_start='2019-12-01',
-        time_stop='2021-01-01',
+        time_stop='2021-01-04',
         spatial_resolution_in_degrees=30,
         time_resolution='3 hours',
     )
@@ -95,9 +95,6 @@ class EvaluationTest(absltest.TestCase):
             against_analysis=False,
             regions=regions,
         ),
-        'forecast_vs_analysis': config.EvalConfig(
-            metrics={'rmse': metrics.RMSE()}, against_analysis=True
-        ),
         'forecast_vs_era_spatial': config.EvalConfig(
             metrics={'mse': metrics.SpatialMSE()},
             against_analysis=False,
@@ -115,7 +112,7 @@ class EvaluationTest(absltest.TestCase):
     evaluation.evaluate_with_beam(
         data_config,
         eval_configs,
-        input_chunks={'time': 125},
+        input_chunks={'init_time': 125},
         runner='DirectRunner',
     )
 
