@@ -370,6 +370,7 @@ def main(argv: list[str]) -> None:
         runner=BEAM_RUNNER.value,
         input_chunks=input_chunks,
         fanout=FANOUT.value,
+        argv=argv,
     )
   else:
     evaluation.evaluate_in_memory(data_config, eval_configs)
