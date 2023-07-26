@@ -25,11 +25,11 @@ Example Usage:
     --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-ensemble-means.zarr \
     --beam_runner=DataflowRunner \
     -- \
-    --project $PROJECT \
-    --region $REGION \
-    --temp_location gs://$BUCKET/tmp/ \
-    --setup_file setup.py \
-    --job_name compute-ensemble-mean-$USER
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=setup.py \
+    --job_name=compute-ensemble-mean-$USER
   ```
 """
 from absl import app

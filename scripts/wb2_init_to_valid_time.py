@@ -81,11 +81,11 @@ Example Usage:
     --output_path=gs://$BUCKET/datasets/hres/$USER/2016-2022-0012-64x32_equiangular_with_poles_conservative_with_valid_times.zarr/ \
     --beam_runner=DataflowRunner \
     -- \
-    --project $PROJECT \
-    --region $REGION \
-    --temp_location gs://$BUCKET/tmp/ \
-    --setup_file setup.py \
-    --job_name init-to-valid-times-$USER
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=setup.py \
+    --job_name=init-to-valid-times-$USER
   ```
 """
 from typing import Iterable, Mapping

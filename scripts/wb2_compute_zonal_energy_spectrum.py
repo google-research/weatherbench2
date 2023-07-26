@@ -26,11 +26,11 @@ Example Usage:
     --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-6h-64x32_equiangular_with_poles_conservative_with_zonal_energy_spectrum.zarr \
     --beam_runner=DataflowRunner \
     -- \
-    --project $PROJECT \
-    --region $REGION \
-    --temp_location gs://$BUCKET/tmp/ \
-    --setup_file setup.py \
-    --job_name compute-zonal-energy-spectrum-$USER
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=setup.py \
+    --job_name=compute-zonal-energy-spectrum-$USER
   ```
 """
 import typing as t

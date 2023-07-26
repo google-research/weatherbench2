@@ -24,13 +24,13 @@ Example Usage:
   python scripts/wb2_compute_derived_variables.py \
     --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
     --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-6h-64x32_equiangular_with_poles_conservative_with_derived_vars.zarr \
-    --beam_runner=DataflowRunner \
+    --runner=DataflowRunner \
     -- \
-    --project $PROJECT \
-    --region $REGION \
-    --temp_location gs://$BUCKET/tmp/ \
-    --setup_file setup.py \
-    --job_name compute-derived-variables-$USER
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=setup.py \
+    --job_name=compute-derived-variables-$USER
   ```
 """
 from absl import app

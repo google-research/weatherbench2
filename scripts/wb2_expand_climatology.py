@@ -29,11 +29,11 @@ Example Usage:
     --time_stop=$STOP_TIME \
     --beam_runner=DataflowRunner \
     -- \
-    --project $PROJECT \
-    --region $REGION \
-    --temp_location gs://$BUCKET/tmp/ \
-    --setup_file setup.py \
-    --job_name expand-climatology-$USER
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=setup.py \
+    --job_name=expand-climatology-$USER
   ```
 """
 from collections import abc

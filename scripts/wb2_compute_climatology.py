@@ -20,18 +20,18 @@ Example Usage:
   export PROJECT=my-project
   export REGION=us-central1
 
-  python scripts/compute_climatology_beam.py \
+  python scripts/wb2_compute_climatology.py \
     --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
     --output_path=gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/1990_to_2020_1h_64x32_equiangular_with_poles_conservative.zarr \
     --working_chunks="level=1,longitude=4,latitude=4" \
     --output_chunks="level=1,hour=3" \
     --beam_runner=DataflowRunner \
     -- \
-    --project $PROJECT \
-    --region $REGION \
-    --temp_location gs://$BUCKET/tmp/ \
-    --setup_file setup.py \
-    --job_name compute-climatology-$USER
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=setup.py \
+    --job_name=compute-climatology-$USER
   ```
 """
 import ast

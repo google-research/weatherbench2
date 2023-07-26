@@ -19,7 +19,7 @@ Example Usage:
   export BUCKET=my-bucket
   python scripts/compute_climatology.py \
     --input_path='gs://weatherbench2/datasets/era5/1959-2022-full_37-1h-0p25deg-chunk-1.zarr-v2' \
-    --output_path='gs://$BUCKET/datasets/ear5-hourly-climatology/1990-2019_6h_1440x721.zarr' \
+    --output_path='gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/1990-2019_6h_1440x721.zarr' \
     --by_hour=False
   ```
 """

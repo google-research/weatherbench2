@@ -33,11 +33,11 @@ Example Usage:
     --output_chunks="level=1,hour=3" \
     --beam_runner=DataflowRunner \
     -- \
-    --project $PROJECT \
-    --region $REGION \
-    --temp_location gs://$BUCKET/tmp/ \
-    --setup_file setup.py \
-    --job_name compute-hourly-climatology-$USER
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=setup.py \
+    --job_name=compute-hourly-climatology-$USER
   ```
 """
 import functools
