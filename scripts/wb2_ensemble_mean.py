@@ -12,7 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Ensemble mean (over REALIZATION dimension) of a forecast dataset."""
+r"""Ensemble mean (over REALIZATION dimension) of a forecast dataset.
+
+Example Usage:
+  ```
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/wb2_ensemble_mean.py \
+    --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-ensemble-means.zarr \
+    --beam_runner=DataflowRunner \
+    -- \
+    --project $PROJECT \
+    --region $REGION \
+    --temp_location gs://$BUCKET/tmp/ \
+    --job_name compute-ensemble-mean-$USER
+  ```
+"""
 from absl import app
 from absl import flags
 import apache_beam as beam

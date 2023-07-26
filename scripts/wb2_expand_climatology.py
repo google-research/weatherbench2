@@ -12,7 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Expand a climatology dataset into forecasts for particular times."""
+r"""Expand a climatology dataset into forecasts for particular times.
+
+Example Usage:
+  ```
+  export START_TIME=2017-01-01
+  export STOP_TIME=2017-12-31
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/wb2_expand_climatology.py \
+    --input_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2017_6h_64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/era5-expanded-climatology/$USER/era5-expanded-climatology-2017.zarr/ \
+    --time_start=$START_TIME \
+    --time_stop=$STOP_TIME \
+    --beam_runner=DataflowRunner \
+    -- \
+    --project $PROJECT \
+    --region $REGION \
+    --temp_location gs://$BUCKET/tmp/ \
+    --job_name expand-climatology-$USER
+  ```
+"""
 from collections import abc
 import math
 

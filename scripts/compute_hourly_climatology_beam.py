@@ -28,7 +28,7 @@ Example Usage:
     --start_year=$START_YEAR \
     --end_year=$END_YEAR \
     --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
-    --output_path=gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/clim_${MODE}_${START_YEAR}_to_${END_YEAR}_64x32_equiangular_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/${MODE}/${START_YEAR}_to_${END_YEAR}_6h_64x32_equiangular_conservative.zarr \
     --working_chunks="level=1,longitude=4,latitude=4" \
     --output_chunks="level=1,hour=3" \
     --beam_runner=DataflowRunner \

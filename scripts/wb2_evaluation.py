@@ -12,7 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Run WeatherBench 2 evaluation pipeline."""
+r"""Run WeatherBench 2 evaluation pipeline.
+
+Example Usage:
+  ```
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/wb2_evaluation.py \
+    --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
+    --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2017_6h_64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/evals/$USER/5.625-deterministic-results/ \
+    --input_chunks=time=1,lead_time=1 \
+    --eval_configs=deterministic \
+    --use_beam=True \
+    --beam_runner=DataflowRunner \
+    -- \
+    --project $PROJECT \
+    --region $REGION \
+    --temp_location gs://$BUCKET/tmp/ \
+    --job_name compute-zonal-energy-spectrum-$USER
+  ```
+"""
 import ast
 
 from absl import app

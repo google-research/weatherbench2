@@ -13,7 +13,25 @@
 # limitations under the License.
 # ==============================================================================
 # pyformat: mode=pyink
-"""Compute ZonalEnergySpectrum derived variable."""
+r"""Compute ZonalEnergySpectrum derived variable.
+
+Example Usage:
+  ```
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/wb2_compute_zonal_energy_spectrum.py \
+    --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-6h-64x32_equiangular_with_poles_conservative_with_zonal_energy_spectrum.zarr \
+    --beam_runner=DataflowRunner \
+    -- \
+    --project $PROJECT \
+    --region $REGION \
+    --temp_location gs://$BUCKET/tmp/ \
+    --job_name compute-zonal-energy-spectrum-$USER
+  ```
+"""
 import typing as t
 
 from absl import app

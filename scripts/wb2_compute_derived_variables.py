@@ -13,7 +13,25 @@
 # limitations under the License.
 # ==============================================================================
 # pyformat: mode=pyink
-"""Add derived variables to dataset and save as new file."""
+r"""Add derived variables to dataset and save as new file.
+
+Example Usage:
+  ```
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/wb2_compute_derived_variables.py \
+    --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-6h-64x32_equiangular_with_poles_conservative_with_derived_vars.zarr \
+    --beam_runner=DataflowRunner \
+    -- \
+    --project $PROJECT \
+    --region $REGION \
+    --temp_location gs://$BUCKET/tmp/ \
+    --job_name compute-derived-variables-$USER
+  ```
+"""
 from absl import app
 from absl import flags
 import apache_beam as beam
