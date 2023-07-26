@@ -84,7 +84,7 @@ Example Usage:
     --project=$PROJECT \
     --region=$REGION \
     --temp_location=gs://$BUCKET/tmp/ \
-    --setup_file=setup.py \
+    --setup_file=./setup.py \
     --job_name=init-to-valid-times-$USER
   ```
 """

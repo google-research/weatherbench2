@@ -24,7 +24,7 @@ Example Usage:
     --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
     --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
     --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2017_6h_64x32_equiangular_with_poles_conservative.zarr \
-    --output_path=gs://$BUCKET/datasets/evals/$USER/5.625-deterministic-results/ \
+    --output_dir=gs://$BUCKET/datasets/evals/$USER/5.625-deterministic-results/ \
     --input_chunks=time=1,lead_time=1 \
     --eval_configs=deterministic \
     --use_beam=True \
@@ -33,7 +33,7 @@ Example Usage:
     --project=$PROJECT \
     --region=$REGION \
     --temp_location=gs://$BUCKET/tmp/ \
-    --setup_file=setup.py \
+    --setup_file=./setup.py \
     --job_name=compute-zonal-energy-spectrum-$USER
   ```
 """
