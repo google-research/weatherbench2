@@ -31,7 +31,7 @@ Example Usage:
     --output_path=gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/${MODE}/${START_YEAR}_to_${END_YEAR}_6h_64x32_equiangular_conservative.zarr \
     --working_chunks="level=1,longitude=4,latitude=4" \
     --output_chunks="level=1,hour=3" \
-    --beam_runner=DataflowRunner \
+    --runner=DataflowRunner \
     -- \
     --project=$PROJECT \
     --region=$REGION \
@@ -65,9 +65,7 @@ HOUR_INTERVAL = flags.DEFINE_integer(
 WINDOW_SIZE = flags.DEFINE_integer('window_size', 61, help='Window size')
 START_YEAR = flags.DEFINE_integer('start_year', 1990, help='Clim start year')
 END_YEAR = flags.DEFINE_integer('end_year', 2020, help='Clim end year (incl.)')
-BEAM_RUNNER = flags.DEFINE_string(
-    'beam_runner', None, help='beam.runners.Runner'
-)
+RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 WORKING_CHUNKS = flag_utils.DEFINE_chunks(
     'working_chunks',
     '',
@@ -159,7 +157,7 @@ def main(argv: list[str]) -> None:
   else:
     raise ValueError(f'Wrong climatological mode value: {MODE.value}')
 
-  with beam.Pipeline(runner=BEAM_RUNNER.value, argv=argv) as root:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     _ = (
         root
         | xbeam.DatasetToChunks(

@@ -59,7 +59,7 @@ class WB2ExpandClimatologyTest(absltest.TestCase):
         output_path=output_path,
         time_start='2019-12-01',
         time_stop='2020-03-30',
-        beam_runner='DirectRunner',
+        runner='DirectRunner',
     ):
       wb2_expand_climatology.main([])
 

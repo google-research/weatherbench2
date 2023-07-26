@@ -79,7 +79,7 @@ Example Usage:
   python scripts/wb2_init_to_valid_time.py \
     --input_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
     --output_path=gs://$BUCKET/datasets/hres/$USER/2016-2022-0012-64x32_equiangular_with_poles_conservative_with_valid_times.zarr/ \
-    --beam_runner=DataflowRunner \
+    --runner=DataflowRunner \
     -- \
     --project=$PROJECT \
     --region=$REGION \
@@ -101,9 +101,7 @@ import xarray_beam
 
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='zarr inputs')
 OUTPUT_PATH = flags.DEFINE_string('output_path', None, help='zarr outputs')
-BEAM_RUNNER = flags.DEFINE_string(
-    'beam_runner', None, help='beam.runners.Runner'
-)
+RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 TIME = 'time'
 DELTA = 'prediction_timedelta'
@@ -245,7 +243,7 @@ def main(argv: list[str]) -> None:
       .astype(np.float32)  # ensure we can represent NaN
   )
 
-  with beam.Pipeline(runner=BEAM_RUNNER.value, argv=argv) as p:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as p:
     padding = (
         p
         | beam.Create([None])  # dummy input

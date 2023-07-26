@@ -27,7 +27,7 @@ Example Usage:
     --output_path=gs://$BUCKET/datasets/era5-expanded-climatology/$USER/era5-expanded-climatology-2017.zarr/ \
     --time_start=$START_TIME \
     --time_stop=$STOP_TIME \
-    --beam_runner=DataflowRunner \
+    --runner=DataflowRunner \
     -- \
     --project=$PROJECT \
     --region=$REGION \
@@ -72,9 +72,7 @@ TIME_CHUNK_SIZE = flags.DEFINE_integer(
     None,
     help='Desired integer chunk size. If not set, inferred from input chunks.',
 )
-BEAM_RUNNER = flags.DEFINE_string(
-    'beam_runner', None, help='beam.runners.Runner'
-)
+RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 
 def select_climatology(
@@ -134,7 +132,7 @@ def main(argv: list[str]) -> None:
   # https://github.com/apache/beam/issues/24685
   beam.typehints.disable_type_annotations()
 
-  with beam.Pipeline(runner=BEAM_RUNNER.value, argv=argv) as root:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     _ = (
         root
         | beam.Create([i * time_chunk_size for i in range(time_chunk_count)])

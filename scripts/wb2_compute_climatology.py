@@ -25,7 +25,7 @@ Example Usage:
     --output_path=gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/1990_to_2020_1h_64x32_equiangular_with_poles_conservative.zarr \
     --working_chunks="level=1,longitude=4,latitude=4" \
     --output_chunks="level=1,hour=3" \
-    --beam_runner=DataflowRunner \
+    --runner=DataflowRunner \
     -- \
     --project=$PROJECT \
     --region=$REGION \
@@ -71,9 +71,7 @@ START_YEAR = flags.DEFINE_integer(
 END_YEAR = flags.DEFINE_integer(
     'end_year', 2020, help='Inclusive end year of climatology'
 )
-BEAM_RUNNER = flags.DEFINE_string(
-    'beam_runner', None, help='beam.runners.Runner'
-)
+RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 WORKING_CHUNKS = flag_utils.DEFINE_chunks(
     'working_chunks',
     '',
@@ -259,7 +257,7 @@ def main(argv: list[str]) -> None:
     for var in raw_vars:
       clim_template = clim_template.drop(var)
 
-  with beam.Pipeline(runner=BEAM_RUNNER.value, argv=argv) as root:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     # Read and Rechunk
     pcoll = (
         root

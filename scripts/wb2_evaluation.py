@@ -28,7 +28,7 @@ Example Usage:
     --input_chunks=time=1,lead_time=1 \
     --eval_configs=deterministic \
     --use_beam=True \
-    --beam_runner=DataflowRunner \
+    --runner=DataflowRunner \
     -- \
     --project=$PROJECT \
     --region=$REGION \
@@ -205,7 +205,7 @@ USE_BEAM = flags.DEFINE_bool(
     False,
     'Run evaluation pipeline as beam pipeline. If False, run in memory.',
 )
-BEAM_RUNNER = flags.DEFINE_string('beam_runner', None, help='Beam runner')
+RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 FANOUT = flags.DEFINE_integer(
     'fanout',
     None,
@@ -391,7 +391,7 @@ def main(argv: list[str]) -> None:
     evaluation.evaluate_with_beam(
         data_config,
         eval_configs,
-        runner=BEAM_RUNNER.value,
+        runner=RUNNER.value,
         input_chunks=input_chunks,
         fanout=FANOUT.value,
         argv=argv,
