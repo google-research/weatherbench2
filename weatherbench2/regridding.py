@@ -27,6 +27,8 @@ https://gist.github.com/shoyer/c0f1ddf409667650a076c058f9a17276
 """
 from __future__ import annotations
 
+from typing import Union
+
 import dataclasses
 import functools
 
@@ -36,7 +38,7 @@ import numpy as np
 from sklearn import neighbors
 
 
-Array = np.ndarray | jax.Array
+Array = Union[np.ndarray, jax.Array]
 
 
 @dataclasses.dataclass(frozen=True)
