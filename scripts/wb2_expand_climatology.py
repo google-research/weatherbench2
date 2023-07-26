@@ -33,6 +33,7 @@ Example Usage:
     --region=$REGION \
     --temp_location=gs://$BUCKET/tmp/ \
     --setup_file=./setup.py \
+    --requirements_file=./dataflow-requirements.txt \
     --job_name=expand-climatology-$USER
   ```
 """
