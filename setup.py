@@ -22,7 +22,7 @@ base_requires = [
     'numpy',
     'pandas<1.4',
     'scipy',
-    'sklearn',
+    'scikit-learn',
     'xarray',
     'pandas',
     'xarray-beam',
@@ -41,6 +41,11 @@ tests_requires = [
     'pytest',
 ]
 
+gcp_requires = [
+    'apache_beam[gcp]>=2.31.0',
+    'gcsfs',
+]
+
 setuptools.setup(
     name='weatherbench2',
     version='0.0.0',
@@ -51,6 +56,7 @@ setuptools.setup(
     extras_require={
         'tests': tests_requires,
         'docs': docs_requires,
+        'gcp': gcp_requires,
     },
     url='https://github.com/google-research/weatherbench2',
     packages=setuptools.find_packages(exclude=['notebooks', 'scripts']),

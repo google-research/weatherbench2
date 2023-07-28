@@ -12,9 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Run WeatherBench 2 evaluation pipeline."""
+r"""Run WeatherBench 2 evaluation pipeline.
+
+Example Usage:
+  ```
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/wb2_evaluation.py \
+    --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
+    --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2017_6h_64x32_equiangular_with_poles_conservative.zarr \
+    --output_dir=gs://$BUCKET/datasets/evals/$USER/5.625-deterministic-results/ \
+    --input_chunks=time=1,lead_time=1 \
+    --eval_configs=deterministic \
+    --use_beam=True \
+    --runner=DataflowRunner \
+    -- \
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=./setup.py \
+    --requirements_file=./scripts/dataflow-requirements.txt \
+    --job_name=compute-zonal-energy-spectrum-$USER
+  ```
+"""
 import ast
-import typing as t
 
 from absl import app
 from absl import flags
@@ -182,7 +206,7 @@ USE_BEAM = flags.DEFINE_bool(
     False,
     'Run evaluation pipeline as beam pipeline. If False, run in memory.',
 )
-BEAM_RUNNER = flags.DEFINE_string('beam_runner', None, help='Beam runner')
+RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 FANOUT = flags.DEFINE_integer(
     'fanout',
     None,
@@ -218,7 +242,7 @@ def _wind_vector_rmse():
   return wind_vector_rmse
 
 
-def main(_: t.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   """Run all WB2 metrics."""
   selection = Selection(
       variables=VARIABLES.value,
@@ -368,9 +392,10 @@ def main(_: t.Sequence[str]) -> None:
     evaluation.evaluate_with_beam(
         data_config,
         eval_configs,
-        runner=BEAM_RUNNER.value,
+        runner=RUNNER.value,
         input_chunks=input_chunks,
         fanout=FANOUT.value,
+        argv=argv,
     )
   else:
     evaluation.evaluate_in_memory(data_config, eval_configs)

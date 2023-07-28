@@ -12,7 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Expand a climatology dataset into forecasts for particular times."""
+r"""Expand a climatology dataset into forecasts for particular times.
+
+Example Usage:
+  ```
+  export START_TIME=2017-01-01
+  export STOP_TIME=2017-12-31
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/wb2_expand_climatology.py \
+    --input_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2017_6h_64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/era5-expanded-climatology/$USER/era5-expanded-climatology-2017.zarr/ \
+    --time_start=$START_TIME \
+    --time_stop=$STOP_TIME \
+    --runner=DataflowRunner \
+    -- \
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=./setup.py \
+    --requirements_file=./scripts/dataflow-requirements.txt \
+    --job_name=expand-climatology-$USER
+  ```
+"""
 from collections import abc
 import math
 
@@ -49,9 +73,7 @@ TIME_CHUNK_SIZE = flags.DEFINE_integer(
     None,
     help='Desired integer chunk size. If not set, inferred from input chunks.',
 )
-BEAM_RUNNER = flags.DEFINE_string(
-    'beam_runner', None, help='beam.runners.Runner'
-)
+RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 
 def select_climatology(
@@ -77,7 +99,7 @@ def select_climatology(
     yield key, chunk[[variable_name]]
 
 
-def main(_: abc.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   climatology, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
 
   if 'hour' not in climatology.coords:
@@ -111,7 +133,7 @@ def main(_: abc.Sequence[str]) -> None:
   # https://github.com/apache/beam/issues/24685
   beam.typehints.disable_type_annotations()
 
-  with beam.Pipeline(runner=BEAM_RUNNER.value) as root:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     _ = (
         root
         | beam.Create([i * time_chunk_size for i in range(time_chunk_count)])

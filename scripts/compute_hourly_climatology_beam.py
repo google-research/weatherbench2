@@ -12,8 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""CLI to compute and save climatology."""
-from collections import abc
+r"""CLI to compute and save climatology.
+
+Example Usage:
+  ```
+  export MODE=mean
+  export START_YEAR=1959
+  export END_YEAR=2015
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/compute_hourly_climatology_beam.py \
+    --mode=$MODE \
+    --start_year=$START_YEAR \
+    --end_year=$END_YEAR \
+    --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/${MODE}/${START_YEAR}_to_${END_YEAR}_6h_64x32_equiangular_conservative.zarr \
+    --working_chunks="level=1,longitude=4,latitude=4" \
+    --output_chunks="level=1,hour=3" \
+    --runner=DataflowRunner \
+    -- \
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=./setup.py \
+    --requirements_file=./scripts/dataflow-requirements.txt \
+    --job_name=compute-hourly-climatology-$USER
+  ```
+"""
 import functools
 
 from absl import app
@@ -39,9 +66,7 @@ HOUR_INTERVAL = flags.DEFINE_integer(
 WINDOW_SIZE = flags.DEFINE_integer('window_size', 61, help='Window size')
 START_YEAR = flags.DEFINE_integer('start_year', 1990, help='Clim start year')
 END_YEAR = flags.DEFINE_integer('end_year', 2020, help='Clim end year (incl.)')
-BEAM_RUNNER = flags.DEFINE_string(
-    'beam_runner', None, help='beam.runners.Runner'
-)
+RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 WORKING_CHUNKS = flag_utils.DEFINE_chunks(
     'working_chunks',
     '',
@@ -95,7 +120,7 @@ def compute_hourly_climatology_std_chunk(
   return clim_key, clim_chunk
 
 
-def main(argv: abc.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   obs, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
   # TODO(shoyer): slice obs in time using START_YEAR and END_YEAR. This would
   # require some care in order to ensure input_chunks['time'] remains valid.
@@ -133,7 +158,7 @@ def main(argv: abc.Sequence[str]) -> None:
   else:
     raise ValueError(f'Wrong climatological mode value: {MODE.value}')
 
-  with beam.Pipeline(runner=BEAM_RUNNER.value, argv=argv) as root:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     _ = (
         root
         | xbeam.DatasetToChunks(
