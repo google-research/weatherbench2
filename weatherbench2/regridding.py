@@ -27,10 +27,10 @@ https://gist.github.com/shoyer/c0f1ddf409667650a076c058f9a17276
 """
 from __future__ import annotations
 
-from typing import Union
 
 import dataclasses
 import functools
+from typing import Union
 
 import jax
 import jax.numpy as jnp
