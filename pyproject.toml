@@ -3,3 +3,9 @@ line-length = 80
 preview = true
 pyink-indentation = 2
 pyink-use-majority-quotes = true
+
+[tool.isort]
+profile = "google"
+use_parentheses = true
+known_third_party= ['absl']
+multi_line_output = 3
