@@ -30,7 +30,7 @@ from absl import app
 from absl import flags
 import xarray as xr
 
-from weatherbench2 import utils as wb2_utils
+from weatherbench2 import utils
 
 # Command line arguments
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='Input Zarr path')
@@ -50,7 +50,7 @@ def main(_: t.Sequence[str]) -> None:
   obs = xr.open_zarr(INPUT_PATH.value)
   if BY_HOUR.value:
     print('Compute hourly climatology.')
-    clim = wb2_utils.compute_hourly_stat(
+    clim = utils.compute_hourly_stat(
         obs=obs,
         window_size=WINDOW_SIZE.value,
         clim_years=slice(str(START_YEAR.value), str(END_YEAR.value)),
@@ -58,7 +58,7 @@ def main(_: t.Sequence[str]) -> None:
     )
   else:
     print('Compute daily climatology.')
-    clim = wb2_utils.compute_daily_stat(
+    clim = utils.compute_daily_stat(
         obs=obs,
         window_size=WINDOW_SIZE.value,
         clim_years=slice(str(START_YEAR.value), str(END_YEAR.value)),
