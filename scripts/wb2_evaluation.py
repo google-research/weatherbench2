@@ -42,13 +42,40 @@ import ast
 
 from absl import app
 from absl import flags
+import xarray as xr
+
 from weatherbench2 import evaluation
 from weatherbench2 import flag_utils
-from weatherbench2.config import DataConfig, EvalConfig, Paths, Selection  # pylint: disable=g-multiple-import
+from weatherbench2.config import (
+    DataConfig  # pylint: disable=g-multiple-import
+)
+from weatherbench2.config import EvalConfig
+from weatherbench2.config import Paths
+from weatherbench2.config import Selection
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
-from weatherbench2.metrics import ACC, Bias, CRPS, CRPSSkill, CRPSSpread, EnergyScore, EnergyScoreSkill, EnergyScoreSpread, EnsembleMeanRMSE, EnsembleStddev, RMSE, MSE, SEEPS, SpatialBias, SpatialMSE, SpatialSEEPS, WindVectorRMSE  # pylint: disable=g-multiple-import,unused-import
-from weatherbench2.regions import SliceRegion, LandRegion  # pylint: disable=g-multiple-import
-import xarray as xr
+from weatherbench2.metrics import (
+    ACC  # pylint: disable=g-multiple-import,unused-import
+)
+from weatherbench2.metrics import Bias
+from weatherbench2.metrics import CRPS
+from weatherbench2.metrics import CRPSSkill
+from weatherbench2.metrics import CRPSSpread
+from weatherbench2.metrics import EnergyScore
+from weatherbench2.metrics import EnergyScoreSkill
+from weatherbench2.metrics import EnergyScoreSpread
+from weatherbench2.metrics import EnsembleMeanRMSE
+from weatherbench2.metrics import EnsembleStddev
+from weatherbench2.metrics import MSE
+from weatherbench2.metrics import RMSE
+from weatherbench2.metrics import SEEPS
+from weatherbench2.metrics import SpatialBias
+from weatherbench2.metrics import SpatialMSE
+from weatherbench2.metrics import SpatialSEEPS
+from weatherbench2.metrics import WindVectorRMSE
+from weatherbench2.regions import (
+    LandRegion  # pylint: disable=g-multiple-import
+)
+from weatherbench2.regions import SliceRegion
 
 _DEFAULT_VARIABLES = [
     'geopotential',

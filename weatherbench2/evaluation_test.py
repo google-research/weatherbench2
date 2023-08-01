@@ -15,13 +15,17 @@
 import os
 
 from absl.testing import absltest
+import xarray
+
 from weatherbench2 import config
 from weatherbench2 import evaluation
 from weatherbench2 import metrics
 from weatherbench2 import schema
 from weatherbench2 import utils
-from weatherbench2.regions import ExtraTropicalRegion, SliceRegion  # pylint: disable=g-multiple-import
-import xarray
+from weatherbench2.regions import (
+    ExtraTropicalRegion  # pylint: disable=g-multiple-import
+)
+from weatherbench2.regions import SliceRegion
 
 
 class EvaluationTest(absltest.TestCase):

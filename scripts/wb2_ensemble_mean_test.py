@@ -16,10 +16,11 @@
 
 from absl.testing import absltest
 from absl.testing import flagsaver
-from weatherbench2 import schema
-from weatherbench2 import utils
 import xarray
 from xarray_beam._src import test_util
+
+from weatherbench2 import schema
+from weatherbench2 import utils
 
 from . import wb2_ensemble_mean
 

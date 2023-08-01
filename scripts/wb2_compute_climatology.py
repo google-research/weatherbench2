@@ -42,11 +42,14 @@ from absl import app
 from absl import flags
 import apache_beam as beam
 import numpy as np
-from weatherbench2 import flag_utils
-from weatherbench2.utils import compute_hourly_stat, compute_hourly_stat_fast  # pylint: disable=g-multiple-import
 import xarray as xr
 import xarray_beam as xbeam
 
+from weatherbench2 import flag_utils
+from weatherbench2.utils import (
+    compute_hourly_stat  # pylint: disable=g-multiple-import
+)
+from weatherbench2.utils import compute_hourly_stat_fast
 
 DEFAULT_SEEPS_THRESHOLD_MM = (
     "{'total_precipitation_24hr':0.25, 'total_precipitation_6hr':0.1}"

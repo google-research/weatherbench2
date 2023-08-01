@@ -29,11 +29,16 @@ from typing import Any, Optional
 import apache_beam as beam
 import fsspec
 import numpy as np
-from weatherbench2 import schema
-from weatherbench2.config import DataConfig, EvalConfig, Selection  # pylint: disable=g-multiple-import
-from weatherbench2.utils import make_probabilistic_climatology
 import xarray as xr
 import xarray_beam as xbeam
+
+from weatherbench2 import schema
+from weatherbench2.config import (
+    DataConfig  # pylint: disable=g-multiple-import
+)
+from weatherbench2.config import EvalConfig
+from weatherbench2.config import Selection
+from weatherbench2.utils import make_probabilistic_climatology
 
 # pylint: disable=logging-fstring-interpolation
 

@@ -47,7 +47,6 @@ import pandas as pd
 import xarray
 import xarray_beam as xbeam
 
-
 INPUT_PATH = flags.DEFINE_string(
     'input_path',
     None,

@@ -99,7 +99,6 @@ import pandas as pd
 import xarray
 import xarray_beam
 
-
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='zarr inputs')
 OUTPUT_PATH = flags.DEFINE_string('output_path', None, help='zarr outputs')
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')

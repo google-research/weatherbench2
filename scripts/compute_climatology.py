@@ -28,10 +28,10 @@ import typing as t
 
 from absl import app
 from absl import flags
-from weatherbench2.utils import compute_daily_stat
-from weatherbench2.utils import compute_hourly_stat
 import xarray as xr
 
+from weatherbench2.utils import compute_daily_stat
+from weatherbench2.utils import compute_hourly_stat
 
 # Command line arguments
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='Input Zarr path')

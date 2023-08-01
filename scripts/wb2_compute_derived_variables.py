@@ -37,10 +37,16 @@ Example Usage:
 from absl import app
 from absl import flags
 import apache_beam as beam
-from weatherbench2 import flag_utils
-from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT, DerivedVariable, PrecipitationAccumulation, AggregatePrecipitationAccumulation  # pylint: disable=g-line-too-long,g-multiple-import
 import xarray as xr
 import xarray_beam as xbeam
+
+from weatherbench2 import flag_utils
+from weatherbench2.derived_variables import (
+    AggregatePrecipitationAccumulation  # pylint: disable=g-line-too-long,g-multiple-import
+)
+from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
+from weatherbench2.derived_variables import DerivedVariable
+from weatherbench2.derived_variables import PrecipitationAccumulation
 
 _DEFAULT_DERIVED_VARIABLES = [
     'wind_speed',
