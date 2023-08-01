@@ -47,14 +47,14 @@ import xarray as xr
 from weatherbench2 import evaluation
 from weatherbench2 import flag_utils
 from weatherbench2.config import (
-    DataConfig  # pylint: disable=g-multiple-import
+    DataConfig,  # pylint: disable=g-multiple-import
 )
 from weatherbench2.config import EvalConfig
 from weatherbench2.config import Paths
 from weatherbench2.config import Selection
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
 from weatherbench2.metrics import (
-    ACC  # pylint: disable=g-multiple-import,unused-import
+    ACC,  # pylint: disable=g-multiple-import,unused-import
 )
 from weatherbench2.metrics import Bias
 from weatherbench2.metrics import CRPS
@@ -73,7 +73,7 @@ from weatherbench2.metrics import SpatialMSE
 from weatherbench2.metrics import SpatialSEEPS
 from weatherbench2.metrics import WindVectorRMSE
 from weatherbench2.regions import (
-    LandRegion  # pylint: disable=g-multiple-import
+    LandRegion,  # pylint: disable=g-multiple-import
 )
 from weatherbench2.regions import SliceRegion
 

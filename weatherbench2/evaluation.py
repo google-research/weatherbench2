@@ -34,7 +34,7 @@ import xarray_beam as xbeam
 
 from weatherbench2 import schema
 from weatherbench2.config import (
-    DataConfig  # pylint: disable=g-multiple-import
+    DataConfig,  # pylint: disable=g-multiple-import
 )
 from weatherbench2.config import EvalConfig
 from weatherbench2.config import Selection

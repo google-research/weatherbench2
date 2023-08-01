@@ -43,7 +43,7 @@ import xarray as xr
 import xarray_beam as xbeam
 
 from weatherbench2.derived_variables import (
-    ZonalEnergySpectrum  # pylint: disable=g-line-too-long,g-multiple-import
+    ZonalEnergySpectrum,  # pylint: disable=g-line-too-long,g-multiple-import
 )
 
 _DEFAULT_BASE_VARIABLES = [

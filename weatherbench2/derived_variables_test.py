@@ -24,7 +24,7 @@ from weatherbench2 import schema
 from weatherbench2 import test_utils
 from weatherbench2 import utils
 from weatherbench2.derived_variables import (
-    AggregatePrecipitationAccumulation  # pylint: disable=g-multiple-import
+    AggregatePrecipitationAccumulation,  # pylint: disable=g-multiple-import
 )
 from weatherbench2.derived_variables import PrecipitationAccumulation
 from weatherbench2.derived_variables import WindSpeed
