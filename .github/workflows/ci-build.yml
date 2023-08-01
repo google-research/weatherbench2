@@ -39,6 +39,9 @@ jobs:
       with:
         path: ${{ steps.pip-cache.outputs.dir }}
         key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+    - name: Lint with pyink
+      run: |
+        pyink --check .
     - name: Install Weatherbench2
       run: |
         pip install -e .[tests]

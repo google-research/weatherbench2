@@ -397,7 +397,8 @@ class ZonalEnergySpectrumTest(parameterized.TestCase):
     spectrum = derived_variable.compute(dataset)
 
     interpolated = derived_variables.interpolate_spectral_frequencies(
-        spectrum, wavenumber_dim='zonal_wavenumber')
+        spectrum, wavenumber_dim='zonal_wavenumber'
+    )
 
     self.assertEqual(
         {'frequency'} | set(spectrum.dims) - {'zonal_wavenumber'},

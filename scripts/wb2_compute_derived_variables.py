@@ -131,10 +131,13 @@ def main(argv: list[str]) -> None:
         {dv.variable_name: template[dv.base_variables[0]]}
     )
     template[dv.variable_name].attrs = {}  # Strip attributes
-    if isinstance(dv, (
-        PrecipitationAccumulation,
-        AggregatePrecipitationAccumulation,
-    )):
+    if isinstance(
+        dv,
+        (
+            PrecipitationAccumulation,
+            AggregatePrecipitationAccumulation,
+        ),
+    ):
       derived_variables_with_rechunking.append(dv)
     else:
       derived_variables_without_rechunking.append(dv)

@@ -55,7 +55,7 @@ def main(_: t.Sequence[str]) -> None:
         obs=obs,
         window_size=WINDOW_SIZE.value,
         clim_years=slice(str(START_YEAR.value), str(END_YEAR.value)),
-        hour_interval=HOUR_INTERVAL.value
+        hour_interval=HOUR_INTERVAL.value,
     )
   else:
     print('Compute daily climatology.')

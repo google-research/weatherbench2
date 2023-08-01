@@ -69,6 +69,7 @@ class Grid:
 @dataclasses.dataclass(frozen=True)
 class Regridder:
   """Base class for regridding."""
+
   source: Grid
   target: Grid
 

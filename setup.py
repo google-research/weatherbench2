@@ -15,7 +15,6 @@
 """Setup Weatherbench2."""
 import setuptools
 
-
 base_requires = [
     'apache_beam>=2.31.0',
     'jax[cpu]',
@@ -39,6 +38,7 @@ docs_requires = [
 tests_requires = [
     'absl-py',
     'pytest',
+    'pyink',
 ]
 
 gcp_requires = [
