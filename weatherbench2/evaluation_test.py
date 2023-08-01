@@ -22,9 +22,7 @@ from weatherbench2 import evaluation
 from weatherbench2 import metrics
 from weatherbench2 import schema
 from weatherbench2 import utils
-from weatherbench2.regions import (
-    ExtraTropicalRegion,  # pylint: disable=g-multiple-import
-)
+from weatherbench2.regions import ExtraTropicalRegion
 from weatherbench2.regions import SliceRegion
 
 

@@ -46,9 +46,7 @@ import xarray as xr
 import xarray_beam as xbeam
 
 from weatherbench2 import flag_utils
-from weatherbench2.utils import (
-    compute_hourly_stat,  # pylint: disable=g-multiple-import
-)
+from weatherbench2.utils import compute_hourly_stat
 from weatherbench2.utils import compute_hourly_stat_fast
 
 DEFAULT_SEEPS_THRESHOLD_MM = (

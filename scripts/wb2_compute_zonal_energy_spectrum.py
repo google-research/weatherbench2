@@ -42,9 +42,7 @@ import apache_beam as beam
 import xarray as xr
 import xarray_beam as xbeam
 
-from weatherbench2.derived_variables import (
-    ZonalEnergySpectrum,  # pylint: disable=g-line-too-long,g-multiple-import
-)
+from weatherbench2.derived_variables import ZonalEnergySpectrum
 
 _DEFAULT_BASE_VARIABLES = [
     'geopotential',

@@ -41,9 +41,7 @@ import xarray as xr
 import xarray_beam as xbeam
 
 from weatherbench2 import flag_utils
-from weatherbench2.derived_variables import (
-    AggregatePrecipitationAccumulation,  # pylint: disable=g-line-too-long,g-multiple-import
-)
+from weatherbench2.derived_variables import AggregatePrecipitationAccumulation
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
 from weatherbench2.derived_variables import DerivedVariable
 from weatherbench2.derived_variables import PrecipitationAccumulation

@@ -33,11 +33,14 @@ import xarray as xr
 import xarray_beam as xbeam
 
 from weatherbench2 import schema
+
+# isort: off
 from weatherbench2.config import (
-    DataConfig,  # pylint: disable=g-multiple-import
+    DataConfig,
+    EvalConfig,
+    Selection,
 )
-from weatherbench2.config import EvalConfig
-from weatherbench2.config import Selection
+# isort: on
 from weatherbench2.utils import make_probabilistic_climatology
 
 # pylint: disable=logging-fstring-interpolation
