@@ -362,9 +362,13 @@ def main(argv: list[str]) -> None:
       ),
       'ensemble_forecast_vs_era_experimental_metrics': config.EvalConfig(
           metrics={
-              'crps_spread': metrics.CRPSSpread(ensemble_dim=ENSEMBLE_DIM.value),
+              'crps_spread': metrics.CRPSSpread(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
               'crps_skill': metrics.CRPSSkill(ensemble_dim=ENSEMBLE_DIM.value),
-              'energy_score': metrics.EnergyScore(ensemble_dim=ENSEMBLE_DIM.value),
+              'energy_score': metrics.EnergyScore(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
               'energy_score_spread': metrics.EnergyScoreSpread(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),

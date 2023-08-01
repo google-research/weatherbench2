@@ -423,7 +423,9 @@ def _metric_and_region_loop(
 
 
 def _evaluate_all_metrics(
-    eval_name: str, eval_config: config.EvalConfig, data_config: config.DataConfig
+    eval_name: str,
+    eval_config: config.EvalConfig,
+    data_config: config.DataConfig,
 ) -> None:
   """Evaluate a set of eval metrics in memory."""
   forecast, truth, climatology = open_forecast_and_truth_datasets(
