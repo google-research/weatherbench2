@@ -2,6 +2,7 @@
 # WeatherBench 2
 
 [![CI](https://github.com/google-research/weatherbench2/actions/workflows/ci-build.yml/badge.svg)](https://github.com/google-research/weatherbench2/actions/workflows/ci-build.yml)
+[![Lint](https://github.com/google-research/weatherbench2/actions/workflows/lint.yml/badge.svg)](https://github.com/google-research/weatherbench2/actions/workflows/lint.yml)
 
 This repository contains the code for **WeatherBench 2: A benchmark for the next generation of data-driven global weather models**. 
 
