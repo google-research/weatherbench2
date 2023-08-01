@@ -19,14 +19,10 @@ from absl.testing import parameterized
 import numpy as np
 import xarray as xr
 
-from weatherbench2 import derived_variables
+from weatherbench2 import derived_variables as dvs
 from weatherbench2 import schema
 from weatherbench2 import test_utils
 from weatherbench2 import utils
-from weatherbench2.derived_variables import AggregatePrecipitationAccumulation
-from weatherbench2.derived_variables import PrecipitationAccumulation
-from weatherbench2.derived_variables import WindSpeed
-from weatherbench2.derived_variables import ZonalEnergySpectrum
 
 
 def get_random_weather(
@@ -93,7 +89,7 @@ class DerivedVariablesTest(absltest.TestCase):
         'v_component_of_wind': xr.DataArray([0, -4, 1]),
     })
 
-    derived_variable = WindSpeed(
+    derived_variable = dvs.WindSpeed(
         u_name='u_component_of_wind',
         v_name='v_component_of_wind',
         variable_name='wind_speed',
@@ -120,7 +116,7 @@ class DerivedVariablesTest(absltest.TestCase):
   def testPrecipitationAccumulation6hr(self):
     dataset = self._create_precip_dataset()
 
-    derived_variable = PrecipitationAccumulation(
+    derived_variable = dvs.PrecipitationAccumulation(
         variable_name='total_precipitation_6hr',
         total_precipitation_name='total_precipitation',
         accumulation_hours=6,
@@ -136,7 +132,7 @@ class DerivedVariablesTest(absltest.TestCase):
   def testPrecipitationAccumulation24hr(self):
     dataset = self._create_precip_dataset()
 
-    derived_variable = PrecipitationAccumulation(
+    derived_variable = dvs.PrecipitationAccumulation(
         variable_name='total_precipitation_24hr',
         total_precipitation_name='total_precipitation',
         accumulation_hours=24,
@@ -161,7 +157,7 @@ class DerivedVariablesTest(absltest.TestCase):
         }
     )
 
-    derived_variable = AggregatePrecipitationAccumulation(
+    derived_variable = dvs.AggregatePrecipitationAccumulation(
         variable_name='total_precipitation_24hr',
         accumulation_hours=24,
     )
@@ -190,7 +186,7 @@ class ZonalEnergySpectrumTest(parameterized.TestCase):
         variables=['geopotential'],
         spatial_resolution_in_degrees=spatial_resolution_in_degrees,
     )
-    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+    derived_variable = dvs.ZonalEnergySpectrum(variable_name='geopotential')
     circum_at_equator = schema.EARTH_RADIUS_M * 2 * np.pi
     np.testing.assert_allclose(
         derived_variable._circumference(dataset).sel(latitude=0).data,
@@ -203,7 +199,7 @@ class ZonalEnergySpectrumTest(parameterized.TestCase):
 
   def test_data_has_right_shape_and_dims(self):
     dataset = get_random_weather(variables=['geopotential'], ensemble_size=None)
-    spectrum = ZonalEnergySpectrum(
+    spectrum = dvs.ZonalEnergySpectrum(
         variable_name='geopotential',
     ).compute(dataset)
 
@@ -263,7 +259,7 @@ class ZonalEnergySpectrumTest(parameterized.TestCase):
     dataset['geopotential'] += 10 * np.cos(
         2 * np.pi * dataset.longitude / wavelength_lon
     )
-    spectrum = ZonalEnergySpectrum(variable_name='geopotential').compute(
+    spectrum = dvs.ZonalEnergySpectrum(variable_name='geopotential').compute(
         dataset
     )
 
@@ -310,7 +306,7 @@ class ZonalEnergySpectrumTest(parameterized.TestCase):
         constant_to_add=50 if add_constant else 0,
     )
 
-    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+    derived_variable = dvs.ZonalEnergySpectrum(variable_name='geopotential')
 
     spectrum_5 = derived_variable.compute(dataset_5).swap_dims(
         {'zonal_wavenumber': 'frequency'}
@@ -377,7 +373,7 @@ class ZonalEnergySpectrumTest(parameterized.TestCase):
         constant_to_add=50 if add_constant else 0,
     )
 
-    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+    derived_variable = dvs.ZonalEnergySpectrum(variable_name='geopotential')
 
     energy = (
         (derived_variable.lon_spacing_m(dataset) * dataset**2)
@@ -397,10 +393,10 @@ class ZonalEnergySpectrumTest(parameterized.TestCase):
         spatial_resolution_in_degrees=5,
         latitude=slice(-30, 30),
     )
-    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+    derived_variable = dvs.ZonalEnergySpectrum(variable_name='geopotential')
     spectrum = derived_variable.compute(dataset)
 
-    interpolated = derived_variables.interpolate_spectral_frequencies(
+    interpolated = dvs.interpolate_spectral_frequencies(
         spectrum, wavenumber_dim='zonal_wavenumber'
     )
 
@@ -439,13 +435,13 @@ class ZonalEnergySpectrumTest(parameterized.TestCase):
         spatial_resolution_in_degrees=1.0,
         latitude=slice(-30, 30),
     )
-    derived_variable = ZonalEnergySpectrum(variable_name='geopotential')
+    derived_variable = dvs.ZonalEnergySpectrum(variable_name='geopotential')
     spectrum = derived_variable.compute(dataset)
 
     reference_lat = 5
     reference_wavenumbers = slice(3, 8)
 
-    interpolated = derived_variables.interpolate_spectral_frequencies(
+    interpolated = dvs.interpolate_spectral_frequencies(
         spectrum,
         wavenumber_dim='zonal_wavenumber',
         frequencies=spectrum.frequency.sel(

@@ -32,15 +32,8 @@ import numpy as np
 import xarray as xr
 import xarray_beam as xbeam
 
+from weatherbench2 import config
 from weatherbench2 import schema
-
-# isort: off
-from weatherbench2.config import (
-    DataConfig,
-    EvalConfig,
-    Selection,
-)
-# isort: on
 from weatherbench2.utils import make_probabilistic_climatology
 
 # pylint: disable=logging-fstring-interpolation
@@ -145,7 +138,7 @@ def open_source_files(
 
 def _impose_data_selection(
     dataset: xr.Dataset,
-    selection: Selection,
+    selection: config.Selection,
     select_time: bool = True,
     time_dim: Optional[str] = None,
 ) -> xr.Dataset:
@@ -231,8 +224,8 @@ def _ensure_consistent_time_step_sizes(
 
 
 def _add_base_variables(
-    data_config: DataConfig, eval_config: EvalConfig
-) -> DataConfig:
+    data_config: config.DataConfig, eval_config: config.EvalConfig
+) -> config.DataConfig:
   """Add required base variables for computing derived variables.
 
   Args:
@@ -294,8 +287,8 @@ def _select_analysis_init_time(
 
 
 def open_forecast_and_truth_datasets(
-    data_config: DataConfig,
-    eval_config: EvalConfig,
+    data_config: config.DataConfig,
+    eval_config: config.EvalConfig,
     use_dask: bool = False,
 ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset | None]:
   """Open datasets and select desired slices.
@@ -363,7 +356,7 @@ def open_forecast_and_truth_datasets(
 
 
 def _get_output_path(
-    data_config: DataConfig, eval_name: str, output_format: str
+    data_config: config.DataConfig, eval_name: str, output_format: str
 ) -> str:
   if output_format == 'netcdf':
     suffix = 'nc'
@@ -385,7 +378,7 @@ def _to_netcdf(dataset: xr.Dataset, filename: str) -> None:
 def _metric_and_region_loop(
     forecast: xr.Dataset,
     truth: xr.Dataset,
-    eval_config: EvalConfig,
+    eval_config: config.EvalConfig,
     compute_chunk: bool = False,
 ) -> xr.Dataset:
   """Compute metric results looping over metrics and regions in eval config."""
@@ -430,7 +423,7 @@ def _metric_and_region_loop(
 
 
 def _evaluate_all_metrics(
-    eval_name: str, eval_config: EvalConfig, data_config: DataConfig
+    eval_name: str, eval_config: config.EvalConfig, data_config: config.DataConfig
 ) -> None:
   """Evaluate a set of eval metrics in memory."""
   forecast, truth, climatology = open_forecast_and_truth_datasets(
@@ -472,8 +465,8 @@ def _evaluate_all_metrics(
 
 
 def evaluate_in_memory(
-    data_config: DataConfig,
-    eval_configs: dict[str, EvalConfig],
+    data_config: config.DataConfig,
+    eval_configs: dict[str, config.EvalConfig],
 ) -> None:
   """Run evaluation in memory.
 
@@ -507,7 +500,7 @@ class _SaveOutputs(beam.PTransform):
   """Save outputs to Zarr or netCDF."""
 
   eval_name: str
-  data_config: DataConfig
+  data_config: config.DataConfig
   output_format: str
 
   def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:
@@ -547,8 +540,8 @@ class _EvaluateAllMetrics(beam.PTransform):
   """
 
   eval_name: str
-  eval_config: EvalConfig
-  data_config: DataConfig
+  eval_config: config.EvalConfig
+  data_config: config.DataConfig
   input_chunks: abc.Mapping[str, int]
   fanout: Optional[int] = None
 
@@ -699,8 +692,8 @@ class _EvaluateAllMetrics(beam.PTransform):
 
 
 def evaluate_with_beam(
-    data_config: DataConfig,
-    eval_configs: dict[str, EvalConfig],
+    data_config: config.DataConfig,
+    eval_configs: dict[str, config.EvalConfig],
     *,
     input_chunks: abc.Mapping[str, int],
     runner: str,
