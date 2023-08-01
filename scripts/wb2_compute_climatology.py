@@ -46,8 +46,7 @@ import xarray as xr
 import xarray_beam as xbeam
 
 from weatherbench2 import flag_utils
-from weatherbench2.utils import compute_hourly_stat
-from weatherbench2.utils import compute_hourly_stat_fast
+from weatherbench2 import utils
 
 DEFAULT_SEEPS_THRESHOLD_MM = (
     "{'total_precipitation_24hr':0.25, 'total_precipitation_6hr':0.1}"
@@ -181,7 +180,7 @@ def compute_hourly_stat_chunk(
     raise NotImplementedError(f'stat {statistic} not implemented.')
 
   if METHOD.value == 'explicit':
-    clim_chunk = compute_hourly_stat(
+    clim_chunk = utils.compute_hourly_stat(
         obs=obs_chunk,
         window_size=window_size,
         clim_years=clim_years,
@@ -189,7 +188,7 @@ def compute_hourly_stat_chunk(
         stat_fn=stat_fn,
     )
   elif METHOD.value == 'fast':
-    clim_chunk = compute_hourly_stat_fast(
+    clim_chunk = utils.compute_hourly_stat_fast(
         obs=obs_chunk,
         window_size=window_size,
         clim_years=clim_years,
