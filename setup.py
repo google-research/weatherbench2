@@ -58,6 +58,7 @@ setuptools.setup(
         'tests': tests_requires,
         'docs': docs_requires,
         'gcp': gcp_requires,
+        'viz': ['matplotlib'],
     },
     url='https://github.com/google-research/weatherbench2',
     packages=setuptools.find_packages(exclude=['notebooks', 'scripts']),
