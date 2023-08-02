@@ -22,7 +22,7 @@ from matplotlib import patches
 from matplotlib.gridspec import GridSpec
 import matplotlib.pyplot as plt
 import numpy as np
-from weatherbench2.config import PanelConfig, VizConfig  # pylint: disable=g-multiple-import
+from weatherbench2 import config
 from weatherbench2.utils import open_nc
 import xarray as xr
 
@@ -250,8 +250,8 @@ def plot_timeseries(
 
 
 def visualize_timeseries(
-    viz_config: VizConfig,
-    panel_configs: t.Sequence[PanelConfig],
+    viz_config: config.VizConfig,
+    panel_configs: t.Sequence[config.PanelConfig],
     save_path: t.Optional[str] = None,
     subplots_adjust_kwargs: t.Optional[t.Dict[str, float]] = None,
     legend_position: t.Optional[int] = 2,
@@ -300,7 +300,7 @@ def visualize_timeseries(
 
 
 def visualize_scorecard(
-    viz_config: VizConfig,
+    viz_config: config.VizConfig,
     baseline: str,
     forecast: str,
     metric: str,

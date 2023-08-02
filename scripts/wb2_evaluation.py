@@ -42,12 +42,13 @@ import ast
 
 from absl import app
 from absl import flags
+from weatherbench2 import config
 from weatherbench2 import evaluation
 from weatherbench2 import flag_utils
-from weatherbench2.config import DataConfig, EvalConfig, Paths, Selection  # pylint: disable=g-multiple-import
+from weatherbench2 import metrics
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
-from weatherbench2.metrics import ACC, Bias, CRPS, CRPSSkill, CRPSSpread, EnergyScore, EnergyScoreSkill, EnergyScoreSpread, EnsembleMeanRMSE, EnsembleStddev, RMSE, MSE, SEEPS, SpatialBias, SpatialMSE, SpatialSEEPS, WindVectorRMSE  # pylint: disable=g-multiple-import,unused-import
-from weatherbench2.regions import SliceRegion, LandRegion  # pylint: disable=g-multiple-import
+from weatherbench2.regions import LandRegion
+from weatherbench2.regions import SliceRegion
 import xarray as xr
 
 _DEFAULT_VARIABLES = [
@@ -222,7 +223,7 @@ def _wind_vector_rmse():
       and 'v_component_of_wind' in VARIABLES.value
   ):
     wind_vector_rmse.append(
-        WindVectorRMSE(
+        metrics.WindVectorRMSE(
             u_name='u_component_of_wind',
             v_name='v_component_of_wind',
             vector_name='wind_vector',
@@ -233,7 +234,7 @@ def _wind_vector_rmse():
       and '10m_v_component_of_wind' in VARIABLES.value
   ):
     wind_vector_rmse.append(
-        WindVectorRMSE(
+        metrics.WindVectorRMSE(
             u_name='10m_u_component_of_wind',
             v_name='10m_v_component_of_wind',
             vector_name='10m_wind_vector',
@@ -244,13 +245,13 @@ def _wind_vector_rmse():
 
 def main(argv: list[str]) -> None:
   """Run all WB2 metrics."""
-  selection = Selection(
+  selection = config.Selection(
       variables=VARIABLES.value,
       levels=[int(level) for level in LEVELS.value],
       time_slice=slice(TIME_START.value, TIME_STOP.value),
   )
 
-  paths = Paths(
+  paths = config.Paths(
       forecast=FORECAST_PATH.value,
       obs=OBS_PATH.value,
       climatology=CLIMATOLOGY_PATH.value,
@@ -263,7 +264,7 @@ def main(argv: list[str]) -> None:
       if RENAME_VARIABLES.value
       else None
   )
-  data_config = DataConfig(
+  data_config = config.DataConfig(
       selection=selection,
       paths=paths,
       by_init=BY_INIT.value,
@@ -293,14 +294,14 @@ def main(argv: list[str]) -> None:
   climatology = evaluation.make_latitude_increasing(climatology)
 
   deterministic_metrics = {
-      'rmse': RMSE(wind_vector_rmse=_wind_vector_rmse()),
-      'mse': MSE(),
-      'acc': ACC(climatology=climatology),
+      'rmse': metrics.RMSE(wind_vector_rmse=_wind_vector_rmse()),
+      'mse': metrics.MSE(),
+      'acc': metrics.ACC(climatology=climatology),
   }
-  spatial_metrics = {'bias': SpatialBias(), 'mse': SpatialMSE()}
+  spatial_metrics = {'bias': metrics.SpatialBias(), 'mse': metrics.SpatialMSE()}
   if COMPUTE_SEEPS.value:
-    deterministic_metrics['seeps'] = SEEPS(climatology=climatology)
-    spatial_metrics['seeps'] = SpatialSEEPS(climatology=climatology)
+    deterministic_metrics['seeps'] = metrics.SEEPS(climatology=climatology)
+    spatial_metrics['seeps'] = metrics.SpatialSEEPS(climatology=climatology)
 
   derived_variables = [
       DERIVED_VARIABLE_DICT[derived_variable]
@@ -308,7 +309,7 @@ def main(argv: list[str]) -> None:
   ]
 
   eval_configs = {
-      'deterministic': EvalConfig(
+      'deterministic': config.EvalConfig(
           metrics=deterministic_metrics,
           against_analysis=False,
           regions=regions,
@@ -316,7 +317,7 @@ def main(argv: list[str]) -> None:
           evaluate_persistence=EVALUATE_PERSISTENCE.value,
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
       ),
-      'deterministic_spatial': EvalConfig(
+      'deterministic_spatial': config.EvalConfig(
           metrics=spatial_metrics,
           against_analysis=False,
           derived_variables=derived_variables,
@@ -324,7 +325,7 @@ def main(argv: list[str]) -> None:
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
           output_format='zarr',
       ),
-      'deterministic_temporal': EvalConfig(
+      'deterministic_temporal': config.EvalConfig(
           metrics=deterministic_metrics,
           against_analysis=False,
           regions=regions,
@@ -335,19 +336,19 @@ def main(argv: list[str]) -> None:
       ),
       # Against analysis is deprecated for by_init, since the time intervals are
       # not compatible. Still functional for by_valid
-      'deterministic_vs_analysis': EvalConfig(
+      'deterministic_vs_analysis': config.EvalConfig(
           metrics=deterministic_metrics,
           against_analysis=True,
           regions=regions,
           derived_variables=derived_variables,
       ),
-      'probabilistic': EvalConfig(
+      'probabilistic': config.EvalConfig(
           metrics={
-              'crps': CRPS(ensemble_dim=ENSEMBLE_DIM.value),
-              'ensemble_mean_rmse': EnsembleMeanRMSE(
+              'crps': metrics.CRPS(ensemble_dim=ENSEMBLE_DIM.value),
+              'ensemble_mean_rmse': metrics.EnsembleMeanRMSE(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
-              'ensemble_stddev': EnsembleStddev(
+              'ensemble_stddev': metrics.EnsembleStddev(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
           },
@@ -358,15 +359,19 @@ def main(argv: list[str]) -> None:
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
           probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
       ),
-      'ensemble_forecast_vs_era_experimental_metrics': EvalConfig(
+      'ensemble_forecast_vs_era_experimental_metrics': config.EvalConfig(
           metrics={
-              'crps_spread': CRPSSpread(ensemble_dim=ENSEMBLE_DIM.value),
-              'crps_skill': CRPSSkill(ensemble_dim=ENSEMBLE_DIM.value),
-              'energy_score': EnergyScore(ensemble_dim=ENSEMBLE_DIM.value),
-              'energy_score_spread': EnergyScoreSpread(
+              'crps_spread': metrics.CRPSSpread(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
-              'energy_score_skill': EnergyScoreSkill(
+              'crps_skill': metrics.CRPSSkill(ensemble_dim=ENSEMBLE_DIM.value),
+              'energy_score': metrics.EnergyScore(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'energy_score_spread': metrics.EnergyScoreSpread(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'energy_score_skill': metrics.EnergyScoreSkill(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
           },

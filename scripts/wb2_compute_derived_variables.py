@@ -37,8 +37,8 @@ Example Usage:
 from absl import app
 from absl import flags
 import apache_beam as beam
+from weatherbench2 import derived_variables as dvs
 from weatherbench2 import flag_utils
-from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT, DerivedVariable, PrecipitationAccumulation, AggregatePrecipitationAccumulation  # pylint: disable=g-line-too-long,g-multiple-import
 import xarray as xr
 import xarray_beam as xbeam
 
@@ -93,7 +93,7 @@ RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 
 def _add_derived_variables(
-    dataset: xr.Dataset, derived_variables: list[DerivedVariable]
+    dataset: xr.Dataset, derived_variables: list[dvs.DerivedVariable]
 ) -> xr.Dataset:
   for dv in derived_variables:
     dataset[dv.variable_name] = dv.compute(dataset)
@@ -112,7 +112,7 @@ def _strip_offsets(
 
 def main(argv: list[str]) -> None:
   derived_variables = [
-      DERIVED_VARIABLE_DICT[derived_variable]
+      dvs.DERIVED_VARIABLE_DICT[derived_variable]
       for derived_variable in DERIVED_VARIABLES.value
   ]
 
@@ -131,10 +131,13 @@ def main(argv: list[str]) -> None:
         {dv.variable_name: template[dv.base_variables[0]]}
     )
     template[dv.variable_name].attrs = {}  # Strip attributes
-    if isinstance(dv, (
-        PrecipitationAccumulation,
-        AggregatePrecipitationAccumulation,
-    )):
+    if isinstance(
+        dv,
+        (
+            dvs.PrecipitationAccumulation,
+            dvs.AggregatePrecipitationAccumulation,
+        ),
+    ):
       derived_variables_with_rechunking.append(dv)
     else:
       derived_variables_without_rechunking.append(dv)

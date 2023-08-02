@@ -99,7 +99,6 @@ import pandas as pd
 import xarray
 import xarray_beam
 
-
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='zarr inputs')
 OUTPUT_PATH = flags.DEFINE_string('output_path', None, help='zarr outputs')
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
@@ -158,7 +157,8 @@ def slice_along_timedelta_axis(
 
 
 def index_on_valid_time(
-    key: xarray_beam.Key, chunk: xarray.Dataset,
+    key: xarray_beam.Key,
+    chunk: xarray.Dataset,
 ) -> tuple[xarray_beam.Key, xarray.Dataset]:
   """Adjust keys and datasets in one chunk from init to valid time."""
   time_offset = key.offsets[INIT] + key.offsets[DELTA]
@@ -232,8 +232,7 @@ def main(argv: list[str]) -> None:
   delta_slice = slice(forecast_offset, None, forecast_spacing)
   new_deltas = source_ds.prediction_timedelta.data[delta_slice]
   new_times = np.unique(
-      source_ds.init.data[:, np.newaxis]
-      + new_deltas[np.newaxis, :]
+      source_ds.init.data[:, np.newaxis] + new_deltas[np.newaxis, :]
   )
   template = (
       xarray_beam.make_template(source_ds)

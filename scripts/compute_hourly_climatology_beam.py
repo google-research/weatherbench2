@@ -52,7 +52,6 @@ from weatherbench2 import utils
 import xarray as xr
 import xarray_beam as xbeam
 
-
 # Command line arguments
 # TODO(shoyer): add an option for daily climatology
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='Input Zarr path')
