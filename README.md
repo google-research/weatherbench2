@@ -1,7 +1,8 @@
-![logo](assets/wb2-logo-wide.png)
-# WeatherBench 2
+![logo](docs/assets/wb2-logo-wide.png)
 
 [![CI](https://github.com/google-research/weatherbench2/actions/workflows/ci-build.yml/badge.svg)](https://github.com/google-research/weatherbench2/actions/workflows/ci-build.yml)
+
+# WeatherBench 2
 
 This repository contains the code for **WeatherBench 2: A benchmark for the next generation of data-driven global weather models**. 
 
