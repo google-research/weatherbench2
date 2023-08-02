@@ -17,15 +17,10 @@
 import typing as t
 
 import fsspec
-
-try:
-  import matplotlib
-  from matplotlib import patches
-  from matplotlib.gridspec import GridSpec
-  import matplotlib.pyplot as plt
-except ImportError as e:
-  raise EnvironmentError('Please run `pip install ".[viz]"`.') from e
-
+import matplotlib
+from matplotlib import patches
+from matplotlib.gridspec import GridSpec
+import matplotlib.pyplot as plt
 import numpy as np
 from weatherbench2 import config
 from weatherbench2.utils import open_nc
