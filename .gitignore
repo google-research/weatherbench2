@@ -4,6 +4,6 @@ build
 dist
 docs/.ipynb_checkpoints
 docs/_build
-docs/_autosummary
+docs/source/_autosummary
 docs/*.zarr
 __pycache__

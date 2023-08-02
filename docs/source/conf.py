@@ -63,6 +63,8 @@ html_theme = 'sphinx_rtd_theme'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+autosummary_generate = True
+
 # https://stackoverflow.com/a/66295922/809705
 autodoc_typehints = "description"
 
