@@ -27,10 +27,9 @@ except ImportError as e:
   raise EnvironmentError('Please run `pip install ".[viz]"`.') from e
 
 import numpy as np
-import xarray as xr
-
 from weatherbench2 import config
 from weatherbench2.utils import open_nc
+import xarray as xr
 
 long2short = {
     'geopotential': 'Z',

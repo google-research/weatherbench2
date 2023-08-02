@@ -16,9 +16,8 @@ import os
 
 from absl.testing import absltest
 from absl.testing import flagsaver
-import xarray
-
 from weatherbench2 import schema
+import xarray
 
 from . import wb2_evaluation
 

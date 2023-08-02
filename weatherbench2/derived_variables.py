@@ -18,9 +18,8 @@ import dataclasses
 import typing as t
 
 import numpy as np
-import xarray as xr
-
 from weatherbench2 import schema
+import xarray as xr
 
 
 @dataclasses.dataclass

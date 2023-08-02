@@ -42,8 +42,6 @@ import ast
 
 from absl import app
 from absl import flags
-import xarray as xr
-
 from weatherbench2 import config
 from weatherbench2 import evaluation
 from weatherbench2 import flag_utils
@@ -51,6 +49,7 @@ from weatherbench2 import metrics
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
 from weatherbench2.regions import LandRegion
 from weatherbench2.regions import SliceRegion
+import xarray as xr
 
 _DEFAULT_VARIABLES = [
     'geopotential',

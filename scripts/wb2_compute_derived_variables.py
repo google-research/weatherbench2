@@ -37,11 +37,10 @@ Example Usage:
 from absl import app
 from absl import flags
 import apache_beam as beam
-import xarray as xr
-import xarray_beam as xbeam
-
 from weatherbench2 import derived_variables as dvs
 from weatherbench2 import flag_utils
+import xarray as xr
+import xarray_beam as xbeam
 
 _DEFAULT_DERIVED_VARIABLES = [
     'wind_speed',

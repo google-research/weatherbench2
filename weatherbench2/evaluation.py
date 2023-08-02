@@ -29,12 +29,11 @@ from typing import Any, Optional
 import apache_beam as beam
 import fsspec
 import numpy as np
-import xarray as xr
-import xarray_beam as xbeam
-
 from weatherbench2 import config
 from weatherbench2 import schema
 from weatherbench2.utils import make_probabilistic_climatology
+import xarray as xr
+import xarray_beam as xbeam
 
 # pylint: disable=logging-fstring-interpolation
 

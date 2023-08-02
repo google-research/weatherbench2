@@ -7,5 +7,5 @@ pyink-use-majority-quotes = true
 [tool.isort]
 profile = "google"
 use_parentheses = true
-known_third_party= ['absl']
+known_third_party= ['absl', 'weatherbench2']
 multi_line_output = 3

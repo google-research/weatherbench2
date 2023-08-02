@@ -15,11 +15,10 @@
 # pyformat: mode=pyink
 from absl.testing import absltest
 import numpy as np
-import xarray as xr
-
 from weatherbench2 import metrics
 from weatherbench2 import regions
 from weatherbench2 import schema
+import xarray as xr
 
 
 class RegionsTest(absltest.TestCase):

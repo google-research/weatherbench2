@@ -39,10 +39,9 @@ import typing as t
 from absl import app
 from absl import flags
 import apache_beam as beam
+from weatherbench2.derived_variables import ZonalEnergySpectrum
 import xarray as xr
 import xarray_beam as xbeam
-
-from weatherbench2.derived_variables import ZonalEnergySpectrum
 
 _DEFAULT_BASE_VARIABLES = [
     'geopotential',

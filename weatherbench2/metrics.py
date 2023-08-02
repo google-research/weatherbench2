@@ -22,9 +22,8 @@ import typing as t
 
 import numpy as np
 from scipy import stats
-import xarray as xr
-
 from weatherbench2.regions import Region
+import xarray as xr
 
 REALIZATION = 'realization'
 

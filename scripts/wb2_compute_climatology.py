@@ -42,11 +42,10 @@ from absl import app
 from absl import flags
 import apache_beam as beam
 import numpy as np
-import xarray as xr
-import xarray_beam as xbeam
-
 from weatherbench2 import flag_utils
 from weatherbench2 import utils
+import xarray as xr
+import xarray_beam as xbeam
 
 DEFAULT_SEEPS_THRESHOLD_MM = (
     "{'total_precipitation_24hr':0.25, 'total_precipitation_6hr':0.1}"

@@ -15,11 +15,10 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
-import xarray as xr
-
 from weatherbench2 import metrics
 from weatherbench2 import schema
 from weatherbench2 import utils
+import xarray as xr
 
 
 def get_random_truth_and_forecast(

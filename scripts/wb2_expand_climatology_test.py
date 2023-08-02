@@ -16,9 +16,8 @@ from absl.testing import absltest
 from absl.testing import flagsaver
 import numpy as np
 import pandas as pd
-import xarray
-
 from weatherbench2 import schema
+import xarray
 
 from . import wb2_expand_climatology
 

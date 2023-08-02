@@ -28,9 +28,8 @@ import typing as t
 
 from absl import app
 from absl import flags
-import xarray as xr
-
 from weatherbench2 import utils
+import xarray as xr
 
 # Command line arguments
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='Input Zarr path')

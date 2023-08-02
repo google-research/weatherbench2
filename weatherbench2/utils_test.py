@@ -13,10 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 from absl.testing import absltest
-import xarray
-
 from weatherbench2 import schema
 from weatherbench2 import utils
+import xarray
 
 
 class UtilsTest(absltest.TestCase):
