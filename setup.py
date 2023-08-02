@@ -22,7 +22,7 @@ base_requires = [
     'numpy',
     'pandas<1.4',
     'scipy',
-    'sklearn',
+    'scikit-learn',
     'xarray',
     'pandas',
     'xarray-beam',
