@@ -31,14 +31,14 @@ import fsspec
 import numpy as np
 from weatherbench2 import config
 from weatherbench2 import schema
-from weatherbench2.utils import make_probabilistic_climatology
+from weatherbench2 import utils
 import xarray as xr
 import xarray_beam as xbeam
 
 # pylint: disable=logging-fstring-interpolation
 
 
-def make_latitude_increasing(dataset) -> xr.Dataset:
+def make_latitude_increasing(dataset: xr.Dataset) -> xr.Dataset:
   """Make sure latitude values are increasing. Flip dataset if necessary."""
   lat = dataset.latitude.values
   if (np.diff(lat) < 0).all():
@@ -382,12 +382,10 @@ def _metric_and_region_loop(
 ) -> xr.Dataset:
   """Compute metric results looping over metrics and regions in eval config."""
   # Compute derived variables
-  for derived_variable in eval_config.derived_variables:
-    logging.info(f'Logging: derived_variable: {derived_variable}')
-    forecast[derived_variable.variable_name] = derived_variable.compute(
-        forecast
-    )
-    truth[derived_variable.variable_name] = derived_variable.compute(truth)
+  for dv in eval_config.derived_variables:
+    logging.info(f'Logging: derived_variable: {dv}')
+    forecast[dv.variable_name] = dv.compute(forecast)
+    truth[dv.variable_name] = dv.compute(truth)
 
   results = []
   for name, metric in eval_config.metrics.items():
@@ -438,7 +436,7 @@ def _evaluate_all_metrics(
         hour=forecast[time_dim].dt.hour,
     )
   if eval_config.evaluate_probabilistic_climatology:
-    probabilistic_climatology = make_probabilistic_climatology(
+    probabilistic_climatology = utils.make_probabilistic_climatology(
         truth,
         eval_config.probabilistic_climatology_start_year,
         eval_config.probabilistic_climatology_end_year,
@@ -561,23 +559,31 @@ class _EvaluateAllMetrics(beam.PTransform):
     return result_key, results
 
   def _sel_corresponding_truth_chunk(
-      self, key: xbeam.Key, forecast_chunk: xr.Dataset, truth: xr.Dataset
-  ) -> tuple[xr.Dataset, xr.Dataset]:
+      self,
+      key: xbeam.Key,
+      forecast_chunk: xr.Dataset,
+      truth: Optional[xr.Dataset] = None,
+  ) -> tuple[xbeam.Key, tuple[xr.Dataset, xr.Dataset]]:
+    if truth is None:
+      truth = xr.Dataset()
     truth_chunk = truth.sel(time=forecast_chunk.valid_time).compute()
-    return (forecast_chunk, truth_chunk)
+    return key, (forecast_chunk, truth_chunk)
 
   def _climatology_like_forecast_chunk(
       self,
       key: xbeam.Key,
       chunks: tuple[xr.Dataset, xr.Dataset],
-      climatology: xr.Dataset,
-      variables: list[str],
-      by_init: bool,
-  ) -> tuple[xbeam.Key, xr.Dataset]:
+      climatology: Optional[xr.Dataset] = None,
+      variables: Optional[list[str]] = None,
+  ) -> tuple[xbeam.Key, tuple[xr.Dataset, xr.Dataset]]:
+    if climatology is None:
+      climatology = xr.Dataset()
+    if variables is None:
+      variables = list()
     forecast_chunk, truth_chunk = chunks
     # Load the data, using a separate thread for each variable
     num_threads = len(variables)
-    time_dim = 'valid_time' if by_init else 'time'
+    time_dim = 'valid_time' if self.data_config.by_init else 'time'
     climatology_chunk = (
         climatology[variables]
         .sel(
@@ -593,13 +599,16 @@ class _EvaluateAllMetrics(beam.PTransform):
       self,
       key: xbeam.Key,
       chunks: tuple[xr.Dataset, xr.Dataset],
-      truth: xr.Dataset,
-      variables: list[str],
-      by_init: bool,
-  ) -> tuple[xbeam.Key, xr.Dataset]:
+      truth: Optional[xr.Dataset] = None,
+      variables: Optional[list[str]] = None,
+  ) -> tuple[xbeam.Key, tuple[xr.Dataset, xr.Dataset]]:
+    if truth is None:
+      truth = xr.Dataset()
+    if variables is None:
+      variables = list()
     forecast_chunk, truth_chunk = chunks
     num_threads = len(variables)
-    if by_init:
+    if self.data_config.by_init:
       persistence_chunk = truth.sel(time=forecast_chunk.init_time).compute(
           num_workers=num_threads
       )
@@ -612,14 +621,13 @@ class _EvaluateAllMetrics(beam.PTransform):
       )
     return key, (persistence_chunk, truth_chunk)
 
-  def _pipeline(
+  def _evaluate(
       self,
-      pcoll: beam.PCollection,
       forecast: xr.Dataset,
       truth: xr.Dataset,
       climatology: xr.Dataset,
-      by_init: bool,
   ) -> beam.PCollection:
+    variables = []
     if (
         self.eval_config.evaluate_climatology
         or self.eval_config.evaluate_probabilistic_climatology
@@ -628,14 +636,12 @@ class _EvaluateAllMetrics(beam.PTransform):
       variables = list(forecast.keys())
       forecast = forecast.drop(variables)
 
-    if by_init:
+    if self.data_config.by_init:
       forecast_pipeline = xbeam.DatasetToChunks(
           forecast,
           self.input_chunks,
           split_vars=False,
-      ) | beam.MapTuple(
-          lambda k, v: (k, self._sel_corresponding_truth_chunk(k, v, truth))
-      )
+      ) | beam.MapTuple(self._sel_corresponding_truth_chunk, truth=truth)
     else:
       forecast_pipeline = xbeam.DatasetToChunks(
           [forecast, truth],
@@ -644,52 +650,49 @@ class _EvaluateAllMetrics(beam.PTransform):
       )
 
     if self.eval_config.evaluate_climatology:
-      forecast_pipeline = forecast_pipeline | beam.MapTuple(
-          lambda k, v: self._climatology_like_forecast_chunk(  # pylint: disable=g-long-lambda
-              k, v, climatology, variables, by_init
-          ),
+      forecast_pipeline |= beam.MapTuple(
+          self._climatology_like_forecast_chunk,
+          climatology=climatology,
+          variables=variables,
       )
+
     if self.eval_config.evaluate_probabilistic_climatology:
-      probabilistic_climatology = make_probabilistic_climatology(
+      probabilistic_climatology = utils.make_probabilistic_climatology(
           truth,
           self.eval_config.probabilistic_climatology_start_year,
           self.eval_config.probabilistic_climatology_end_year,
           self.eval_config.probabilistic_climatology_hour_interval,
       )
-      forecast_pipeline = forecast_pipeline | beam.MapTuple(
-          lambda k, v: self._climatology_like_forecast_chunk(  # pylint: disable=g-long-lambda
-              k, v, probabilistic_climatology, variables, by_init
-          ),
+      forecast_pipeline |= beam.MapTuple(
+          self._climatology_like_forecast_chunk,
+          probabilistic_climatology=probabilistic_climatology,
+          variables=variables
       )
     elif self.eval_config.evaluate_persistence:
-      forecast_pipeline = forecast_pipeline | beam.MapTuple(
-          lambda k, v: self._persistence_like_forecast_chunk(  # pylint: disable=g-long-lambda
-              k, v, truth, variables, by_init
-          ),
+      forecast_pipeline |= beam.MapTuple(
+          self._persistence_like_forecast_chunk,
+          truth=truth,
+          variables=variables
       )
 
-    forecast_pipeline = forecast_pipeline | 'EvaluateChunk' >> beam.MapTuple(
-        self._evaluate_chunk
-    )
+    forecast_pipeline |= 'EvaluateChunk' >> beam.MapTuple(self._evaluate_chunk)
+
     if self.eval_config.temporal_mean:
-      forecast_pipeline = forecast_pipeline | 'TemporalMean' >> xbeam.Mean(
-          dim='init_time' if by_init else 'time', fanout=self.fanout
+      forecast_pipeline |= 'TemporalMean' >> xbeam.Mean(
+          dim='init_time' if self.data_config.by_init else 'time',
+          fanout=self.fanout,
       )
 
-    forecast_pipeline = forecast_pipeline | 'SaveOutputs' >> _SaveOutputs(
-        self.eval_name, self.data_config, self.eval_config.output_format
-    )
-    return pcoll | forecast_pipeline
+    return forecast_pipeline
 
   def expand(self, pcoll: beam.PCollection) -> beam.PCollection:
     forecast, truth, climatology = open_forecast_and_truth_datasets(
         self.data_config, self.eval_config
     )
-    logging.info(f'Logging 1 forecast {forecast}')
-    logging.info(f'Logging 1 truth {truth}')
-    return self._pipeline(
-        pcoll, forecast, truth, climatology, by_init=self.data_config.by_init
+    logging.info(
+        f'forecast={forecast}, truth={truth}, climatology={climatology}'
     )
+    return pcoll | self._evaluate(forecast, truth, climatology)
 
 
 def evaluate_with_beam(
@@ -732,6 +735,12 @@ def evaluate_with_beam(
   with beam.Pipeline(runner=runner, argv=argv) as root:
     for eval_name, eval_config in eval_configs.items():
       logging.info(f'Logging Eval config: {eval_config}')
-      _ = root | f'evaluate_{eval_name}' >> _EvaluateAllMetrics(
-          eval_name, eval_config, data_config, input_chunks, fanout=fanout
+      _ = (
+          root
+          | f'evaluate_{eval_name}'
+          >> _EvaluateAllMetrics(
+              eval_name, eval_config, data_config, input_chunks, fanout=fanout
+          )
+          | f'save_{eval_name}'
+          >> _SaveOutputs(eval_name, data_config, eval_config.output_format)
       )
