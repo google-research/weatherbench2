@@ -20,7 +20,10 @@ from typing import Dict
 
 from weatherbench2.derived_variables import DerivedVariable
 from weatherbench2.metrics import Metric
-from weatherbench2.regions import ExtraTropicalRegion, LandRegion, Region, SliceRegion  # pylint: disable=g-multiple-import
+from weatherbench2.regions import ExtraTropicalRegion
+from weatherbench2.regions import LandRegion
+from weatherbench2.regions import Region
+from weatherbench2.regions import SliceRegion
 
 
 @dataclasses.dataclass

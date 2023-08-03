@@ -12,9 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-r"""CLI to compute and save climatology."""
+r"""CLI to compute and save climatology.
+
+Example Usage:
+  ```
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/wb2_compute_climatology.py \
+    --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/1990_to_2020_1h_64x32_equiangular_with_poles_conservative.zarr \
+    --working_chunks="level=1,longitude=4,latitude=4" \
+    --output_chunks="level=1,hour=3" \
+    --runner=DataflowRunner \
+    -- \
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=./setup.py \
+    --job_name=compute-climatology-$USER
+  ```
+"""
 import ast
-from collections import abc
 import functools
 from typing import Optional
 
@@ -23,10 +43,9 @@ from absl import flags
 import apache_beam as beam
 import numpy as np
 from weatherbench2 import flag_utils
-from weatherbench2.utils import compute_hourly_stat, compute_hourly_stat_fast  # pylint: disable=g-multiple-import
+from weatherbench2 import utils
 import xarray as xr
 import xarray_beam as xbeam
-
 
 DEFAULT_SEEPS_THRESHOLD_MM = (
     "{'total_precipitation_24hr':0.25, 'total_precipitation_6hr':0.1}"
@@ -51,9 +70,7 @@ START_YEAR = flags.DEFINE_integer(
 END_YEAR = flags.DEFINE_integer(
     'end_year', 2020, help='Inclusive end year of climatology'
 )
-BEAM_RUNNER = flags.DEFINE_string(
-    'beam_runner', None, help='beam.runners.Runner'
-)
+RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 WORKING_CHUNKS = flag_utils.DEFINE_chunks(
     'working_chunks',
     '',
@@ -162,7 +179,7 @@ def compute_hourly_stat_chunk(
     raise NotImplementedError(f'stat {statistic} not implemented.')
 
   if METHOD.value == 'explicit':
-    clim_chunk = compute_hourly_stat(
+    clim_chunk = utils.compute_hourly_stat(
         obs=obs_chunk,
         window_size=window_size,
         clim_years=clim_years,
@@ -170,7 +187,7 @@ def compute_hourly_stat_chunk(
         stat_fn=stat_fn,
     )
   elif METHOD.value == 'fast':
-    clim_chunk = compute_hourly_stat_fast(
+    clim_chunk = utils.compute_hourly_stat_fast(
         obs=obs_chunk,
         window_size=window_size,
         clim_years=clim_years,
@@ -182,7 +199,7 @@ def compute_hourly_stat_chunk(
   return clim_key, clim_chunk
 
 
-def main(argv: abc.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   obs, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
   # TODO(shoyer): slice obs in time using START_YEAR and END_YEAR. This would
   # require some care in order to ensure input_chunks['time'] remains valid.
@@ -239,7 +256,7 @@ def main(argv: abc.Sequence[str]) -> None:
     for var in raw_vars:
       clim_template = clim_template.drop(var)
 
-  with beam.Pipeline(runner=BEAM_RUNNER.value, argv=argv) as root:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     # Read and Rechunk
     pcoll = (
         root

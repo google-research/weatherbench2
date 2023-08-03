@@ -29,14 +29,14 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+from typing import Union
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from sklearn import neighbors
 
-
-Array = np.ndarray | jax.Array
+Array = Union[np.ndarray, jax.Array]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -67,6 +67,7 @@ class Grid:
 @dataclasses.dataclass(frozen=True)
 class Regridder:
   """Base class for regridding."""
+
   source: Grid
   target: Grid
 

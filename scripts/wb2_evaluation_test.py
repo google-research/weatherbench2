@@ -73,7 +73,7 @@ class WB2Evaluation(absltest.TestCase):
         output_dir=output_dir,
         time_start='2020-01-01',
         time_stop='2020-12-31',
-        beam_runner='DirectRunner',
+        runner='DirectRunner',
         input_chunks='time=-1',
         eval_configs=','.join(eval_configs),
         use_beam=use_beam,

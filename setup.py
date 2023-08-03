@@ -15,7 +15,6 @@
 """Setup Weatherbench2."""
 import setuptools
 
-
 base_requires = [
     'apache_beam>=2.31.0',
     'jax[cpu]',
@@ -40,6 +39,13 @@ docs_requires = [
 tests_requires = [
     'absl-py',
     'pytest',
+    'pyink',
+    'isort',
+]
+
+gcp_requires = [
+    'apache_beam[gcp]>=2.31.0',
+    'gcsfs',
 ]
 
 setuptools.setup(
@@ -52,6 +58,8 @@ setuptools.setup(
     extras_require={
         'tests': tests_requires,
         'docs': docs_requires,
+        'gcp': gcp_requires,
+        'viz': ['matplotlib'],
     },
     url='https://github.com/google-research/weatherbench2',
     packages=setuptools.find_packages(exclude=['notebooks', 'scripts']),

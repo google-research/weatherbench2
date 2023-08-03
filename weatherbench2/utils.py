@@ -14,6 +14,7 @@
 # ==============================================================================
 """Utility function for WeatherBench2."""
 from typing import Callable, Union
+
 import fsspec
 import numpy as np
 import xarray as xr
