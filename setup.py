@@ -28,12 +28,13 @@ base_requires = [
     'xarray-beam',
     'zarr',
 ]
-# TODO(b/286936524): Set up docs soon...
+
 docs_requires = [
     'myst-nb',
     'myst-parser',
     'sphinx',
     'sphinx_rtd_theme',
+    # 'sphinx-book-theme',
     'scipy',
 ]
 tests_requires = [

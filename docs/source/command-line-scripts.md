@@ -5,7 +5,7 @@ The `scripts/` directory contains a number of command line scripts for processin
 
 (evaluation-cli)=
 ## Evaluation
-Main evaluation script. To reproduce the official WeatherBench 2 evaluation, follow [these commands](LINK). The results files for the baseline models can be found HERE.
+Main evaluation script. To reproduce the official WeatherBench 2 evaluation, follow [these commands](official-evaluation). The results files for the baseline models can be found [here](https://console.cloud.google.com/storage/browser/weatherbench2/results).
 
 ```
 usage: wb2_evaluation.py [-h] 

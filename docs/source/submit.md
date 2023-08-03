@@ -5,15 +5,15 @@ You have the latest and greatest new ML model? Awesome! Here are the steps requi
 
 ## Save forecasts in a standardized Zarr format
 
-The WeatherBench evaluation pipeline expects forecasts and ground truth to be stored as Zarr files. See the Quickstart [LINK] for a description of the format. Saving all variables is too much? You can also select specific levels and variables. See the [Pangu forecasts](https://github.com/google-research/weatherbench2/issues) for an example.
+The WeatherBench evaluation pipeline expects forecasts and ground truth to be stored as Zarr files. See the [Quickstart](evaluation) for a description of the format. Saving all variables is too much? You can also select specific levels and variables. See the [Pangu forecasts](https://github.com/google-research/weatherbench2/issues) for an example.
 
 We recommend having single chunks in space (latitude and longitude) but small chunks in time to allow for efficient paralellization.
 
 ## Regrid
 
-The WeatherBench 2 code can be used to evaluate any resolution. However, we only provide ground truth data for a range of resolutions (see Data Guide [LINK]). The official resolution used in the paper is 1.5 degrees but the website also contains scores for 0.25 and 5.625 degrees. Note that absolute values of metrics computed at different resolution are not necessarily comparable (see paper).
+The WeatherBench 2 code can be used to evaluate any resolution. However, we only provide ground truth data for a range of resolutions (see [Data Guide](data-guide)). The official resolution used in the paper is 1.5 degrees but the website also contains scores for 0.25 and 5.625 degrees. Note that absolute values of metrics computed at different resolution are not necessarily comparable (see paper).
 
-TODO: Regridding code
+We plan to open-source our regridding code soon.
 
 Note that following the WMO standards we are using conservative regridding.
 
