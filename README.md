@@ -2,14 +2,24 @@
 # WeatherBench 2 - A benchmark for the next generation of data-driven global weather models
 
 [![CI](https://github.com/google-research/weatherbench2/actions/workflows/ci-build.yml/badge.svg)](https://github.com/google-research/weatherbench2/actions/workflows/ci-build.yml)
+[![Documentation Status](https://readthedocs.org/projects/weatherbench2/badge/?version=latest)](https://weatherbench2.readthedocs.io/en/latest/?badge=latest)
+
+
+```
+[TODO] Paper citation
+```
+
+## Why WeatherBench?
 
 WeatherBench 2 is a framework for evaluating and comparing data-driven and traditional numerical weather forecasting models. WeatherBench consists of:
-- Publicly available, cloud-optimized ground truth and baseline datasets. For a complete list, see [this page](data-guide). 
-- Open-source evaluation code. See this [quick-start](evaluation) to explore the basic functionality or the [API docs](api) for more detail. Since high-resolution forecast files can be large, the WeatherBench 2 code was written with scalability in mind. See the [command-line scripts](cli) based on [Xarray-Beam](https://xarray-beam.readthedocs.io/en/latest/) and [this guide](dataflow) for running the scripts on GCP using [DataFlow](https://cloud.google.com/dataflow).
-- A [website](LINK) displaying up-to-date scores of many of the state-of-the-art data-driven and physical approaches.
+- Publicly available, cloud-optimized ground truth and baseline datasets. For a complete list, see [this page](https://weatherbench2.readthedocs.io/en/latest/data-guide.html). 
+- Open-source evaluation code. See this [quick-start](https://weatherbench2.readthedocs.io/en/latest/evaluation.html) to explore the basic functionality or the [API docs](https://weatherbench2.readthedocs.io/en/latest/api.html) for more detail. Since high-resolution forecast files can be large, the WeatherBench 2 code was written with scalability in mind. See the [command-line scripts](https://weatherbench2.readthedocs.io/en/latest/command-line-scripts.html) based on [Xarray-Beam](https://xarray-beam.readthedocs.io/en/latest/) and [this guide](https://weatherbench2.readthedocs.io/en/latest/beam-in-the-cloud.html) for running the scripts on GCP using [DataFlow](https://cloud.google.com/dataflow).
+- A [website] displaying up-to-date scores of many of the state-of-the-art data-driven and physical approaches.
 - A [paper] describing the rationale behind the evaluation setup.
 
-WeatherBench 2 is supposed to be an evolving tool for the entire community. For this reason, we welcome any feedback (ideally, submitted as [GitHub issues](https://github.com/google-research/weatherbench2/issues)) or contributions. If you would like you model to be part of WeatherBench, check out [this guide](submit).
+WeatherBench 2 has been built as an evolving tool for the entire community. For this reason, we welcome any feedback (ideally, submitted as [GitHub issues](https://github.com/google-research/weatherbench2/issues)) or contributions. If you would like you model to be part of WeatherBench, check out [this guide](https://weatherbench2.readthedocs.io/en/latest/submit.html).
+
+
 
 
 ## License
