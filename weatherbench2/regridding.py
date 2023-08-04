@@ -35,6 +35,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from sklearn import neighbors
+import xarray
 
 Array = Union[np.ndarray, jax.Array]
 
@@ -75,7 +76,21 @@ class Regridder:
     """Regrid an array with dimensions (..., lon, lat) from source to target."""
     raise NotImplementedError
 
-  # TODO(shoyer): add an interface for regridding xarray.Dataset objects
+  def regrid_dataset(self, dataset: xarray.Dataset) -> xarray.Dataset:
+    """Regrid an xarray.Dataset from source to target."""
+    if not (dataset['latitude'].diff('latitude') > 0).all():
+      # ensure latitude is increasing
+      dataset = dataset.isel(latitude=slice(None, None, -1))  # reverse
+    assert (dataset['latitude'].diff('latitude') > 0).all()
+    dataset = xarray.apply_ufunc(
+        self.regrid_array,
+        dataset,
+        input_core_dims=[['longitude', 'latitude']],
+        output_core_dims=[['longitude', 'latitude']],
+        exclude_dims={'longitude', 'latitude'},
+        vectorize=True,  # loop over level & time, for lower memory usage
+    )
+    return dataset
 
 
 def nearest_neighbor_indices(
@@ -139,7 +154,7 @@ class BilinearRegridder(Regridder):
 
 
 def _assert_increasing(x: np.ndarray) -> None:
-  if isinstance(x, np.ndarray) and not (np.diff(x) > 0).all():
+  if not (np.diff(x) > 0).all():
     raise ValueError(f'array is not increasing: {x}')
 
 
