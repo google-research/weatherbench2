@@ -666,13 +666,13 @@ class _EvaluateAllMetrics(beam.PTransform):
       forecast_pipeline |= beam.MapTuple(
           self._climatology_like_forecast_chunk,
           probabilistic_climatology=probabilistic_climatology,
-          variables=variables
+          variables=variables,
       )
     elif self.eval_config.evaluate_persistence:
       forecast_pipeline |= beam.MapTuple(
           self._persistence_like_forecast_chunk,
           truth=truth,
-          variables=variables
+          variables=variables,
       )
 
     forecast_pipeline |= 'EvaluateChunk' >> beam.MapTuple(self._evaluate_chunk)
