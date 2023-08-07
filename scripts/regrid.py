@@ -49,7 +49,6 @@ from weatherbench2 import flag_utils
 from weatherbench2 import regridding
 import xarray_beam
 
-
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='zarr inputs')
 OUTPUT_PATH = flags.DEFINE_string('output_path', None, help='zarr outputs')
 OUTPUT_CHUNKS = flag_utils.DEFINE_chunks(
