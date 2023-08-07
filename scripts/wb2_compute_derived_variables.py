@@ -13,14 +13,32 @@
 # limitations under the License.
 # ==============================================================================
 # pyformat: mode=pyink
-"""Add derived variables to dataset and save as new file."""
-import typing as t
+r"""Add derived variables to dataset and save as new file.
 
+Example Usage:
+  ```
+  export BUCKET=my-bucket
+  export PROJECT=my-project
+  export REGION=us-central1
+
+  python scripts/wb2_compute_derived_variables.py \
+    --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-6h-64x32_equiangular_with_poles_conservative_with_derived_vars.zarr \
+    --runner=DataflowRunner \
+    -- \
+    --project=$PROJECT \
+    --region=$REGION \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=./setup.py \
+    --requirements_file=./scripts/dataflow-requirements.txt \
+    --job_name=compute-derived-variables-$USER
+  ```
+"""
 from absl import app
 from absl import flags
 import apache_beam as beam
+from weatherbench2 import derived_variables as dvs
 from weatherbench2 import flag_utils
-from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT, DerivedVariable, PrecipitationAccumulation, AggregatePrecipitationAccumulation  # pylint: disable=g-line-too-long,g-multiple-import
 import xarray as xr
 import xarray_beam as xbeam
 
@@ -75,7 +93,7 @@ RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 
 def _add_derived_variables(
-    dataset: xr.Dataset, derived_variables: list[DerivedVariable]
+    dataset: xr.Dataset, derived_variables: list[dvs.DerivedVariable]
 ) -> xr.Dataset:
   for dv in derived_variables:
     dataset[dv.variable_name] = dv.compute(dataset)
@@ -92,9 +110,9 @@ def _strip_offsets(
   return key, dataset
 
 
-def main(_: t.Sequence[str]) -> None:
+def main(argv: list[str]) -> None:
   derived_variables = [
-      DERIVED_VARIABLE_DICT[derived_variable]
+      dvs.DERIVED_VARIABLE_DICT[derived_variable]
       for derived_variable in DERIVED_VARIABLES.value
   ]
 
@@ -113,10 +131,13 @@ def main(_: t.Sequence[str]) -> None:
         {dv.variable_name: template[dv.base_variables[0]]}
     )
     template[dv.variable_name].attrs = {}  # Strip attributes
-    if isinstance(dv, (
-        PrecipitationAccumulation,
-        AggregatePrecipitationAccumulation,
-    )):
+    if isinstance(
+        dv,
+        (
+            dvs.PrecipitationAccumulation,
+            dvs.AggregatePrecipitationAccumulation,
+        ),
+    ):
       derived_variables_with_rechunking.append(dv)
     else:
       derived_variables_without_rechunking.append(dv)
@@ -144,7 +165,7 @@ def main(_: t.Sequence[str]) -> None:
     (var,) = key.vars
     return var not in rechunk_variables
 
-  with beam.Pipeline(runner=RUNNER.value) as root:
+  with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     # Initial branch for computation without rechunking
     # TODO(srasp): Further optimize by splitting branches earlier
     # so that with and without rechunking can be computed in parallel

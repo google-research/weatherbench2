@@ -1,11 +1,14 @@
+
 ![logo](docs/source/_static/wb2-logo-wide.png)
-# WeatherBench 2 - A benchmark for the next generation of data-driven global weather models
 
 [![CI](https://github.com/google-research/weatherbench2/actions/workflows/ci-build.yml/badge.svg)](https://github.com/google-research/weatherbench2/actions/workflows/ci-build.yml)
+[![Lint](https://github.com/google-research/weatherbench2/actions/workflows/lint.yml/badge.svg)](https://github.com/google-research/weatherbench2/actions/workflows/lint.yml)
 [![Documentation Status](https://readthedocs.org/projects/weatherbench2/badge/?version=latest)](https://weatherbench2.readthedocs.io/en/latest/?badge=latest)
 <a target="_blank" href="https://colab.research.google.com/drive/1qYH5VuMa7OWRHtEkdVya3u5gmCjcPDeX?usp=sharing">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
+
+# WeatherBench 2 - A benchmark for the next generation of data-driven global weather models
 
 
 ```

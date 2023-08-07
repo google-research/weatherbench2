@@ -78,7 +78,7 @@ class InitToValidTimeTest(parameterized.TestCase):
     with flagsaver.flagsaver(
         input_path=input_path,
         output_path=output_path,
-        beam_runner='DirectRunner',
+        runner='DirectRunner',
     ):
       wb2_init_to_valid_time.main([])
 
@@ -138,7 +138,7 @@ class InitToValidTimeTest(parameterized.TestCase):
     with flagsaver.flagsaver(
         input_path=input_path,
         output_path=output_path,
-        beam_runner='DirectRunner',
+        runner='DirectRunner',
     ):
       wb2_init_to_valid_time.main([])
 

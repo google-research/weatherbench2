@@ -29,4 +29,48 @@ Guidelines](https://opensource.google/conduct/).
 
 All submissions, including submissions by project members, require review. We 
 use [GitHub pull requests](https://docs.github.com/articles/about-pull-requests)
-for this purpose.
+for this purpose. If possible, consider reviewing [Google's Code Review Guide](https://google.github.io/eng-practices/review/).
+
+### Development Setup
+
+After cloning the project, we recommend creating a local Python3.9 environment
+for development (try [Miniconda](https://docs.conda.io/en/latest/miniconda.html)).
+
+> Note: We'll soon support Python 3.10 & 3.11 ([#3](https://github.com/google-research/weatherbench2/issues/3)).
+> At that point, we will recommend creating a Python3.10 environment.
+
+To locally install the project for development, please run:
+```shell
+pip install -e ".[tests]"
+```
+> Note: The `-e` flag installs sources in "editable" mode. Except when one needs
+> to add a new dependency, you should only have to do this once.
+
+### Local Testing
+To locally test changes to the `weatherbench2` package, run:
+
+```shell
+pytest weatherbench2/
+```
+
+To test all changes to all scripts, run:
+```shell
+for test in scripts/*_test.py; do pytest $test; done
+```
+
+Or, to test a single script, simply run:
+```shell
+pytest scripts/<script_test.py>
+```
+
+In addition, we require that all<sup>*</sup> code adhere to the [Google Style Python Guide](https://google.github.io/styleguide/pyguide.html).
+To assist with this, we've configured the project with the `pyink` and `isort` 
+formatters. To format your change before patch, please run:
+
+```shell
+pyink .
+isort .
+```
+
+_<sup>*</sup>We do express some project-specific opinions._
+

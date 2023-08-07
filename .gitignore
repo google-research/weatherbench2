@@ -7,3 +7,4 @@ docs/_build
 docs/source/_autosummary
 docs/*.zarr
 __pycache__
+.pytest_cache

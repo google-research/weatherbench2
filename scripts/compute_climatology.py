@@ -12,16 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""CLI to compute and save climatology."""
+r"""CLI to compute and save climatology.
+
+Example Usage:
+  ```
+  export BUCKET=my-bucket
+  python scripts/compute_climatology.py \
+    --input_path='gs://weatherbench2/datasets/era5/1959-2022-full_37-1h-0p25deg-chunk-1.zarr-v2' \
+    --output_path='gs://$BUCKET/datasets/ear5-hourly-climatology/$USER/1990-2019_6h_1440x721.zarr' \
+    --by_hour=False
+  ```
+"""
 
 import typing as t
 
 from absl import app
 from absl import flags
-from weatherbench2.utils import compute_daily_stat
-from weatherbench2.utils import compute_hourly_stat
+from weatherbench2 import utils
 import xarray as xr
-
 
 # Command line arguments
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='Input Zarr path')
@@ -41,15 +49,15 @@ def main(_: t.Sequence[str]) -> None:
   obs = xr.open_zarr(INPUT_PATH.value)
   if BY_HOUR.value:
     print('Compute hourly climatology.')
-    clim = compute_hourly_stat(
+    clim = utils.compute_hourly_stat(
         obs=obs,
         window_size=WINDOW_SIZE.value,
         clim_years=slice(str(START_YEAR.value), str(END_YEAR.value)),
-        hour_interval=HOUR_INTERVAL.value
+        hour_interval=HOUR_INTERVAL.value,
     )
   else:
     print('Compute daily climatology.')
-    clim = compute_daily_stat(
+    clim = utils.compute_daily_stat(
         obs=obs,
         window_size=WINDOW_SIZE.value,
         clim_years=slice(str(START_YEAR.value), str(END_YEAR.value)),
