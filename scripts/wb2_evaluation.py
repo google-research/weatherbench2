@@ -35,7 +35,7 @@ Example Usage:
     --temp_location=gs://$BUCKET/tmp/ \
     --setup_file=./setup.py \
     --requirements_file=./scripts/dataflow-requirements.txt \
-    --job_name=compute-zonal-energy-spectrum-$USER
+    --job_name=eval-$USER
   ```
 """
 import ast
