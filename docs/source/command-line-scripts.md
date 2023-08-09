@@ -304,8 +304,50 @@ python ensemble_mean.py -- \
   --realization_name=number
 ```
 
-## What about regridding?
-We plan to open-source our regridding script soon.
+(regridding)=
+## Regridding
+Only rectalinear grids (one dimensional lat/lon coordinates) on the input Zarr file are supported, but irregular spacing is OK.
+
+```
+usage: regrid.py [-h] 
+                 [--input_path INPUT_PATH]
+                 [--output_path OUTPUT_PATH]
+                 [--output_chunks OUTPUT_CHUNKS]
+                 [--latitude_nodes LATITUDE_NODES]
+                 [--longitude_nodes LONGITUDE_NODES]
+                 [--latitude_spacing LATITUDE_SPACING]
+                 [--regridding_method REGRIDDING_METHOD]
+                 [--latitude_name LATITUDE_NAME]
+                 [--longitude_name LONGITUDE_NAME]
+                 [--runner RUNNER]
+```
+
+_Command options_:
+
+* `--input_path`: (required) Input Zarr path
+* `--output_path`: (required) Output Zarr path
+* `--output_chunks`: Desired chunking of output zarr
+* `--latitude_nodes`: Number of desired latitude nodes
+* `--longitude_nodes`: Number of desired longitude nodes
+* `--latitude_spacing`: Desired latitude spacing from `equiangular_with_poles` or `equiangular_without_poles`. Default: `equiangular_with_poles`
+* `--regridding_method`: Regridding method from `nearest`, `bilinear` or `conservative`. Default: `conservative`
+* `--latitude_name`: Name of latitude dimension in dataset. Default: `latitude`
+* `--longitude_name`: Name of longitude dimension in dataset. Default: `longitude`
+* `--runner`: Beam runner. Use `DirectRunner` for local execution.
+
+*Example*
+
+```bash
+python scripts/regrid.py \
+  --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
+  --output_path=PATH \
+  --output_chunks="time=100" \
+  --latitude_nodes=64 \
+  --longitude_nodes=33 \
+  --latitude_spacing=equiangular_with_poles \
+  --regridding_method=conservative
+```
+
 
 ## Expand climatology
 
