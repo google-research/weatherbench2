@@ -144,8 +144,7 @@ def main(argv: list[str]) -> None:
   template = xbeam.make_template(template)
 
   working_chunks = dict(source_chunks)  # No rechunking
-  if WORKING_CHUNKS.value:
-    working_chunks.update(flag_utils.parse_chunks(WORKING_CHUNKS.value))
+  working_chunks.update(WORKING_CHUNKS.value)
   working_chunks.update({'prediction_timedelta': -1})
 
   # Define helper functions for branching

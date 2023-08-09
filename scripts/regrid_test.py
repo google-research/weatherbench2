@@ -36,12 +36,12 @@ class RegridTest(absltest.TestCase):
 
     input_ds.chunk({'time': 40}).to_zarr(input_path)
 
-    with flagsaver.flagsaver(
+    with flagsaver.as_parsed(
         input_path=input_path,
         output_path=output_path,
         output_chunks='time=160',
-        latitude_nodes=36,
-        longitude_nodes=19,
+        latitude_nodes='36',
+        longitude_nodes='19',
         latitude_spacing='equiangular_with_poles',
         regridding_method='conservative',
         runner='DirectRunner',

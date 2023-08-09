@@ -132,7 +132,7 @@ def main(argv: list[str]) -> None:
   }
 
   working_chunks = input_chunks_without_time.copy()
-  working_chunks.update(flag_utils.parse_chunks(WORKING_CHUNKS.value))
+  working_chunks.update(WORKING_CHUNKS.value)
   if 'time' in working_chunks:
     raise ValueError('cannot include time in working chunks')
   in_working_chunks = dict(working_chunks, time=-1)
@@ -140,7 +140,7 @@ def main(argv: list[str]) -> None:
 
   output_chunks = input_chunks_without_time.copy()
   output_chunks.update(hour=-1, dayofyear=-1)
-  output_chunks.update(flag_utils.parse_chunks(OUTPUT_CHUNKS.value))
+  output_chunks.update(OUTPUT_CHUNKS.value)
 
   clim_template = (
       xbeam.make_template(obs)

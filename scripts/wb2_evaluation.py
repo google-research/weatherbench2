@@ -391,14 +391,12 @@ def main(argv: list[str]) -> None:
       if k in EVAL_CONFIGS.value.split(',')
   }
 
-  input_chunks = flag_utils.parse_chunks(INPUT_CHUNKS.value)
-
   if USE_BEAM.value:
     evaluation.evaluate_with_beam(
         data_config,
         eval_configs,
         runner=RUNNER.value,
-        input_chunks=input_chunks,
+        input_chunks=INPUT_CHUNKS.value,
         fanout=FANOUT.value,
         argv=argv,
     )

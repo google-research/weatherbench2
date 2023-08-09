@@ -129,7 +129,8 @@ def main(argv):
       .transpose(..., 'longitude', 'latitude')
   )
 
-  output_chunks = flag_utils.parse_chunks(OUTPUT_CHUNKS.value)
+  output_chunks = OUTPUT_CHUNKS.value
+  print('OUTPUT_CHUNKS:', repr(output_chunks))
 
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     _ = (
