@@ -75,7 +75,7 @@ def mock_truth_data(
   num_longitudes = round(360 / spatial_resolution_in_degrees)
   freq = pd.Timedelta(time_resolution)
   coords = {
-      'time': pd.date_range(time_start, time_stop, freq=freq, closed='left'),
+      'time': pd.date_range(time_start, time_stop, freq=freq, inclusive='left'),
       'latitude': np.linspace(-90, 90, num_latitudes),
       'longitude': np.linspace(0, 360, num_longitudes, endpoint=False),
       'level': np.array(levels),
