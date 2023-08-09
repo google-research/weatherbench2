@@ -14,8 +14,9 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-import sys
 import subprocess
+import sys
+
 import weatherbench2  # verify this works
 
 print("python exec:", sys.executable)

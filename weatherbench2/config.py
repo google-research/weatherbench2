@@ -15,8 +15,8 @@
 """Configuration classes."""
 
 import dataclasses
-import typing as t
 from typing import Dict
+import typing as t
 
 from weatherbench2.derived_variables import DerivedVariable
 from weatherbench2.metrics import Metric
