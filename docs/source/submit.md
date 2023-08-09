@@ -23,6 +23,6 @@ Next, run the [evaluation command-line script](evaluation-cli) for your forecast
 
 ## "Submit" the results
 
-To have your model appear on the WeatherBench 2 website, you can either provide us with your forecasts (create a GitHub issue or contact us directly at weatherbench2@google.com). We will then evaluate the forecast. Or you evaluate the forecasts yourself and share your evaluation code and results with us. Then we will update the results on the website. 
+To have your model appear on the WeatherBench 2 website, you can either provide us with your forecasts (create a [GitHub issue](https://github.com/google-research/weatherbench2/issues) or contact us directly at weatherbench2@google.com). We will then evaluate the forecast. Or you evaluate the forecasts yourself and share your evaluation code and results with us. Then we will update the results on the website. 
 
 
