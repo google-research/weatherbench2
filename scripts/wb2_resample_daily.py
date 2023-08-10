@@ -114,7 +114,7 @@ def main(argv: abc.Sequence[str]) -> None:
   }
 
   working_chunks = input_chunks_without_time.copy()
-  working_chunks.update(flag_utils.parse_chunks(WORKING_CHUNKS.value))
+  working_chunks.update(WORKING_CHUNKS.value)
   if 'time' in working_chunks:
     raise ValueError('cannot include time in working chunks')
   in_working_chunks = dict(working_chunks, time=-1)

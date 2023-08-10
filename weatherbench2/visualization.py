@@ -85,9 +85,11 @@ def load_results(results_dict: t.Dict[str, str]) -> t.Dict[str, xr.Dataset]:
         r = xr.open_zarr(path_or_ds)
       else:
         r = open_nc(path_or_ds)
-      # Add perfect scores for GraphCast/HeatFormer at t=0
+      # Add perfect scores at t=0
       if r.lead_time[0] > np.timedelta64(0):
-        lt0 = r.isel(lead_time=0).assign_coords(lead_time=[np.timedelta64(0)])
+        lt0 = r.isel(lead_time=0).assign_coords(
+            lead_time=[np.timedelta64(0, 'h')]
+        )
         lt0 = lt0.where(lt0.metric != 'acc', 1)
         lt0 = lt0.where(lt0.metric != 'rmse', 0)
         lt0 = lt0.where(lt0.metric != 'mse', 0)

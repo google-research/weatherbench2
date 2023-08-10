@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    name: "python ${{ matrix.python-version }}"
+    name: "python ${{ matrix.python-version }} tests"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

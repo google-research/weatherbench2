@@ -19,11 +19,10 @@ base_requires = [
     'apache_beam>=2.31.0',
     'jax[cpu]',
     'numpy',
-    'pandas<1.4',
+    'pandas==2.0.3',
     'scipy',
     'scikit-learn',
-    'xarray',
-    'pandas',
+    'xarray==2023.7.0',
     'xarray-beam',
     'zarr',
 ]
@@ -40,7 +39,6 @@ tests_requires = [
     'absl-py',
     'pytest',
     'pyink',
-    'isort',
 ]
 
 gcp_requires = [
