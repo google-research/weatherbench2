@@ -47,7 +47,6 @@ from weatherbench2 import evaluation
 from weatherbench2 import flag_utils
 from weatherbench2 import metrics
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
-from weatherbench2.regions import LandRegion
 from weatherbench2.regions import SliceRegion
 import xarray as xr
 
@@ -81,7 +80,7 @@ CLIMATOLOGY_PATH = flags.DEFINE_string(
 )
 BY_INIT = flags.DEFINE_bool(
     'by_init',
-    False,
+    True,
     help='Specifies whether forecasts are in by-init or by-valid format.',
 )
 EVALUATE_PERSISTENCE = flags.DEFINE_bool(
@@ -115,12 +114,12 @@ PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL = flags.DEFINE_integer(
     6,
     'Hour interval to computeprobabilistic climatology',
 )
-ADD_LAND_REGION = flags.DEFINE_bool(
-    'add_land_region',
-    False,
+REGIONS = flags.DEFINE_list(
+    'regions',
+    None,
     help=(
-        'Add land-only evaluation. `land_sea_mask` must be in observation'
-        'dataset.'
+        'Comma delimited list of predefined regions to evaluate. "all" for all'
+        'predefined regions.'
     ),
 )
 COMPUTE_SEEPS = flags.DEFINE_bool(
@@ -273,21 +272,44 @@ def main(argv: list[str]) -> None:
   )
 
   # Default regions
-  regions = {
+  predefined_regions = {
       'global': SliceRegion(),
       'tropics': SliceRegion(lat_slice=slice(-20, 20)),
       'extra-tropics': SliceRegion(
           lat_slice=[slice(None, -20), slice(20, None)]
       ),
+      'northern-hemisphere': SliceRegion(lat_slice=slice(20, None)),
+      'southern-hemisphere': SliceRegion(lat_slice=slice(None, -20)),
       'europe': SliceRegion(
           lat_slice=slice(35, 75),
           lon_slice=[slice(360 - 12.5, None), slice(0, 42.5)],
       ),
+      'north-america': SliceRegion(
+          lat_slice=slice(25, 60), lon_slice=slice(360 - 120, 360 - 75)
+      ),
+      'north-atlantic': SliceRegion(
+          lat_slice=slice(25, 65), lon_slice=slice(360 - 70, 360 - 10)
+      ),
+      'north-pacific': SliceRegion(
+          lat_slice=slice(25, 60), lon_slice=slice(145, 360 - 130)
+      ),
+      'east-asia': SliceRegion(
+          lat_slice=slice(25, 60), lon_slice=slice(102.5, 150)
+      ),
+      'ausnz': SliceRegion(
+          lat_slice=slice(-45, -12.5), lon_slice=slice(120, 175)
+      ),
+      'arctic': SliceRegion(lat_slice=slice(60, 90)),
+      'antarctic': SliceRegion(lat_slice=slice(-90, -60)),
   }
-
-  if ADD_LAND_REGION.value:
-    lsm = xr.open_zarr(OBS_PATH.value, chunks=None)['land_sea_mask']
-    regions['land'] = LandRegion(land_sea_mask=lsm)
+  if REGIONS.value == ['all']:
+    regions = predefined_regions
+  elif REGIONS.value is None:
+    regions = None
+  else:
+    regions = {
+        k: v for k, v in predefined_regions.items() if k in REGIONS.value
+    }
 
   # Open climatology for ACC computation
   climatology = xr.open_zarr(CLIMATOLOGY_PATH.value)
@@ -297,8 +319,14 @@ def main(argv: list[str]) -> None:
       'rmse': metrics.RMSE(wind_vector_rmse=_wind_vector_rmse()),
       'mse': metrics.MSE(),
       'acc': metrics.ACC(climatology=climatology),
+      'bias': metrics.Bias(),
+      'mae': metrics.MAE(),
   }
-  spatial_metrics = {'bias': metrics.SpatialBias(), 'mse': metrics.SpatialMSE()}
+  spatial_metrics = {
+      'bias': metrics.SpatialBias(),
+      'mse': metrics.SpatialMSE(),
+      'mae': metrics.SpatialMAE(),
+  }
   if COMPUTE_SEEPS.value:
     deterministic_metrics['seeps'] = metrics.SEEPS(climatology=climatology)
     spatial_metrics['seeps'] = metrics.SpatialSEEPS(climatology=climatology)
@@ -352,6 +380,7 @@ def main(argv: list[str]) -> None:
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
           },
+          regions=regions,
           against_analysis=False,
           derived_variables=derived_variables,
           evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,

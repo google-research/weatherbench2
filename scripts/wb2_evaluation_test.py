@@ -74,6 +74,8 @@ class WB2Evaluation(absltest.TestCase):
         time_start='2020-01-01',
         time_stop='2020-12-31',
         runner='DirectRunner',
+        by_init=False,
+        regions=['global', 'tropics', 'extra-tropics', 'europe'],
         input_chunks=dict(time=-1),
         eval_configs=','.join(eval_configs),
         use_beam=use_beam,
@@ -83,8 +85,8 @@ class WB2Evaluation(absltest.TestCase):
       wb2_evaluation.main([])
 
     for config_name in eval_configs:
-      expected_sizes_2d = {'metric': 3, 'lead_time': 4, 'region': 4}
-      expected_sizes_3d = {'metric': 3, 'lead_time': 4, 'region': 4, 'level': 3}
+      expected_sizes_2d = {'metric': 5, 'lead_time': 4, 'region': 4}
+      expected_sizes_3d = {'metric': 5, 'lead_time': 4, 'region': 4, 'level': 3}
 
       with self.subTest(config_name):
         results_path = os.path.join(output_dir, f'{config_name}.nc')
