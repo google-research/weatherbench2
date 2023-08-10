@@ -52,6 +52,13 @@ class _ChunksParser(flags.ArgumentParser):
     return 'dict[str, int]'
 
 
+class _ChunksSerializer(flags.ArgumentSerializer):
+  """Serializer for Xarray-Beam chunks flags."""
+
+  def serialize(self, value: dict[str, int]) -> str:
+    return ','.join(f'{k}={v}' for k, v in value.items())
+
+
 def DEFINE_chunks(  # pylint: disable=invalid-name
     name: str,
     default: str,
@@ -60,4 +67,7 @@ def DEFINE_chunks(  # pylint: disable=invalid-name
 ):
   """Define a flag for defining Xarray-Beam chunks."""
   parser = _ChunksParser()
-  return flags.DEFINE(parser, name, default, help, **kwargs)
+  serializer = _ChunksSerializer()
+  return flags.DEFINE(
+      parser, name, default, help, serializer=serializer, **kwargs
+  )
