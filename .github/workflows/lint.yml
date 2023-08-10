@@ -42,7 +42,6 @@ jobs:
     - name: Install Weatherbench 2
       run: |
         pip install -e .[tests]
-    - name: Lint with pyink and isort
+    - name: Lint with pyink
       run: |
         pyink --check .
-        isort --check .

@@ -38,7 +38,6 @@ tests_requires = [
     'absl-py',
     'pytest',
     'pyink',
-    'isort',
 ]
 
 gcp_requires = [
