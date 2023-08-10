@@ -24,6 +24,8 @@ print("sys.path:", sys.path)
 print("pip environment:")
 subprocess.run([sys.executable, "-m", "pip", "list"])
 
+print(f"xarray_beam: {weatherbench2.__version__}, {weatherbench2.__file__}")
+
 # -- Project information -----------------------------------------------------
 
 project = "WeatherBench 2"

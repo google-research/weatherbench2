@@ -13,5 +13,4 @@
 # limitations under the License.
 # ==============================================================================
 """Weatherbench2."""
-__all__ = ["evaluation", "metrics"]
-from weatherbench2 import config
+

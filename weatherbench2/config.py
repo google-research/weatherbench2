@@ -16,7 +16,6 @@
 
 import dataclasses
 import typing as t
-from typing import Dict
 
 from weatherbench2.derived_variables import DerivedVariable
 from weatherbench2.metrics import Metric
@@ -87,7 +86,7 @@ class DataConfig:
   selection: Selection
   paths: Paths
   by_init: t.Optional[bool] = True
-  rename_variables: t.Optional[dict[str, str]] = None
+  rename_variables: t.Optional[t.Dict[str, str]] = None
   pressure_level_suffixes: t.Optional[bool] = False
 
 
