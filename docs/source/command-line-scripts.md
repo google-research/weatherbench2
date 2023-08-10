@@ -305,7 +305,7 @@ python ensemble_mean.py -- \
 ```
 
 (regridding)=
-## Regridding
+## Regrid
 Only rectalinear grids (one dimensional lat/lon coordinates) on the input Zarr file are supported, but irregular spacing is OK.
 
 ```
