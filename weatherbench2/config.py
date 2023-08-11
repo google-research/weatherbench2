@@ -86,7 +86,7 @@ class DataConfig:
   selection: Selection
   paths: Paths
   by_init: t.Optional[bool] = True
-  rename_variables: t.Optional[dict[str, str]] = None
+  rename_variables: t.Optional[t.Dict[str, str]] = None
   pressure_level_suffixes: t.Optional[bool] = False
 
 
