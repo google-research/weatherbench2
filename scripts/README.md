@@ -5,7 +5,7 @@ see how to invoke a given pipeline (with examples), please run the commensurate
 script with the `--help` flag. For example:
 
 ```shell
-python3 wb2_evaluation.py --help
+python3 evaluation.py --help
 ```
 
 All of our pipelines make use of [Apache Beam](https://beam.apache.org/). In our
