@@ -10,7 +10,7 @@ Replace `2020` with `2018` for `2018` results (currently not available for Pangu
 ### 64x32 Resolution
 
 ```bash
-python wb2_evaluation.py \
+python evaluation.py \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -31,7 +31,7 @@ python wb2_evaluation.py \
 ```
 
 ```bash
-python wb2_evaluation.py \
+python evaluation.py \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/hres_t0/2016-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -51,7 +51,7 @@ python wb2_evaluation.py \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-64x32_equiangular_with_poles_conservative_mean.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -72,7 +72,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-64x32_equiangular_with_poles_conservative_mean.zarr \
   --obs_path=gs://weatherbench2/datasets/hres_t0/2016-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -92,7 +92,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -113,7 +113,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -134,7 +134,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
  --forecast_path=gs://weatherbench2/datasets/pangu/2020-64x32_equiangular_with_poles_conservative.zarr \
  --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
  --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -156,7 +156,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
  --forecast_path=gs://weatherbench2/datasets/keisler/2020-64x32_equiangular_with_poles_conservative.zarr \
  --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
  --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -178,7 +178,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/era5-forecasts/2020-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -200,7 +200,7 @@ python wb2_evaluation.py -- \
 ### 240x121 Resolution
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-240x121_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -221,7 +221,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-240x121_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/hres_t0/2016-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -241,7 +241,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-240x121_equiangular_with_poles_conservative_mean.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -262,7 +262,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-240x121_equiangular_with_poles_conservative_mean.zarr \
   --obs_path=gs://weatherbench2/datasets/hres_t0/2016-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -282,7 +282,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-240x121_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -303,7 +303,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-240x121_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -324,7 +324,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
  --forecast_path=gs://weatherbench2/datasets/pangu/2020-240x121_equiangular_with_poles_conservative.zarr \
  --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
  --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -346,7 +346,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
  --forecast_path=gs://weatherbench2/datasets/keisler/2020-240x121_equiangular_with_poles_conservative.zarr \
  --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
  --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -368,7 +368,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/era5-forecasts/2020-240x121_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -390,7 +390,7 @@ python wb2_evaluation.py -- \
 ### 1440x721 resolution
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -411,7 +411,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr \
   --obs_path=gs://weatherbench2/datasets/hres_t0/2016-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -431,7 +431,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-1440x721_mean.zarr/ \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -452,7 +452,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-1440x721_mean.zarr/ \
   --obs_path=gs://weatherbench2/datasets/hres_t0/2016-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -472,7 +472,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -493,7 +493,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -514,7 +514,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
  --forecast_path=gs://weatherbench2/datasets/pangu/2020-1440x721_raw.zarr \
  --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
  --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -536,7 +536,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/era5-forecasts/2020-1440x721.zarr/ \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -560,7 +560,7 @@ python wb2_evaluation.py -- \
 ### 64x32 Resolution
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/hres_t0/2016-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -580,7 +580,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -600,7 +600,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -623,7 +623,7 @@ python wb2_evaluation.py -- \
 ### 240x121 Resolution
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-240x121_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/hres_t0/2016-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -643,7 +643,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-240x121_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -663,7 +663,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-240x121_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_240x121_equiangular_with_poles_conservative.zarr \
@@ -686,7 +686,7 @@ python wb2_evaluation.py -- \
 ### 1440x721 Resolution
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-1440x721.zarr \
   --obs_path=gs://weatherbench2/datasets/hres_t0/2016-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -706,7 +706,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-1440x721.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -726,7 +726,7 @@ python wb2_evaluation.py -- \
 ```
 
 ```bash
-python wb2_evaluation.py -- \
+python evaluation.py -- \
   --forecast_path=gs://weatherbench2/datasets/ens/2020-1440x721.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr \
@@ -749,7 +749,7 @@ python wb2_evaluation.py -- \
 ## Spectra
 
 ```bash
-python wb2_compute_zonal_energy_spectrum.py -- \
+python compute_zonal_energy_spectrum.py -- \
 --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr  \
 --output_path=$OUTDIR/highest_res/spectra/era_2020.zarr \
 --time_start=2020 \
@@ -758,7 +758,7 @@ python wb2_compute_zonal_energy_spectrum.py -- \
 ```
 
 ```bash
-python wb2_compute_zonal_energy_spectrum.py -- \
+python compute_zonal_energy_spectrum.py -- \
 --input_path=gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr  \
 --output_path=$OUTDIR/highest_res/spectra/hres_2020.zarr \
 --time_start=2020 \
@@ -767,7 +767,7 @@ python wb2_compute_zonal_energy_spectrum.py -- \
 ```
 
 ```bash
-python wb2_compute_zonal_energy_spectrum.py -- \
+python compute_zonal_energy_spectrum.py -- \
 --input_path=gs://weatherbench2/datasets/ens/2020-1440x721_mean.zarr/  \
 --output_path=$OUTDIR/highest_res/spectra/ens_mean_2020.zarr \
 --time_start=2020 \
@@ -776,7 +776,7 @@ python wb2_compute_zonal_energy_spectrum.py -- \
 ```
 
 ```bash
-python wb2_compute_zonal_energy_spectrum.py -- \
+python compute_zonal_energy_spectrum.py -- \
 --input_path=gs://weatherbench2/datasets/pangu/2020-1440x721_raw.zarr  \
 --output_path=$OUTDIR/highest_res/spectra/pangu_2020.zarr \
 --time_start=2020 \
@@ -785,7 +785,7 @@ python wb2_compute_zonal_energy_spectrum.py -- \
 ```
 
 ```bash
-python wb2_compute_zonal_energy_spectrum.py -- \
+python compute_zonal_energy_spectrum.py -- \
 --input_path=gs://weatherbench2/datasets/keisler/2020-360x181.zarr  \
 --output_path=$OUTDIR/highest_res/spectra/keisler_2020.zarr \
 --time_start=2020 \
@@ -794,7 +794,7 @@ python wb2_compute_zonal_energy_spectrum.py -- \
 ```
 
 ```bash
-python wb2_compute_zonal_energy_spectrum.py -- \
+python compute_zonal_energy_spectrum.py -- \
 --input_path=gs://weatherbench2/datasets/era5-forecasts/2020-1440x721.zarr/  \
 --output_path=$OUTDIR/highest_res/spectra/era5-forecasts_2020.zarr \
 --time_start=2020 \

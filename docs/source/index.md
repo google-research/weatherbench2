@@ -35,6 +35,11 @@ If you would like to actively develop the code, install using
 pip install -e .
 ```
 
+If you plan to launch jobs on GCP, also install the GCP requirements:
+
+```
+pip install .[gcp]
+```
 
 ## Contents
 

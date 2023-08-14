@@ -22,7 +22,7 @@ Example Usage:
   export PROJECT=my-project
   export REGION=us-central1
 
-  python scripts/wb2_expand_climatology.py \
+  python scripts/expand_climatology.py \
     --input_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2017_6h_64x32_equiangular_with_poles_conservative.zarr \
     --output_path=gs://$BUCKET/datasets/era5-expanded-climatology/$USER/era5-expanded-climatology-2017.zarr/ \
     --time_start=$START_TIME \

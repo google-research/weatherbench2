@@ -15,7 +15,7 @@ In this case the `time_slice` argument is applied to the `valid_time`, so that `
 
 When evaluating a full year of data, the differences in the time convention are minimal.
 
-See `wb2_init_to_valid_time.py` in the command line scripts to convert from init to valid time.
+See `init_to_valid_time.py` in the command line scripts to convert from init to valid time.
 
 See also [this page](https://climpred.readthedocs.io/en/stable/alignment.html) from the climpred project. There, the init-time convention is referred to as `same_init`, while the valid-time convention is referred to as `same_verif`.
 

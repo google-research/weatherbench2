@@ -20,7 +20,7 @@ Example Usage:
   export PROJECT=my-project
   export REGION=us-central1
 
-  python scripts/wb2_evaluation.py \
+  python scripts/evaluation.py \
     --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
     --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
     --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2017_6h_64x32_equiangular_with_poles_conservative.zarr \

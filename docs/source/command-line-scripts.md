@@ -8,7 +8,7 @@ The `scripts/` directory contains a number of command line scripts for processin
 Main evaluation script. To reproduce the official WeatherBench 2 evaluation, follow [these commands](official-evaluation). The results files for the baseline models can be found [here](https://console.cloud.google.com/storage/browser/weatherbench2/results).
 
 ```
-usage: wb2_evaluation.py [-h] 
+usage: evaluation.py [-h] 
                          [--forecast_path FORECAST_PATH] 
                          [--obs_path OBS_PATH]
                          [--climatology_path CLIMATOLOGY_PATH] 
@@ -127,7 +127,7 @@ eval_configs = {
 *Example*
 
 ```bash
-python wb2_evaluation.py \
+python evaluation.py \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -146,7 +146,7 @@ python wb2_evaluation.py \
 This scripts computes a day-of-year, hour-of-day climatology with optional smoothing following the methodology proposed [here](https://www.ecmwf.int/en/elibrary/75101-scale-dependent-verification-ensemble-forecasts). 
 
 ```
-usage: wb2_compute_climatology.py [-h] 
+usage: compute_climatology.py [-h] 
                                   [--input_path INPUT_PATH] 
                                   [--output_path OUTPUT_PATH]
                                   [--hour_interval HOUR_INTERVAL] 
@@ -184,7 +184,7 @@ _Command options_:
 *Example*
 
 ```bash
-python wb2_compute_climatology.py \
+python compute_climatology.py \
   --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --output_path=PATH \
   --working_chunks=level=13,longitude=4,latitude=4 \
@@ -200,7 +200,7 @@ python wb2_compute_climatology.py \
 Computes derived variables, adds them to the original dataset and saves it as a new file. See derived_variables.py for a list of available derived variables.
 
 ```
-usage: wb2_compute_derived_variables.py [-h] 
+usage: compute_derived_variables.py [-h] 
                                         [--input_path INPUT_PATH] 
                                         [--output_path OUTPUT_PATH]
                                         [--derived_variables DERIVED_VARIABLES] 
@@ -227,7 +227,7 @@ _Command options_:
 *Example*
 
 ```bash
-python wb2_compute_derived_variables.py \
+python compute_derived_variables.py \
   --input_path=gs://weatherbench2/datasets/hres/2016-2022-12h-6h-0p25deg-chunk-1.zarr/ \
   --output_path=PATH \
   --working_chunks=prediction_timedelta=-1 \
@@ -241,7 +241,7 @@ python wb2_compute_derived_variables.py \
 Computes zonal energy spectra.
 
 ```
-usage: wb2_compute_zonal_energy_spectrum.py [-h] 
+usage: compute_zonal_energy_spectrum.py [-h] 
                                             [--input_path INPUT_PATH] 
                                             [--output_path OUTPUT_PATH]
                                             [--base_variables BASE_VARIABLES] 
@@ -268,7 +268,7 @@ _Command options_:
 *Example*
 
 ```bash
-python wb2_compute_zonal_power_spectrum.py \
+python compute_zonal_power_spectrum.py \
   --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr  \
   --output_path=PATH \
   --time_start=2020 \
@@ -281,7 +281,7 @@ python wb2_compute_zonal_power_spectrum.py \
 To use the ensemble mean in deterministic evaluation, we first must compute the mean and save it in a separate file.
 
 ```
-usage: wb2_compute_ensemble_mean.py [-h] 
+usage: compute_ensemble_mean.py [-h] 
                                     [--input_path INPUT_PATH] 
                                     [--output_path OUTPUT_PATH]
                                     [--realization_name REALIZATION_NAME]
@@ -351,8 +351,8 @@ python scripts/regrid.py \
 
 ## Expand climatology
 
-`wb2_expand_climatology.py` takes a climatology dataset and expands it into a forecast-like format (`init_time` + `lead_time`). This is not currently used as `wb2_evaluation.py` is able to do this on-the-fly, reducing the number of intermediate steps. We still included the script here in case others find it useful. 
+`expand_climatology.py` takes a climatology dataset and expands it into a forecast-like format (`init_time` + `lead_time`). This is not currently used as `evaluation.py` is able to do this on-the-fly, reducing the number of intermediate steps. We still included the script here in case others find it useful. 
 
 ## Init to valid time conversion
 
-`wb2_init_to_valid_time.py` converts a forecasts in init-time convention to valid-time convention. Since currently, we do all evaluation in the init-time format, this script is not used. 
+`init_to_valid_time.py` converts a forecasts in init-time convention to valid-time convention. Since currently, we do all evaluation in the init-time format, this script is not used. 

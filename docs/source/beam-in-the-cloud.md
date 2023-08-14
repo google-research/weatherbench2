@@ -8,7 +8,7 @@ Since the input datasets can be large, distributed computating is key for effici
 To run the scripts locally, chose the `DirectRunner` as your Beam runner. There, you will have an option for how many local workers to use, e.g.:
 
 ```bash
-python wb2_evaluation.py \
+python evaluation.py \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -30,6 +30,8 @@ For a full list of how to configure the direct runner, please review [this page]
 
 ## Dataflow execution
 
+Make sure to install the package including the GCP requirements: `pip install -e .[gcp]`
+
 To run on Google Cloud Dataflow, use the `DataflowRunner`. Additionally, a few parameters need to be specified.
 
 * `--runner`: The `PipelineRunner` to use. This field can be either `DirectRunner` or `DataflowRunner`.
@@ -39,28 +41,30 @@ To run on Google Cloud Dataflow, use the `DataflowRunner`. Additionally, a few p
 * `--temp_location`: Cloud Storage path for temporary files. Must be a valid Cloud Storage URL, beginning with `gs://`.
 * `--region`: Specifies a regional endpoint for deploying your Dataflow jobs. Default: `us-central1`.
 * `--job_name`: The name of the Dataflow job being executed as it appears in Dataflow's jobs list and job details.
+* `--setup_file`: To make sure all the required packages are installed on the workers, pass the `setup.py` file to GCP.
 
 Example run:
 
 ```bash
-python wb2_evaluation.py \
+python scripts/evaluation.py \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
-  --output_dir=./ \
+  --output_dir=gs://$BUCKET \
   --output_file_prefix=hres_vs_era_2020_ \
   --by_init=True \
-  --input_chunks=init_time=1 \
+  --input_chunks=init_time=10 \
   --eval_configs=deterministic \
   --time_start=2020-01-01 \
   --time_stop=2020-12-31 \
   --variables=geopotential \
   --use_beam=True \
-  --beam_runner=DataflowRunner \
+  --runner=DataflowRunner \
   -- \
   --project $PROJECT \
   --region $REGION \
   --temp_location gs://$BUCKET/tmp/
+  --setup_file=./setup.py
 ```
 
 For a full list of how to configure the Dataflow pipeline, please review

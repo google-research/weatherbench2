@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for wb2_init_to_valid_time."""
+"""Tests for init_to_valid_time."""
 
 from absl.testing import absltest
 from absl.testing import flagsaver
@@ -22,7 +22,7 @@ import pandas as pd
 import xarray
 import xarray_beam
 
-from . import wb2_init_to_valid_time
+from . import init_to_valid_time
 
 
 class InitToValidTimeTest(parameterized.TestCase):
@@ -80,7 +80,7 @@ class InitToValidTimeTest(parameterized.TestCase):
         output_path=output_path,
         runner='DirectRunner',
     ):
-      wb2_init_to_valid_time.main([])
+      init_to_valid_time.main([])
 
     actual_ds, actual_chunks = xarray_beam.open_zarr(output_path)
     xarray.testing.assert_allclose(actual_ds, expected_ds)
@@ -140,7 +140,7 @@ class InitToValidTimeTest(parameterized.TestCase):
         output_path=output_path,
         runner='DirectRunner',
     ):
-      wb2_init_to_valid_time.main([])
+      init_to_valid_time.main([])
 
     actual_ds, actual_chunks = xarray_beam.open_zarr(output_path)
     xarray.testing.assert_allclose(actual_ds, expected_ds)

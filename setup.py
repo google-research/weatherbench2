@@ -48,7 +48,7 @@ gcp_requires = [
 
 setuptools.setup(
     name='weatherbench2',
-    version='0.0.0',
+    version='0.1.0',
     license='Apache 2.0',
     author='Google LLC',
     author_email='noreply@google.com',

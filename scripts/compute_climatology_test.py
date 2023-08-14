@@ -15,7 +15,7 @@
 from absl.testing import absltest
 import xarray as xr
 
-from . import wb2_compute_climatology as cc
+from . import compute_climatology as cc
 
 
 class SEEPSThresholdTest(absltest.TestCase):

@@ -19,7 +19,7 @@ import pandas as pd
 from weatherbench2 import schema
 import xarray
 
-from . import wb2_expand_climatology
+from . import expand_climatology
 
 
 def random_like(dataset: xarray.Dataset, seed: int = 0) -> xarray.Dataset:
@@ -61,7 +61,7 @@ class WB2ExpandClimatologyTest(absltest.TestCase):
         time_stop='2020-03-30',
         runner='DirectRunner',
     ):
-      wb2_expand_climatology.main([])
+      expand_climatology.main([])
 
     actual = xarray.open_zarr(output_path)
     xarray.testing.assert_allclose(actual, expected)

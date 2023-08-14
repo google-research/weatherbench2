@@ -7,7 +7,7 @@ You have the latest and greatest new ML model? Awesome! Here are the steps requi
 
 The WeatherBench evaluation pipeline expects forecasts and ground truth to be stored as Zarr files. See the [Quickstart](evaluation) for a description of the format. Saving all variables is too much? You can also select specific levels and variables. See the [Pangu forecasts](pangu) for an example.
 
-We recommend having single chunks in space (latitude and longitude) but small chunks in time to allow for efficient paralellization.
+We recommend having single chunks in space (latitude and longitude) but small chunks in time to allow for efficient parallelization.
 
 ## Regrid
 
