@@ -75,7 +75,7 @@ class EvaluationTest(absltest.TestCase):
         output_dir=output_path_1,
     )
 
-    data_config = config.DataConfig(selection=selection, paths=paths)
+    data_config = config.Data(selection=selection, paths=paths)
 
     regions = {
         'global': SliceRegion(),
@@ -84,23 +84,23 @@ class EvaluationTest(absltest.TestCase):
     }
 
     eval_configs = {
-        'forecast_vs_era': config.EvalConfig(
+        'forecast_vs_era': config.Eval(
             metrics={
                 'rmse': metrics.RMSE(),
                 'acc': metrics.ACC(climatology=climatology),
             },
             against_analysis=False,
         ),
-        'forecast_vs_era_by_region': config.EvalConfig(
+        'forecast_vs_era_by_region': config.Eval(
             metrics={'rmse': metrics.RMSE()},
             against_analysis=False,
             regions=regions,
         ),
-        'forecast_vs_era_spatial': config.EvalConfig(
+        'forecast_vs_era_spatial': config.Eval(
             metrics={'mse': metrics.SpatialMSE()},
             against_analysis=False,
         ),
-        'forecast_vs_era_temporal': config.EvalConfig(
+        'forecast_vs_era_temporal': config.Eval(
             metrics={'rmse': metrics.RMSE()},
             against_analysis=False,
             temporal_mean=False,

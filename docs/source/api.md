@@ -47,10 +47,10 @@
 
     config.Selection
     config.Paths
-    config.DataConfig
-    config.EvalConfig
-    config.VizConfig
-    config.PanelConfig
+    config.Data
+    config.Eval
+    config.Viz
+    config.Panel
 ```
 
 ## Regions

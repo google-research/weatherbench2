@@ -252,8 +252,8 @@ def plot_timeseries(
 
 
 def visualize_timeseries(
-    viz_config: config.VizConfig,
-    panel_configs: t.Sequence[config.PanelConfig],
+    viz_config: config.Viz,
+    panel_configs: t.Sequence[config.Panel],
     save_path: t.Optional[str] = None,
     subplots_adjust_kwargs: t.Optional[t.Dict[str, float]] = None,
     legend_position: t.Optional[int] = 2,
@@ -302,7 +302,7 @@ def visualize_timeseries(
 
 
 def visualize_scorecard(
-    viz_config: config.VizConfig,
+    viz_config: config.Viz,
     baseline: str,
     forecast: str,
     metric: str,

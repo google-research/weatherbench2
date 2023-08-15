@@ -68,7 +68,7 @@ class Paths:
 
 
 @dataclasses.dataclass
-class DataConfig:
+class Data:
   """Data configuration class combining Selection and Paths.
 
   Attributes:
@@ -91,7 +91,7 @@ class DataConfig:
 
 
 @dataclasses.dataclass
-class EvalConfig:
+class Eval:
   """Evaluation configuration class.
 
   Attributes:
@@ -135,7 +135,7 @@ class EvalConfig:
 
 
 @dataclasses.dataclass
-class VizConfig:
+class Viz:
   """Visualization configuration class."""
 
   results: t.Dict[str, str]
@@ -151,7 +151,7 @@ class VizConfig:
 
 
 @dataclasses.dataclass
-class PanelConfig:
+class Panel:
   """Config for each panel."""
 
   metric: str

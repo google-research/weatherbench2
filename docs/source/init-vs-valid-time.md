@@ -1,6 +1,6 @@
 # Init vs Valid Time Conventions
 
-The WeatherBench 2 evaluation code can work with two forecast time conventions: init-time and valid-time. For all official WB2 evaluation, the init-time convention is used. You can switch between the conventions using the `by_init` parameter in the `DataConfig`.
+The WeatherBench 2 evaluation code can work with two forecast time conventions: init-time and valid-time. For all official WB2 evaluation, the init-time convention is used. You can switch between the conventions using the `by_init` parameter in the `config.Data`.
 
 ## Init-time convention
 Here, the `time` dimension of the forecast dataset refers to the initialization time of each forecast. To get the time at which each forecast step is valid, one has to add the `lead_time` (also called `prediction_timedelta`). This is the format used by ECMWF. To avoid confusion, the WB2 code internally renames the `time` dimension to `init_time` and a `valid_time` dimension is created from `init_time` + `lead_time`. 
