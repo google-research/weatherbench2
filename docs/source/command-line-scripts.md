@@ -80,7 +80,7 @@ deterministic_metrics = {
 }
 
 eval_configs = {
-  'deterministic': Eval(
+  'deterministic': config.Eval(
       metrics=deterministic_metrics,
       against_analysis=False,
       regions=regions,
@@ -88,14 +88,14 @@ eval_configs = {
       evaluate_persistence=EVALUATE_PERSISTENCE.value,
       evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
   ),
-  'deterministic_spatial': Eval(
+  'deterministic_spatial': config.Eval(
       metrics={'bias': SpatialBias(), 'mse': SpatialMSE()},
       against_analysis=False,
       derived_variables=derived_variables,
       evaluate_persistence=EVALUATE_PERSISTENCE.value,
       evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
   ),
-  'deterministic_temporal': Eval(
+  'deterministic_temporal': config.Eval(
       metrics=deterministic_metrics,
       against_analysis=False,
       regions=regions,
@@ -104,7 +104,7 @@ eval_configs = {
       evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
       temporal_mean=False,
   ),
-  'probabilistic': Eval(
+  'probabilistic': config.Eval(
       metrics={
           'crps': CRPS(ensemble_dim=ENSEMBLE_DIM.value),
           'ensemble_mean_rmse': EnsembleMeanRMSE(
