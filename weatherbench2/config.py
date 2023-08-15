@@ -91,7 +91,7 @@ class DataConfig:
 
 
 @dataclasses.dataclass
-class EvalConfig:
+class Eval:
   """Evaluation configuration class.
 
   Attributes:

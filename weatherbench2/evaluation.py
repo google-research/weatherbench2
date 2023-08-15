@@ -223,7 +223,7 @@ def _ensure_consistent_time_step_sizes(
 
 
 def _add_base_variables(
-    data_config: config.DataConfig, eval_config: config.EvalConfig
+    data_config: config.DataConfig, eval_config: config.Eval
 ) -> config.DataConfig:
   """Add required base variables for computing derived variables.
 
@@ -287,14 +287,14 @@ def _select_analysis_init_time(
 
 def open_forecast_and_truth_datasets(
     data_config: config.DataConfig,
-    eval_config: config.EvalConfig,
+    eval_config: config.Eval,
     use_dask: bool = False,
 ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset | None]:
   """Open datasets and select desired slices.
 
   Args:
     data_config: DataConfig instance.
-    eval_config: EvalConfig instance.
+    eval_config: Eval instance.
     use_dask: Specifies whether to open datasets using dask.
 
   Returns:
@@ -377,7 +377,7 @@ def _to_netcdf(dataset: xr.Dataset, filename: str) -> None:
 def _metric_and_region_loop(
     forecast: xr.Dataset,
     truth: xr.Dataset,
-    eval_config: config.EvalConfig,
+    eval_config: config.Eval,
     compute_chunk: bool = False,
 ) -> xr.Dataset:
   """Compute metric results looping over metrics and regions in eval config."""
@@ -421,7 +421,7 @@ def _metric_and_region_loop(
 
 def _evaluate_all_metrics(
     eval_name: str,
-    eval_config: config.EvalConfig,
+    eval_config: config.Eval,
     data_config: config.DataConfig,
 ) -> None:
   """Evaluate a set of eval metrics in memory."""
@@ -465,11 +465,11 @@ def _evaluate_all_metrics(
 
 def evaluate_in_memory(
     data_config: config.DataConfig,
-    eval_configs: dict[str, config.EvalConfig],
+    eval_configs: dict[str, config.Eval],
 ) -> None:
   """Run evaluation in memory.
 
-  Will save a separate results NetCDF file for each EvalConfig.
+  Will save a separate results NetCDF file for each config.Eval.
   An example for a results dataset with the respective dimensions is given
   below. Note that region and level are optional.
 
@@ -488,7 +488,7 @@ def evaluate_in_memory(
 
   Args:
     data_config: DataConfig instance.
-    eval_configs: Dictionary of EvalConfig instances.
+    eval_configs: Dictionary of config.Eval instances.
   """
   for eval_name, eval_config in eval_configs.items():
     _evaluate_all_metrics(eval_name, eval_config, data_config)
@@ -539,7 +539,7 @@ class _EvaluateAllMetrics(beam.PTransform):
   """
 
   eval_name: str
-  eval_config: config.EvalConfig
+  eval_config: config.Eval
   data_config: config.DataConfig
   input_chunks: abc.Mapping[str, int]
   fanout: Optional[int] = None
@@ -697,7 +697,7 @@ class _EvaluateAllMetrics(beam.PTransform):
 
 def evaluate_with_beam(
     data_config: config.DataConfig,
-    eval_configs: dict[str, config.EvalConfig],
+    eval_configs: dict[str, config.Eval],
     *,
     input_chunks: abc.Mapping[str, int],
     runner: str,
@@ -706,7 +706,7 @@ def evaluate_with_beam(
 ) -> None:
   """Run evaluation with a Beam pipeline.
 
-  Will save a separate results NetCDF file for each EvalConfig.
+  Will save a separate results NetCDF file for each config.Eval.
   An example for a results dataset with the respective dimensions is given
   below. Note that region and level are optional.
 
@@ -725,7 +725,7 @@ def evaluate_with_beam(
 
   Args:
     data_config: DataConfig instance.
-    eval_configs: Dictionary of EvalConfig instances.
+    eval_configs: Dictionary of config.Eval instances.
     input_chunks: Chunking of input datasets.
     runner: Beam runner.
     fanout: Beam CombineFn fanout.

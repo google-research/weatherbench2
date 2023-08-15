@@ -337,7 +337,7 @@ def main(argv: list[str]) -> None:
   ]
 
   eval_configs = {
-      'deterministic': config.EvalConfig(
+      'deterministic': config.Eval(
           metrics=deterministic_metrics,
           against_analysis=False,
           regions=regions,
@@ -345,7 +345,7 @@ def main(argv: list[str]) -> None:
           evaluate_persistence=EVALUATE_PERSISTENCE.value,
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
       ),
-      'deterministic_spatial': config.EvalConfig(
+      'deterministic_spatial': config.Eval(
           metrics=spatial_metrics,
           against_analysis=False,
           derived_variables=derived_variables,
@@ -353,7 +353,7 @@ def main(argv: list[str]) -> None:
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
           output_format='zarr',
       ),
-      'deterministic_temporal': config.EvalConfig(
+      'deterministic_temporal': config.Eval(
           metrics=deterministic_metrics,
           against_analysis=False,
           regions=regions,
@@ -364,13 +364,13 @@ def main(argv: list[str]) -> None:
       ),
       # Against analysis is deprecated for by_init, since the time intervals are
       # not compatible. Still functional for by_valid
-      'deterministic_vs_analysis': config.EvalConfig(
+      'deterministic_vs_analysis': config.Eval(
           metrics=deterministic_metrics,
           against_analysis=True,
           regions=regions,
           derived_variables=derived_variables,
       ),
-      'probabilistic': config.EvalConfig(
+      'probabilistic': config.Eval(
           metrics={
               'crps': metrics.CRPS(ensemble_dim=ENSEMBLE_DIM.value),
               'ensemble_mean_rmse': metrics.EnsembleMeanRMSE(
@@ -388,7 +388,7 @@ def main(argv: list[str]) -> None:
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
           probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
       ),
-      'ensemble_forecast_vs_era_experimental_metrics': config.EvalConfig(
+      'ensemble_forecast_vs_era_experimental_metrics': config.Eval(
           metrics={
               'crps_spread': metrics.CRPSSpread(
                   ensemble_dim=ENSEMBLE_DIM.value
