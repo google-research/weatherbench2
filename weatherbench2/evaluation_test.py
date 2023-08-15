@@ -75,7 +75,7 @@ class EvaluationTest(absltest.TestCase):
         output_dir=output_path_1,
     )
 
-    data_config = config.DataConfig(selection=selection, paths=paths)
+    data_config = config.Data(selection=selection, paths=paths)
 
     regions = {
         'global': SliceRegion(),

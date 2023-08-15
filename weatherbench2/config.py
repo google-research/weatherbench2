@@ -68,7 +68,7 @@ class Paths:
 
 
 @dataclasses.dataclass
-class DataConfig:
+class Data:
   """Data configuration class combining Selection and Paths.
 
   Attributes:

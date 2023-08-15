@@ -263,7 +263,7 @@ def main(argv: list[str]) -> None:
       if RENAME_VARIABLES.value
       else None
   )
-  data_config = config.DataConfig(
+  data_config = config.Data(
       selection=selection,
       paths=paths,
       by_init=BY_INIT.value,

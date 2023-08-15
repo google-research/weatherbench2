@@ -47,7 +47,7 @@
 
     config.Selection
     config.Paths
-    config.DataConfig
+    config.Data
     config.Eval
     config.VizConfig
     config.PanelConfig

@@ -223,8 +223,8 @@ def _ensure_consistent_time_step_sizes(
 
 
 def _add_base_variables(
-    data_config: config.DataConfig, eval_config: config.Eval
-) -> config.DataConfig:
+    data_config: config.Data, eval_config: config.Eval
+) -> config.Data:
   """Add required base variables for computing derived variables.
 
   Args:
@@ -286,15 +286,15 @@ def _select_analysis_init_time(
 
 
 def open_forecast_and_truth_datasets(
-    data_config: config.DataConfig,
+    data_config: config.Data,
     eval_config: config.Eval,
     use_dask: bool = False,
 ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset | None]:
   """Open datasets and select desired slices.
 
   Args:
-    data_config: DataConfig instance.
-    eval_config: Eval instance.
+    data_config: config.Data instance.
+    eval_config: config.Eval instance.
     use_dask: Specifies whether to open datasets using dask.
 
   Returns:
@@ -355,7 +355,7 @@ def open_forecast_and_truth_datasets(
 
 
 def _get_output_path(
-    data_config: config.DataConfig, eval_name: str, output_format: str
+    data_config: config.Data, eval_name: str, output_format: str
 ) -> str:
   if output_format == 'netcdf':
     suffix = 'nc'
@@ -422,7 +422,7 @@ def _metric_and_region_loop(
 def _evaluate_all_metrics(
     eval_name: str,
     eval_config: config.Eval,
-    data_config: config.DataConfig,
+    data_config: config.Data,
 ) -> None:
   """Evaluate a set of eval metrics in memory."""
   forecast, truth, climatology = open_forecast_and_truth_datasets(
@@ -464,7 +464,7 @@ def _evaluate_all_metrics(
 
 
 def evaluate_in_memory(
-    data_config: config.DataConfig,
+    data_config: config.Data,
     eval_configs: dict[str, config.Eval],
 ) -> None:
   """Run evaluation in memory.
@@ -487,7 +487,7 @@ def evaluate_in_memory(
   ```
 
   Args:
-    data_config: DataConfig instance.
+    data_config: config.Data instance.
     eval_configs: Dictionary of config.Eval instances.
   """
   for eval_name, eval_config in eval_configs.items():
@@ -499,7 +499,7 @@ class _SaveOutputs(beam.PTransform):
   """Save outputs to Zarr or netCDF."""
 
   eval_name: str
-  data_config: config.DataConfig
+  data_config: config.Data
   output_format: str
 
   def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:
@@ -532,15 +532,15 @@ class _EvaluateAllMetrics(beam.PTransform):
 
   Attributes:
     eval_name: Name of evaluation.
-    eval_config: EvalCongig instance.
-    data_config: DataConfig instance.
+    eval_config: config.Eval instance.
+    data_config: config.Data instance.
     input_chunks: Chunks to use for input files.
     fanout: Fanout parameter for Beam combiners.
   """
 
   eval_name: str
   eval_config: config.Eval
-  data_config: config.DataConfig
+  data_config: config.Data
   input_chunks: abc.Mapping[str, int]
   fanout: Optional[int] = None
 
@@ -696,7 +696,7 @@ class _EvaluateAllMetrics(beam.PTransform):
 
 
 def evaluate_with_beam(
-    data_config: config.DataConfig,
+    data_config: config.Data,
     eval_configs: dict[str, config.Eval],
     *,
     input_chunks: abc.Mapping[str, int],
@@ -724,7 +724,7 @@ def evaluate_with_beam(
   ```
 
   Args:
-    data_config: DataConfig instance.
+    data_config: config.Data instance.
     eval_configs: Dictionary of config.Eval instances.
     input_chunks: Chunking of input datasets.
     runner: Beam runner.
