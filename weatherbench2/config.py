@@ -135,7 +135,7 @@ class Eval:
 
 
 @dataclasses.dataclass
-class VizConfig:
+class Viz:
   """Visualization configuration class."""
 
   results: t.Dict[str, str]

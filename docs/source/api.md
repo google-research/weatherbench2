@@ -49,7 +49,7 @@
     config.Paths
     config.Data
     config.Eval
-    config.VizConfig
+    config.Viz
     config.PanelConfig
 ```
 
