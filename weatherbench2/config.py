@@ -151,7 +151,7 @@ class Viz:
 
 
 @dataclasses.dataclass
-class PanelConfig:
+class Panel:
   """Config for each panel."""
 
   metric: str

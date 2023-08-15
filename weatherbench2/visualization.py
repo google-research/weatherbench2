@@ -253,7 +253,7 @@ def plot_timeseries(
 
 def visualize_timeseries(
     viz_config: config.Viz,
-    panel_configs: t.Sequence[config.PanelConfig],
+    panel_configs: t.Sequence[config.Panel],
     save_path: t.Optional[str] = None,
     subplots_adjust_kwargs: t.Optional[t.Dict[str, float]] = None,
     legend_position: t.Optional[int] = 2,

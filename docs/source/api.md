@@ -50,7 +50,7 @@
     config.Data
     config.Eval
     config.Viz
-    config.PanelConfig
+    config.Panel
 ```
 
 ## Regions
