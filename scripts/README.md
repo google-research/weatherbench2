@@ -15,3 +15,6 @@ If Dataflow is not an available option, each pipeline can be run with the Apache
 Spark runner, which is available on every major commercial cloud (and can be
 self-hosted). For more on the Spark runner,
 please [consult this documentation](https://beam.apache.org/documentation/runners/spark/).
+
+For more information on how to run each Beam pipeline, please consult [this
+documentation](https://weatherbench2.readthedocs.io/en/latest/beam-in-the-cloud.html).
