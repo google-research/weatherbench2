@@ -1,7 +1,7 @@
 (dataflow)=
 # Distributed computing using Beam on GCP
 
-Since the input datasets can be large, distributed computating is key for efficient evaluation. Here is a guide for running the [command line scripts](cli) on [Google Cloud Dataflow](https://cloud.google.com/dataflow).
+Since the input datasets can be large, distributed computing is key for efficient evaluation. Here is a guide for running the [command line scripts](cli) on [Google Cloud Dataflow](https://cloud.google.com/dataflow).
 
 ## Local execution
 
@@ -70,7 +70,7 @@ python scripts/evaluation.py \
 For a full list of how to configure the Dataflow pipeline, please review
 [this table](https://cloud.google.com/dataflow/docs/reference/pipeline-options).
 
-## Monitoring
+### Monitoring
 
 When running Dataflow, you
 can [monitor jobs through UI](https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf),
@@ -104,4 +104,12 @@ You can even [view logs via the beta commands](https://cloud.google.com/sdk/gclo
 gcloud beta dataflow logs list $JOBID
 ```
 
+## Spark execution
+
+Users may want to run Weatherbench 2 scripts on other clouds beyond GCP. To best
+accomplish this, we recommend using a managed or self-hosted Apache Spark
+runner: [beam.apache.org/documentation/runners/spark/](https://beam.apache.org/documentation/runners/spark/).
+
+Once you have a Spark cluster set up (specifically, running on the JVM), please
+follow the above documentation to configure the `PortableRunner` on the cluster.
 
