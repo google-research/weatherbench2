@@ -434,6 +434,7 @@ def _get_n_ensemble(
 
 @dataclasses.dataclass
 class EnsembleMetric(Metric):
+  """Ensemble metric base class."""
   ensemble_dim: str = REALIZATION
 
   def _ensemble_slice(self, ds: xr.Dataset, slice_obj: slice) -> xr.Dataset:
