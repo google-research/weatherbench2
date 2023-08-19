@@ -34,9 +34,10 @@ BEAM_RUNNER = flags.DEFINE_string(
     None,
     help='beam.runners.Runner',
 )
-# TODO(ilopezgp): Allow multiple statistics in a single output dataset
-STATISTIC = flags.DEFINE_string(
-    'statistic', 'mean', help='Output resampled time statistic.'
+STATISTICS = flags.DEFINE_list(
+    'statistics',
+    ['mean'],
+    help='Output resampled time statistics, from "mean", "min", or "max".',
 )
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads', None, help='Number of chunks to load in parallel per worker.'
@@ -83,6 +84,13 @@ def resample_in_time_chunk(
     rsmp_chunk = rsmp_chunk.min()
   elif statistic == 'max':
     rsmp_chunk = rsmp_chunk.max()
+
+  # Append time statistic to var name.
+  for var in rsmp_chunk:
+    rsmp_chunk = rsmp_chunk.rename({var: f'{var}_{statistic}'})
+  rsmp_key = rsmp_key.replace(
+      vars={f'{var}_{statistic}' for var in rsmp_key.vars}
+  )
   return rsmp_key, rsmp_chunk
 
 
@@ -91,6 +99,8 @@ def main(argv: abc.Sequence[str]) -> None:
   if START_YEAR.value is not None and END_YEAR.value is not None:
     time_slice = (str(START_YEAR.value), str(END_YEAR.value))
     obs = obs.sel(time=slice(*time_slice))
+  # drop static variables, for which time resampling would fail
+  obs = obs.drop_vars([k for k, v in obs.items() if 'time' not in v.dims])
 
   # Get output times at daily resolution
   orig_times = obs.coords['time'].values
@@ -99,20 +109,10 @@ def main(argv: abc.Sequence[str]) -> None:
       orig_times.max() + np.timedelta64(1, 'D'),
       dtype='datetime64[D]',
   )
-  # Append time statistic to var name.
-  statistic = STATISTIC.value
-  var_list = list(set(obs.variables) - set(obs.coords))
-  rsmp_var_list = [var + '_' + statistic for var in var_list]
-  rename_dict = dict(zip(var_list, rsmp_var_list))
-  obs = obs.rename(name_dict=rename_dict)
-
-  # drop static variables, for which time resampling would fail
-  obs = obs.drop_vars([k for k, v in obs.items() if 'time' not in v.dims])
 
   input_chunks_without_time = {
       k: v for k, v in input_chunks.items() if k != 'time'
   }
-
   working_chunks = input_chunks_without_time.copy()
   working_chunks.update(WORKING_CHUNKS.value)
   if 'time' in working_chunks:
@@ -129,11 +129,20 @@ def main(argv: abc.Sequence[str]) -> None:
           time=daily_times,
       )
   )
+  raw_vars = list(rsmp_template)
+  # Append time statistic to var name.
+  for var in raw_vars:
+    for stat in STATISTICS.value:
+      rsmp_template = rsmp_template.assign(
+          {f'{var}_{stat}': rsmp_template[var]}
+      )
+    rsmp_template = rsmp_template.drop(var)
 
   itemsize = max(var.dtype.itemsize for var in rsmp_template.values())
 
   with beam.Pipeline(runner=BEAM_RUNNER.value, argv=argv) as root:
-    _ = (
+    # Read and rechunk
+    pcoll = (
         root
         | xbeam.DatasetToChunks(
             obs, input_chunks, split_vars=True, num_threads=NUM_THREADS.value
@@ -142,13 +151,24 @@ def main(argv: abc.Sequence[str]) -> None:
         >> xbeam.Rechunk(
             obs.sizes, input_chunks, in_working_chunks, itemsize=itemsize
         )
-        | beam.MapTuple(
-            functools.partial(
-                resample_in_time_chunk,
-                resampled_frequency='1d',
-                statistic=statistic,
-            )
-        )
+    )
+
+    # Branches to compute statistics
+    pcolls = []
+    for stat in STATISTICS.value:
+      pcoll_tmp = pcoll | f'{stat}' >> beam.MapTuple(
+          functools.partial(
+              resample_in_time_chunk,
+              resampled_frequency='1d',
+              statistic=stat,
+          )
+      )
+      pcolls.append(pcoll_tmp)
+
+    # Rechunk and write to file
+    _ = (
+        pcolls
+        | beam.Flatten()
         | 'RechunkOut'
         >> xbeam.Rechunk(
             rsmp_template.sizes,
