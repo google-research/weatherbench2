@@ -148,11 +148,11 @@ python evaluation.py -- \
  --evaluate_persistence=False \
  --time_start=2020-01-01 \
  --time_stop=2020-12-31 \
---pressure_level_suffixes=True \
---variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity,2m_temperature,10m_u_component_of_wind,10m_v_component_of_wind,mean_sea_level_pressure \
---derived_variables=wind_speed,10m_wind_speed \
+ --pressure_level_suffixes=True \
+ --variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity,2m_temperature,10m_u_component_of_wind,10m_v_component_of_wind,mean_sea_level_pressure \
+ --derived_variables=wind_speed,10m_wind_speed \
  --add_land_region=False \
---use_beam=True
+ --use_beam=True
 ```
 
 ```bash
@@ -170,9 +170,9 @@ python evaluation.py -- \
  --evaluate_persistence=False \
  --time_start=2020-01-01 \
  --time_stop=2020-12-31 \
---pressure_level_suffixes=True \
---variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity \
---derived_variables=wind_speed \
+ --pressure_level_suffixes=True \
+ --variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity \
+ --derived_variables=wind_speed \
  --add_land_region=False \
  --use_beam=True
 ```
@@ -338,9 +338,9 @@ python evaluation.py -- \
  --evaluate_persistence=False \
  --time_start=2020-01-01 \
  --time_stop=2020-12-31 \
---pressure_level_suffixes=True \
---variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity,2m_temperature,10m_u_component_of_wind,10m_v_component_of_wind,mean_sea_level_pressure \
---derived_variables=wind_speed,10m_wind_speed \
+ --pressure_level_suffixes=True \
+ --variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity,2m_temperature,10m_u_component_of_wind,10m_v_component_of_wind,mean_sea_level_pressure \
+ --derived_variables=wind_speed,10m_wind_speed \
  --add_land_region=False \
  --use_beam=True
 ```
@@ -360,9 +360,9 @@ python evaluation.py -- \
  --evaluate_persistence=False \
  --time_start=2020-01-01 \
  --time_stop=2020-12-31 \
---pressure_level_suffixes=True \
---variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity \
---derived_variables=wind_speed \
+ --pressure_level_suffixes=True \
+ --variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity \
+ --derived_variables=wind_speed \
  --add_land_region=False \
  --use_beam=True
 ```
@@ -528,9 +528,9 @@ python evaluation.py -- \
  --evaluate_persistence=False \
  --time_start=2020-01-01 \
  --time_stop=2020-12-31 \
---pressure_level_suffixes=True \
---variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity,2m_temperature,10m_u_component_of_wind,10m_v_component_of_wind,mean_sea_level_pressure \
---derived_variables=wind_speed,10m_wind_speed \
+ --pressure_level_suffixes=True \
+ --variables=geopotential,temperature,u_component_of_wind,v_component_of_wind,specific_humidity,2m_temperature,10m_u_component_of_wind,10m_v_component_of_wind,mean_sea_level_pressure \
+ --derived_variables=wind_speed,10m_wind_speed \
  --add_land_region=False \
  --use_beam=True
 ```
@@ -750,54 +750,54 @@ python evaluation.py -- \
 
 ```bash
 python compute_zonal_energy_spectrum.py -- \
---input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr  \
---output_path=$OUTDIR/highest_res/spectra/era_2020.zarr \
---time_start=2020 \
---time_stop=2020 \
---base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed,10m_u_component_of_wind,10m_v_component_of_wind,10m_wind_speed,2m_temperature,mean_sea_level_pressure,total_precipitation_6hr,total_precipitation_24hr \
+ --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr  \
+ --output_path=$OUTDIR/highest_res/spectra/era_2020.zarr \
+ --time_start=2020 \
+ --time_stop=2020 \
+ --base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed,10m_u_component_of_wind,10m_v_component_of_wind,10m_wind_speed,2m_temperature,mean_sea_level_pressure,total_precipitation_6hr,total_precipitation_24hr \
 ```
 
 ```bash
 python compute_zonal_energy_spectrum.py -- \
---input_path=gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr  \
---output_path=$OUTDIR/highest_res/spectra/hres_2020.zarr \
---time_start=2020 \
---time_stop=2020 \
---base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed,10m_u_component_of_wind,10m_v_component_of_wind,10m_wind_speed,2m_temperature,mean_sea_level_pressure,total_precipitation_6hr,total_precipitation_24hr \
+ --input_path=gs://weatherbench2/datasets/hres/2016-2022-0012-1440x721.zarr  \
+ --output_path=$OUTDIR/highest_res/spectra/hres_2020.zarr \
+ --time_start=2020 \
+ --time_stop=2020 \
+ --base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed,10m_u_component_of_wind,10m_v_component_of_wind,10m_wind_speed,2m_temperature,mean_sea_level_pressure,total_precipitation_6hr,total_precipitation_24hr \
 ```
 
 ```bash
 python compute_zonal_energy_spectrum.py -- \
---input_path=gs://weatherbench2/datasets/ens/2020-1440x721_mean.zarr/  \
---output_path=$OUTDIR/highest_res/spectra/ens_mean_2020.zarr \
---time_start=2020 \
---time_stop=2020 \
---base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed,10m_u_component_of_wind,10m_v_component_of_wind,10m_wind_speed,2m_temperature,mean_sea_level_pressure,total_precipitation_6hr,total_precipitation_24hr \
+ --input_path=gs://weatherbench2/datasets/ens/2020-1440x721_mean.zarr/  \
+ --output_path=$OUTDIR/highest_res/spectra/ens_mean_2020.zarr \
+ --time_start=2020 \
+ --time_stop=2020 \
+ --base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed,10m_u_component_of_wind,10m_v_component_of_wind,10m_wind_speed,2m_temperature,mean_sea_level_pressure,total_precipitation_6hr,total_precipitation_24hr \
 ```
 
 ```bash
 python compute_zonal_energy_spectrum.py -- \
---input_path=gs://weatherbench2/datasets/pangu/2020-1440x721_raw.zarr  \
---output_path=$OUTDIR/highest_res/spectra/pangu_2020.zarr \
---time_start=2020 \
---time_stop=2020 \
---base_variables=geopotential_500,specific_humidity_700,temperature_850,u_component_of_wind_850,v_component_of_wind_850,10m_u_component_of_wind,10m_v_component_of_wind,2m_temperature,mean_sea_level_pressure \
+ --input_path=gs://weatherbench2/datasets/pangu/2020-1440x721_raw.zarr  \
+ --output_path=$OUTDIR/highest_res/spectra/pangu_2020.zarr \
+ --time_start=2020 \
+ --time_stop=2020 \
+ --base_variables=geopotential_500,specific_humidity_700,temperature_850,u_component_of_wind_850,v_component_of_wind_850,10m_u_component_of_wind,10m_v_component_of_wind,2m_temperature,mean_sea_level_pressure \
 ```
 
 ```bash
 python compute_zonal_energy_spectrum.py -- \
---input_path=gs://weatherbench2/datasets/keisler/2020-360x181.zarr  \
---output_path=$OUTDIR/highest_res/spectra/keisler_2020.zarr \
---time_start=2020 \
---time_stop=2020 \
---base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed \
+ --input_path=gs://weatherbench2/datasets/keisler/2020-360x181.zarr  \
+ --output_path=$OUTDIR/highest_res/spectra/keisler_2020.zarr \
+ --time_start=2020 \
+ --time_stop=2020 \
+ --base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed \
 ```
 
 ```bash
 python compute_zonal_energy_spectrum.py -- \
---input_path=gs://weatherbench2/datasets/era5-forecasts/2020-1440x721.zarr/  \
---output_path=$OUTDIR/highest_res/spectra/era5-forecasts_2020.zarr \
---time_start=2020 \
---time_stop=2020 \
---base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed,10m_u_component_of_wind,10m_v_component_of_wind,10m_wind_speed,2m_temperature,mean_sea_level_pressure \
+ --input_path=gs://weatherbench2/datasets/era5-forecasts/2020-1440x721.zarr/  \
+ --output_path=$OUTDIR/highest_res/spectra/era5-forecasts_2020.zarr \
+ --time_start=2020 \
+ --time_stop=2020 \
+ --base_variables=geopotential,specific_humidity,temperature,u_component_of_wind,v_component_of_wind,wind_speed,10m_u_component_of_wind,10m_v_component_of_wind,10m_wind_speed,2m_temperature,mean_sea_level_pressure \
 ```

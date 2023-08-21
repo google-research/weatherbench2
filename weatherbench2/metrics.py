@@ -25,12 +25,12 @@ from scipy import stats
 from weatherbench2.regions import Region
 import xarray as xr
 
-REALIZATION = 'realization'
+REALIZATION = "realization"
 
 
 def _assert_increasing(x: np.ndarray):
   if not (np.diff(x) > 0).all():
-    raise ValueError(f'array is not increasing: {x}')
+    raise ValueError(f"array is not increasing: {x}")
 
 
 def _latitude_cell_bounds(x: np.ndarray) -> np.ndarray:
@@ -93,13 +93,13 @@ class Metric:
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
     """Evaluate this metric on datasets with full temporal coverages."""
-    if 'time' in forecast.dims:
-      avg_dim = 'time'
-    elif 'init_time' in forecast.dims:
-      avg_dim = 'init_time'
+    if "time" in forecast.dims:
+      avg_dim = "time"
+    elif "init_time" in forecast.dims:
+      avg_dim = "init_time"
     else:
       raise ValueError(
-          f'Forecast has neither valid_time or init_time dimension {forecast}'
+          f"Forecast has neither valid_time or init_time dimension {forecast}"
       )
     return self.compute_chunk(forecast, truth, region=region).mean(avg_dim)
 
@@ -121,7 +121,7 @@ def _spatial_average(
   if region is not None:
     dataset, weights = region.apply(dataset, weights)
   return dataset.weighted(weights).mean(
-      ['latitude', 'longitude'], skipna=skipna
+      ["latitude", "longitude"], skipna=skipna
   )
 
 
@@ -282,12 +282,12 @@ class ACC(Metric):
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
-    if 'init_time' in forecast.dims:
-      time_dim = 'valid_time'
+    if "init_time" in forecast.dims:
+      time_dim = "valid_time"
     else:
-      time_dim = 'time'
+      time_dim = "time"
     climatology_chunk = self.climatology[list(forecast.keys())]
-    if hasattr(forecast, 'level'):
+    if hasattr(forecast, "level"):
       climatology_chunk = climatology_chunk.sel(level=forecast.level)
     climatology_chunk = climatology_chunk.sel(
         dayofyear=forecast[time_dim].dt.dayofyear,
@@ -323,18 +323,18 @@ class SpatialSEEPS(Metric):
 
   climatology: xr.Dataset
   dry_threshold_mm: float = 0.25
-  precip_name: str = 'total_precipitation_24hr'
+  precip_name: str = "total_precipitation_24hr"
   min_p1: float = 0.01
   max_p1: float = 0.85
 
   @functools.cached_property
   def p1(self) -> xr.DataArray:
-    dry_fraction = self.climatology[f'{self.precip_name}_seeps_dry_fraction']
-    return dry_fraction.mean(('hour', 'dayofyear')).compute()
+    dry_fraction = self.climatology[f"{self.precip_name}_seeps_dry_fraction"]
+    return dry_fraction.mean(("hour", "dayofyear")).compute()
 
   def _convert_precip_to_seeps_cat(self, ds):
     """Helper function for SEEPS computation. Converts values to categories."""
-    wet_threshold = self.climatology[f'{self.precip_name}_seeps_threshold']
+    wet_threshold = self.climatology[f"{self.precip_name}_seeps_threshold"]
     # Convert to SI units [meters]
     dry_threshold = self.dry_threshold_mm / 1000.0
     da = ds[self.precip_name]
@@ -349,10 +349,10 @@ class SpatialSEEPS(Metric):
     heavy = da >= wet_threshold_for_valid_time
     result = xr.concat(
         [dry, light, heavy],
-        dim=xr.DataArray(['dry', 'light', 'heavy'], dims=['seeps_cat']),
+        dim=xr.DataArray(["dry", "light", "heavy"], dims=["seeps_cat"]),
     )
     # Convert NaNs back to NaNs
-    result = result.astype('int').where(da.notnull())
+    result = result.astype("int").where(da.notnull())
     return result
 
   def compute_chunk(
@@ -366,8 +366,8 @@ class SpatialSEEPS(Metric):
 
     # Compute contingency table
     out = (
-        forecast_cat.rename({'seeps_cat': 'forecast_cat'})
-        * truth_cat.rename({'seeps_cat': 'truth_cat'})
+        forecast_cat.rename({"seeps_cat": "forecast_cat"})
+        * truth_cat.rename({"seeps_cat": "truth_cat"})
     ).compute()
 
     # Compute scoring matrix
@@ -387,12 +387,12 @@ class SpatialSEEPS(Metric):
     scoring_matrix = scoring_matrix.compute()
 
     # Take dot product
-    result = xr.dot(out, scoring_matrix, dims=('forecast_cat', 'truth_cat'))
+    result = xr.dot(out, scoring_matrix, dims=("forecast_cat", "truth_cat"))
 
     # Mask out p1 thresholds
     result = result.where(self.p1 < self.max_p1, np.NaN)
     result = result.where(self.p1 > self.min_p1, np.NaN)
-    return xr.Dataset({f'{self.precip_name}': result})
+    return xr.Dataset({f"{self.precip_name}": result})
 
 
 @dataclasses.dataclass
@@ -422,18 +422,20 @@ def _get_n_ensemble(
 ) -> int:
   """Returns the size of `ensemble_dim`, optionally asserting size at least."""
   if ensemble_dim not in ds.dims:
-    raise ValueError(f'{ensemble_dim=} not found in {ds.dims=}')
+    raise ValueError(f"{ensemble_dim=} not found in {ds.dims=}")
   n_ensemble = ds.dims[ensemble_dim]
   if n_ensemble < expect_n_ensemble_at_least:
     raise ValueError(
-        f'{n_ensemble=} is less than expected size of '
-        f'{expect_n_ensemble_at_least}'
+        f"{n_ensemble=} is less than expected size of "
+        f"{expect_n_ensemble_at_least}"
     )
   return n_ensemble
 
 
 @dataclasses.dataclass
 class EnsembleMetric(Metric):
+  """Ensemble metric base class."""
+
   ensemble_dim: str = REALIZATION
 
   def _ensemble_slice(self, ds: xr.Dataset, slice_obj: slice) -> xr.Dataset:
@@ -585,7 +587,7 @@ def _rank_ds(ds: xr.Dataset, dim: str) -> xr.Dataset:
   """The ranking of `ds` along `dim`, with 1 being the smallest entry."""
 
   def _rank_da(da: xr.DataArray) -> np.ndarray:
-    return stats.rankdata(da.values, method='ordinal', axis=da.dims.index(dim))
+    return stats.rankdata(da.values, method="ordinal", axis=da.dims.index(dim))
 
   return ds.copy(data={k: _rank_da(v) for k, v in ds.items()})
 
