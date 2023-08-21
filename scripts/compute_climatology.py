@@ -53,9 +53,17 @@ DEFAULT_SEEPS_THRESHOLD_MM = (
 
 
 # Command line arguments
-# TODO(shoyer): add an option for daily climatology
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='Input Zarr path')
 OUTPUT_PATH = flags.DEFINE_string('output_path', None, help='Output Zarr path')
+FREQUENCY = flags.DEFINE_string(
+    'frequency',
+    'hourly',
+    (
+        'Frequency of the computed climatology. "hourly": Compute the'
+        ' climatology per day of year and hour of day. "daily": Compute the'
+        ' climatology per day of year.'
+    ),
+)
 HOUR_INTERVAL = flags.DEFINE_integer(
     'hour_interval',
     1,
@@ -147,38 +155,26 @@ class SEEPSThreshold:
     return out
 
 
-def compute_hourly_stat_chunk(
+def compute_seeps_chunk(
     obs_key: xbeam.Key,
     obs_chunk: xr.Dataset,
     *,
+    frequency: str,
     window_size: int,
     clim_years: slice,
     hour_interval: int,
-    statistic: str = 'mean',
     seeps_threshold_mm: Optional[dict[str, float]] = None,
 ) -> tuple[xbeam.Key, xr.Dataset]:
-  """Compute hourly climatology on a chunk."""
+  """Compute SEEPS climatology on a chunk."""
   clim_key = obs_key.with_offsets(time=None, hour=0, dayofyear=0)
-  if statistic == 'seeps':
-    if METHOD.value != 'explicit':
-      raise NotImplementedError('SEEPS only tested for explicit.')
-    (var,) = clim_key.vars
-    clim_key = clim_key.replace(
-        vars={f'{var}_seeps_threshold', f'{var}_seeps_dry_fraction'}
-    )
-    stat_fn = SEEPSThreshold(seeps_threshold_mm[var], var=var).compute
-  elif statistic in ['mean', 'std']:
-    stat_fn = statistic
-    if ADD_STATISTIC_SUFFIX.value:
-      for var in obs_chunk:
-        obs_chunk = obs_chunk.rename({var: f'{var}_{statistic}'})
-    clim_key = clim_key.replace(
-        vars={f'{var}_{statistic}' for var in clim_key.vars}
-    )
-  else:
-    raise NotImplementedError(f'stat {statistic} not implemented.')
-
-  if METHOD.value == 'explicit':
+  if METHOD.value != 'explicit':
+    raise NotImplementedError('SEEPS only tested for explicit.')
+  (var,) = clim_key.vars
+  clim_key = clim_key.replace(
+      vars={f'{var}_seeps_threshold', f'{var}_seeps_dry_fraction'}
+  )
+  stat_fn = SEEPSThreshold(seeps_threshold_mm[var], var=var).compute
+  if frequency == 'hourly':
     clim_chunk = utils.compute_hourly_stat(
         obs=obs_chunk,
         window_size=window_size,
@@ -186,20 +182,74 @@ def compute_hourly_stat_chunk(
         hour_interval=hour_interval,
         stat_fn=stat_fn,
     )
-  elif METHOD.value == 'fast':
-    clim_chunk = utils.compute_hourly_stat_fast(
+  elif frequency == 'daily':
+    clim_chunk = utils.compute_daily_stat(
         obs=obs_chunk,
         window_size=window_size,
         clim_years=clim_years,
-        hour_interval=hour_interval,
         stat_fn=stat_fn,
     )
   else:
-    raise NotImplementedError(f'method {METHOD.value} not implemented.')
+    raise NotImplementedError(f'Frequency {frequency} not implemented.')
+  return clim_key, clim_chunk
+
+
+def compute_stat_chunk(
+    obs_key: xbeam.Key,
+    obs_chunk: xr.Dataset,
+    *,
+    frequency: str,
+    window_size: int,
+    clim_years: slice,
+    statistic: str = 'mean',
+    hour_interval: Optional[int] = None,
+    add_statistic_suffix: bool = False,
+) -> tuple[xbeam.Key, xr.Dataset]:
+  """Compute climatology on a chunk."""
+  if statistic not in ['mean', 'std']:
+    raise NotImplementedError(f'stat {statistic} not implemented.')
+  offsets = dict(dayofyear=0)
+  if frequency == 'hourly':
+    offsets['hour'] = 0
+  clim_key = obs_key.with_offsets(time=None, **offsets)
+  if add_statistic_suffix:
+    clim_key = clim_key.replace(
+        vars={f'{var}_{statistic}' for var in clim_key.vars}
+    )
+    for var in obs_chunk:
+      obs_chunk = obs_chunk.rename({var: f'{var}_{statistic}'})
+  compute_kwargs = {
+      'obs': obs_chunk,
+      'window_size': window_size,
+      'clim_years': clim_years,
+      'stat_fn': statistic,
+  }
+
+  if frequency == 'hourly' and METHOD.value == 'explicit':
+    clim_chunk = utils.compute_hourly_stat(
+        **compute_kwargs, hour_interval=hour_interval
+    )
+  elif frequency == 'hourly' and METHOD.value == 'fast':
+    clim_chunk = utils.compute_hourly_stat_fast(
+        **compute_kwargs, hour_interval=hour_interval
+    )
+  elif frequency == 'daily' and METHOD.value == 'explicit':
+    clim_chunk = utils.compute_daily_stat(**compute_kwargs)
+  elif frequency == 'daily' and METHOD.value == 'fast':
+    clim_chunk = utils.compute_daily_stat_fast(**compute_kwargs)
+  else:
+    raise NotImplementedError(
+        f'method {METHOD.value} for climatological frequency {frequency}'
+        ' not implemented.'
+    )
   return clim_key, clim_chunk
 
 
 def main(argv: list[str]) -> None:
+
+  if not ADD_STATISTIC_SUFFIX.value and len(STATISTICS.value) > 1:
+    raise ValueError('--add_statistic_suffix is required for >1 statistics.')
+
   obs, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
   # TODO(shoyer): slice obs in time using START_YEAR and END_YEAR. This would
   # require some care in order to ensure input_chunks['time'] remains valid.
@@ -211,39 +261,47 @@ def main(argv: list[str]) -> None:
       k: v for k, v in input_chunks.items() if k != 'time'
   }
 
+  if FREQUENCY.value == 'daily':
+    stat_kwargs = {}
+    clim_chunks = dict(dayofyear=-1)
+    clim_dims = dict(dayofyear=1 + np.arange(366))
+  elif FREQUENCY.value == 'hourly':
+    stat_kwargs = dict(hour_interval=HOUR_INTERVAL.value)
+    clim_chunks = dict(hour=-1, dayofyear=-1)
+    clim_dims = dict(
+        hour=np.arange(0, 24, HOUR_INTERVAL.value), dayofyear=1 + np.arange(366)
+    )
+  else:
+    raise NotImplementedError(f'frequency {FREQUENCY.value} not implemented.')
+
   working_chunks = input_chunks_without_time.copy()
   working_chunks.update(WORKING_CHUNKS.value)
   if 'time' in working_chunks:
     raise ValueError('cannot include time in working chunks')
   in_working_chunks = dict(working_chunks, time=-1)
-  out_working_chunks = dict(working_chunks, hour=-1, dayofyear=-1)
+  out_working_chunks = dict(working_chunks, **clim_chunks)
 
   output_chunks = input_chunks_without_time.copy()
-  output_chunks.update(hour=-1, dayofyear=-1)
+  output_chunks.update(clim_chunks)
   output_chunks.update(OUTPUT_CHUNKS.value)
 
   clim_template = (
-      xbeam.make_template(obs)
-      .isel(time=0, drop=True)
-      .expand_dims(
-          hour=np.arange(0, 24, HOUR_INTERVAL.value),
-          dayofyear=1 + np.arange(366),
-      )
+      xbeam.make_template(obs).isel(time=0, drop=True).expand_dims(clim_dims)
   )
 
   raw_vars = list(clim_template)
+  seeps_dry_threshold_mm = ast.literal_eval(SEEPS_DRY_THRESHOLD_MM.value)
   if 'seeps' in STATISTICS.value:
-    seeps_dry_threshold_mm = ast.literal_eval(SEEPS_DRY_THRESHOLD_MM.value)
     for v in seeps_dry_threshold_mm.keys():
       clim_template = clim_template.assign({
           f'{v}_seeps_threshold': clim_template[v],
           f'{v}_seeps_dry_fraction': clim_template[v],
       })
 
-    def _compute_seeps(kv):
-      k, _ = kv
-      (var,) = k.vars
-      return var in seeps_dry_threshold_mm.keys()
+  def _compute_seeps(kv):
+    k, _ = kv
+    (var,) = k.vars
+    return var in seeps_dry_threshold_mm.keys()
 
   for stat in STATISTICS.value:
     if stat != 'seeps':
@@ -283,14 +341,14 @@ def main(argv: list[str]) -> None:
             | 'seeps'
             >> beam.MapTuple(
                 functools.partial(
-                    compute_hourly_stat_chunk,
+                    compute_seeps_chunk,
                     window_size=WINDOW_SIZE.value,
                     clim_years=slice(
                         str(START_YEAR.value), str(END_YEAR.value)
                     ),
-                    hour_interval=HOUR_INTERVAL.value,
-                    statistic='seeps',
+                    frequency=FREQUENCY.value,
                     seeps_threshold_mm=seeps_dry_threshold_mm,
+                    **stat_kwargs,
                 )
             )
         )
@@ -298,11 +356,13 @@ def main(argv: list[str]) -> None:
         # Mean and Std branches
         pcoll_tmp = pcoll | f'{stat}' >> beam.MapTuple(
             functools.partial(
-                compute_hourly_stat_chunk,
+                compute_stat_chunk,
+                frequency=FREQUENCY.value,
                 window_size=WINDOW_SIZE.value,
                 clim_years=slice(str(START_YEAR.value), str(END_YEAR.value)),
-                hour_interval=HOUR_INTERVAL.value,
                 statistic=stat,
+                add_statistic_suffix=ADD_STATISTIC_SUFFIX.value,
+                **stat_kwargs,
             )
         )
       pcolls.append(pcoll_tmp)

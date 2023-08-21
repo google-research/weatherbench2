@@ -163,7 +163,6 @@ def compute_hourly_stat(
   return hourly_rolling_clim
 
 
-# TODO(b/269079672): New climatology functions, not yet implemented in pipeline.
 def smooth_dayofyear_variable_with_rolling_window(
     obs_dayofyear: xr.Dataset, window_size: int
 ) -> xr.Dataset:
@@ -266,6 +265,21 @@ def compute_hourly_stat_fast(
     return compute_hourly_climatology_std_fast(
         obs, window_size, clim_years, hour_interval
     )
+  else:
+    raise NotImplementedError(f'stat {stat_fn} not implemented.')
+
+
+def compute_daily_stat_fast(
+    obs: xr.Dataset,
+    window_size: int,
+    clim_years: slice,
+    stat_fn: str = 'mean',
+) -> xr.Dataset:
+  """Compute climatology mean or std by day of year."""
+  if stat_fn == 'mean':
+    return compute_daily_climatology_mean(obs, window_size, clim_years)
+  elif stat_fn == 'std':
+    return compute_daily_climatology_std(obs, window_size, clim_years)
   else:
     raise NotImplementedError(f'stat {stat_fn} not implemented.')
 
