@@ -246,7 +246,6 @@ def compute_stat_chunk(
 
 
 def main(argv: list[str]) -> None:
-
   if not ADD_STATISTIC_SUFFIX.value and len(STATISTICS.value) > 1:
     raise ValueError('--add_statistic_suffix is required for >1 statistics.')
 
