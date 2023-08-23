@@ -39,6 +39,11 @@ STATISTICS = flags.DEFINE_list(
     ['mean'],
     help='Output resampled time statistics, from "mean", "min", or "max".',
 )
+ADD_STATISTIC_SUFFIX = flags.DEFINE_bool(
+    'add_statistic_suffix',
+    False,
+    'Add suffix of statistic to variable name. Required for >1 statistic.',
+)
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads', None, help='Number of chunks to load in parallel per worker.'
 )
@@ -62,6 +67,7 @@ def resample_in_time_chunk(
     *,
     resampled_frequency: str = '1d',
     statistic: str = 'mean',
+    add_statistic_suffix: bool = False,
 ) -> tuple[xbeam.Key, xr.Dataset]:
   """Resample a data chunk in time and return a requested time statistic.
 
@@ -71,6 +77,8 @@ def resample_in_time_chunk(
     resampled_frequency: The time frequency of the resampled data.
     statistic: The statistic used for time aggregation. It can be `mean`, `min`,
       or `max`.
+    add_statistic_suffix: Whether to append the statistic name as a suffix to
+      all output variables.
 
   Returns:
     The resampled data chunk and its key.
@@ -86,15 +94,19 @@ def resample_in_time_chunk(
     rsmp_chunk = rsmp_chunk.max()
 
   # Append time statistic to var name.
-  for var in rsmp_chunk:
-    rsmp_chunk = rsmp_chunk.rename({var: f'{var}_{statistic}'})
-  rsmp_key = rsmp_key.replace(
-      vars={f'{var}_{statistic}' for var in rsmp_key.vars}
-  )
+  if add_statistic_suffix:
+    for var in rsmp_chunk:
+      rsmp_chunk = rsmp_chunk.rename({var: f'{var}_{statistic}'})
+    rsmp_key = rsmp_key.replace(
+        vars={f'{var}_{statistic}' for var in rsmp_key.vars}
+    )
   return rsmp_key, rsmp_chunk
 
 
 def main(argv: abc.Sequence[str]) -> None:
+  if not ADD_STATISTIC_SUFFIX.value and len(STATISTICS.value) > 1:
+    raise ValueError('--add_statistic_suffix is required for >1 statistics.')
+
   obs, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
   if START_YEAR.value is not None and END_YEAR.value is not None:
     time_slice = (str(START_YEAR.value), str(END_YEAR.value))
@@ -129,14 +141,15 @@ def main(argv: abc.Sequence[str]) -> None:
           time=daily_times,
       )
   )
-  raw_vars = list(rsmp_template)
-  # Append time statistic to var name.
-  for var in raw_vars:
-    for stat in STATISTICS.value:
-      rsmp_template = rsmp_template.assign(
-          {f'{var}_{stat}': rsmp_template[var]}
-      )
-    rsmp_template = rsmp_template.drop(var)
+  if ADD_STATISTIC_SUFFIX.value:
+    raw_vars = list(rsmp_template)
+    # Append time statistic to var name.
+    for var in raw_vars:
+      for stat in STATISTICS.value:
+        rsmp_template = rsmp_template.assign(
+            {f'{var}_{stat}': rsmp_template[var]}
+        )
+      rsmp_template = rsmp_template.drop(var)
 
   itemsize = max(var.dtype.itemsize for var in rsmp_template.values())
 
@@ -161,6 +174,7 @@ def main(argv: abc.Sequence[str]) -> None:
               resample_in_time_chunk,
               resampled_frequency='1d',
               statistic=stat,
+              add_statistic_suffix=ADD_STATISTIC_SUFFIX.value,
           )
       )
       pcolls.append(pcoll_tmp)
