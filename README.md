@@ -11,9 +11,10 @@
 # WeatherBench 2 - A benchmark for the next generation of data-driven global weather models
 
 
-```
-[TODO] Paper citation
-```
+> Rasp, S., Hoyer, S., Merose, A., Langmore, I., Battaglia, P., Russel, T., Sanchez-Gonzalez, A., Yang, V., Carver, R., Agrawal, S., Shah, K., Mahrsee, R., Chantry, Z., Ben Bouallegue, Z., Dueben, P., Bromberg, C., Sisk, J., Barrington, L., Bell, A. and Sha, F. (2023). 
+> WeatherBench 2: A benchmark for the next generation of data-driven global weather models. 
+> *arXiv preprint arXiv:XXXX.XXXXX*
+
 
 ## Why WeatherBench?
 
