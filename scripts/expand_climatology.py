@@ -91,7 +91,7 @@ def select_climatology(
     del chunk.coords['hour']
   else:
     chunk = climatology.sel(dayofyear=times_array.dt.dayofyear)
-    del chunk.coords['hour']
+    del chunk.coords['dayofyear']
 
   for variable_name in chunk:
     key = xbeam.Key({'time': time_slice.start}, vars={variable_name})
