@@ -10,19 +10,15 @@
 
 # WeatherBench 2 - A benchmark for the next generation of data-driven global weather models
 
-
-> Rasp, S., Hoyer, S., Merose, A., Langmore, I., Battaglia, P., Russel, T., Sanchez-Gonzalez, A., Yang, V., Carver, R., Agrawal, S., Shah, K., Mahrsee, R., Chantry, Z., Ben Bouallegue, Z., Dueben, P., Bromberg, C., Sisk, J., Barrington, L., Bell, A. and Sha, F. (2023). 
-> WeatherBench 2: A benchmark for the next generation of data-driven global weather models. 
-> *arXiv preprint arXiv:XXXX.XXXXX*
-
+[Paper](https://drive.google.com/file/d/1OqSR5H_h2y2HXEf4LVFO7ZLxgdafK2Va/view?usp=sharing)
 
 ## Why WeatherBench?
 
 WeatherBench 2 is a framework for evaluating and comparing data-driven and traditional numerical weather forecasting models. WeatherBench consists of:
 - Publicly available, cloud-optimized ground truth and baseline datasets. For a complete list, see [this page](https://weatherbench2.readthedocs.io/en/latest/data-guide.html). 
 - Open-source evaluation code. See this [quick-start](https://weatherbench2.readthedocs.io/en/latest/evaluation.html) to explore the basic functionality or the [API docs](https://weatherbench2.readthedocs.io/en/latest/api.html) for more detail. Since high-resolution forecast files can be large, the WeatherBench 2 code was written with scalability in mind. See the [command-line scripts](https://weatherbench2.readthedocs.io/en/latest/command-line-scripts.html) based on [Xarray-Beam](https://xarray-beam.readthedocs.io/en/latest/) and [this guide](https://weatherbench2.readthedocs.io/en/latest/beam-in-the-cloud.html) for running the scripts on GCP using [DataFlow](https://cloud.google.com/dataflow).
-- A [website] displaying up-to-date scores of many of the state-of-the-art data-driven and physical approaches.
-- A [paper] describing the rationale behind the evaluation setup.
+- A [website](https://weatherbench.research.google.com) displaying up-to-date scores of many of the state-of-the-art data-driven and physical approaches.
+- A [paper](https://drive.google.com/file/d/1OqSR5H_h2y2HXEf4LVFO7ZLxgdafK2Va/view?usp=sharing) describing the rationale behind the evaluation setup.
 
 WeatherBench 2 has been built as an evolving tool for the entire community. For this reason, we welcome any feedback (ideally, submitted as [GitHub issues](https://github.com/google-research/weatherbench2/issues)) or contributions. If you would like you model to be part of WeatherBench, check out [this guide](https://weatherbench2.readthedocs.io/en/latest/submit.html).
 
