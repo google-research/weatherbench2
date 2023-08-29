@@ -20,7 +20,7 @@ Example Usage:
   export PROJECT=my-project
   export REGION=us-central1
 
-  python scripts/ensemble_mean.py \
+  python scripts/compute_ensemble_mean.py \
     --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
     --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-ensemble-means.zarr \
     --runner=DataflowRunner \

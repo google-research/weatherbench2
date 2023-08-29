@@ -8,7 +8,7 @@ The `scripts/` directory contains a number of command line scripts for processin
 Main evaluation script. To reproduce the official WeatherBench 2 evaluation, follow [these commands](official-evaluation). The results files for the baseline models can be found [here](https://console.cloud.google.com/storage/browser/weatherbench2/results).
 
 ```
-usage: evaluation.py [-h] 
+usage: evaluate.py [-h] 
                          [--forecast_path FORECAST_PATH] 
                          [--obs_path OBS_PATH]
                          [--climatology_path CLIMATOLOGY_PATH] 
@@ -127,7 +127,7 @@ eval_configs = {
 *Example*
 
 ```bash
-python evaluation.py \
+python evaluate.py \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -298,7 +298,7 @@ _Command options_:
 *Example*
 
 ```bash
-python ensemble_mean.py -- \
+python compute_ensemble_mean.py -- \
   --input_path=gs://weatherbench2/datasets/ens/2018-64x32_equiangular_with_poles_conservative.zarr \
   --output_path=PATH \
   --realization_name=number
@@ -338,7 +338,7 @@ _Command options_:
 *Example*
 
 ```bash
-python scripts/regrid.py \
+python regrid.py \
   --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
   --output_path=PATH \
   --output_chunks="time=100" \
@@ -355,4 +355,4 @@ python scripts/regrid.py \
 
 ## Init to valid time conversion
 
-`init_to_valid_time.py` converts a forecasts in init-time convention to valid-time convention. Since currently, we do all evaluation in the init-time format, this script is not used. 
+`compute_init_to_valid_time.py` converts a forecasts in init-time convention to valid-time convention. Since currently, we do all evaluation in the init-time format, this script is not used. 
