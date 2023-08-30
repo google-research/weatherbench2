@@ -246,8 +246,11 @@ def compute_stat_chunk(
 
 
 def main(argv: list[str]) -> None:
-  if not ADD_STATISTIC_SUFFIX.value and len(STATISTICS.value) > 1:
-    raise ValueError('--add_statistic_suffix is required for >1 statistics.')
+  non_seeps_stats = [stat for stat in STATISTICS.value if stat != 'seeps']
+  if not ADD_STATISTIC_SUFFIX.value and len(non_seeps_stats) > 1:
+    raise ValueError(
+        '--add_statistic_suffix is required for >1 non-SEEPS statistics.'
+    )
 
   obs, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
   # TODO(shoyer): slice obs in time using START_YEAR and END_YEAR. This would
