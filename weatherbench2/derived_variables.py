@@ -251,7 +251,7 @@ def interpolate_spectral_frequencies(
 
   def interp_at_one_lat(da: xr.DataArray) -> xr.DataArray:
     da = (
-        da.swap_dims({wavenumber_dim: 'frequency'})
+        da.swap_dims({wavenumber_dim: 'frequency'})  # pytype: disable=wrong-arg-types
         .drop_vars(wavenumber_dim)
         .interp(frequency=frequencies, method=method, **interp_kwargs)
     )
