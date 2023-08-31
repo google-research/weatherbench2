@@ -10,7 +10,7 @@
 
 # WeatherBench 2 - A benchmark for the next generation of data-driven global weather models
 
-[Paper](https://drive.google.com/file/d/1OqSR5H_h2y2HXEf4LVFO7ZLxgdafK2Va/view?usp=sharing)
+[Paper](https://arxiv.org/abs/2308.15560)
 
 ## Why WeatherBench?
 
@@ -18,12 +18,22 @@ WeatherBench 2 is a framework for evaluating and comparing data-driven and tradi
 - Publicly available, cloud-optimized ground truth and baseline datasets. For a complete list, see [this page](https://weatherbench2.readthedocs.io/en/latest/data-guide.html). 
 - Open-source evaluation code. See this [quick-start](https://weatherbench2.readthedocs.io/en/latest/evaluation.html) to explore the basic functionality or the [API docs](https://weatherbench2.readthedocs.io/en/latest/api.html) for more detail. Since high-resolution forecast files can be large, the WeatherBench 2 code was written with scalability in mind. See the [command-line scripts](https://weatherbench2.readthedocs.io/en/latest/command-line-scripts.html) based on [Xarray-Beam](https://xarray-beam.readthedocs.io/en/latest/) and [this guide](https://weatherbench2.readthedocs.io/en/latest/beam-in-the-cloud.html) for running the scripts on GCP using [DataFlow](https://cloud.google.com/dataflow).
 - A [website](https://sites.research.google/weatherbench) displaying up-to-date scores of many of the state-of-the-art data-driven and physical approaches.
-- A [paper](https://drive.google.com/file/d/1OqSR5H_h2y2HXEf4LVFO7ZLxgdafK2Va/view?usp=sharing) describing the rationale behind the evaluation setup.
+- A [paper](https://arxiv.org/abs/2308.15560) describing the rationale behind the evaluation setup.
 
 WeatherBench 2 has been built as an evolving tool for the entire community. For this reason, we welcome any feedback (ideally, submitted as [GitHub issues](https://github.com/google-research/weatherbench2/issues)) or contributions. If you would like you model to be part of WeatherBench, check out [this guide](https://weatherbench2.readthedocs.io/en/latest/submit.html).
 
 
-
+## Citation
+```
+@article{rasp2023weatherbench,
+      title={WeatherBench 2: A benchmark for the next generation of data-driven global weather models}, 
+      author={Stephan Rasp and Stephan Hoyer and Alexander Merose and Ian Langmore and Peter Battaglia and Tyler Russel and Alvaro Sanchez-Gonzalez and Vivian Yang and Rob Carver and Shreya Agrawal and Matthew Chantry and Zied Ben Bouallegue and Peter Dueben and Carla Bromberg and Jared Sisk and Luke Barrington and Aaron Bell and Fei Sha},
+      year={2023},
+      eprint={2308.15560},
+      archivePrefix={arXiv},
+      primaryClass={physics.ao-ph}
+}
+```
 
 ## License
 
