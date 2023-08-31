@@ -8,7 +8,7 @@ Since the input datasets can be large, distributed computing is key for efficien
 To run the scripts locally, chose the `DirectRunner` as your Beam runner. There, you will have an option for how many local workers to use, e.g.:
 
 ```bash
-python evaluation.py \
+python evaluate.py \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \
@@ -46,7 +46,7 @@ To run on Google Cloud Dataflow, use the `DataflowRunner`. Additionally, a few p
 Example run:
 
 ```bash
-python scripts/evaluation.py \
+python scripts/evaluate.py \
   --forecast_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
   --obs_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
   --climatology_path=gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_64x32_equiangular_with_poles_conservative.zarr \

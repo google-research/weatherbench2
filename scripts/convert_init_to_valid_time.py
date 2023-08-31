@@ -76,7 +76,7 @@ Example Usage:
   export PROJECT=my-project
   export REGION=us-central1
 
-  python scripts/init_to_valid_time.py \
+  python scripts/convert_init_to_valid_time.py \
     --input_path=gs://weatherbench2/datasets/hres/2016-2022-0012-64x32_equiangular_with_poles_conservative.zarr \
     --output_path=gs://$BUCKET/datasets/hres/$USER/2016-2022-0012-64x32_equiangular_with_poles_conservative_with_valid_times.zarr/ \
     --runner=DataflowRunner \

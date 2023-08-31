@@ -22,7 +22,7 @@ import pandas as pd
 import xarray
 import xarray_beam
 
-from . import init_to_valid_time
+from . import convert_init_to_valid_time
 
 
 class InitToValidTimeTest(parameterized.TestCase):
@@ -80,7 +80,7 @@ class InitToValidTimeTest(parameterized.TestCase):
         output_path=output_path,
         runner='DirectRunner',
     ):
-      init_to_valid_time.main([])
+      convert_init_to_valid_time.main([])
 
     actual_ds, actual_chunks = xarray_beam.open_zarr(output_path)
     xarray.testing.assert_allclose(actual_ds, expected_ds)
@@ -140,7 +140,7 @@ class InitToValidTimeTest(parameterized.TestCase):
         output_path=output_path,
         runner='DirectRunner',
     ):
-      init_to_valid_time.main([])
+      convert_init_to_valid_time.main([])
 
     actual_ds, actual_chunks = xarray_beam.open_zarr(output_path)
     xarray.testing.assert_allclose(actual_ds, expected_ds)

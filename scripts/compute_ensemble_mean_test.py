@@ -21,7 +21,7 @@ from weatherbench2 import utils
 import xarray
 from xarray_beam._src import test_util
 
-from . import ensemble_mean
+from . import compute_ensemble_mean
 
 
 class EnsembleMeanTest(test_util.TestCase):
@@ -37,12 +37,12 @@ class EnsembleMeanTest(test_util.TestCase):
         input_path=input_path,
         output_path=output_path,
     ):
-      ensemble_mean.main([])
+      compute_ensemble_mean.main([])
 
     output_ds = xarray.open_zarr(output_path)
 
     xarray.testing.assert_allclose(
-        output_ds, input_ds.mean(ensemble_mean.REALIZATION)
+        output_ds, input_ds.mean(compute_ensemble_mean.REALIZATION)
     )
 
 

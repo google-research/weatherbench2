@@ -19,7 +19,7 @@ from absl.testing import flagsaver
 from weatherbench2 import schema
 import xarray
 
-from . import evaluation
+from . import evaluate
 
 
 class WB2Evaluation(absltest.TestCase):
@@ -82,7 +82,7 @@ class WB2Evaluation(absltest.TestCase):
         variables=variables_3d + variables_2d,
         derived_variables=['wind_speed'],
     ):
-      evaluation.main([])
+      evaluate.main([])
 
     for config_name in eval_configs:
       expected_sizes_2d = {'metric': 5, 'lead_time': 4, 'region': 4}
