@@ -10,7 +10,8 @@
 
 # WeatherBench 2 - A benchmark for the next generation of data-driven global weather models
 
-[Paper](https://arxiv.org/abs/2308.15560)
+[arXiv paper](https://arxiv.org/abs/2308.15560)
+[Google AI Blog post](http://ai.googleblog.com/2023/08/weatherbench-2-benchmark-for-next.html)
 
 ## Why WeatherBench?
 
@@ -25,7 +26,7 @@ WeatherBench 2 has been built as an evolving tool for the entire community. For 
 
 ## Citation
 ```
-@article{rasp2023weatherbench,
+@misc{rasp2023weatherbench,
       title={WeatherBench 2: A benchmark for the next generation of data-driven global weather models}, 
       author={Stephan Rasp and Stephan Hoyer and Alexander Merose and Ian Langmore and Peter Battaglia and Tyler Russel and Alvaro Sanchez-Gonzalez and Vivian Yang and Rob Carver and Shreya Agrawal and Matthew Chantry and Zied Ben Bouallegue and Peter Dueben and Carla Bromberg and Jared Sisk and Luke Barrington and Aaron Bell and Fei Sha},
       year={2023},
