@@ -10,7 +10,7 @@
 
 # WeatherBench 2 - A benchmark for the next generation of data-driven global weather models
 
-[arXiv paper](https://arxiv.org/abs/2308.15560)
+[arXiv paper](https://arxiv.org/abs/2308.15560)   
 [Google AI Blog post](http://ai.googleblog.com/2023/08/weatherbench-2-benchmark-for-next.html)
 
 ## Why WeatherBench?
