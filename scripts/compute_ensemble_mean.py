@@ -36,6 +36,7 @@ Example Usage:
 from absl import app
 from absl import flags
 import apache_beam as beam
+import xarray as xr
 import xarray_beam as xbeam
 
 REALIZATION = 'realization'
@@ -48,13 +49,34 @@ REALIZATION_NAME = flags.DEFINE_string(
     REALIZATION,
     'Name of realization/member/number dimension.',
 )
+TIME_DIM = flags.DEFINE_string(
+    'time_dim', 'time', help='Name for the time dimension to slice data on.'
+)
+TIME_START = flags.DEFINE_string(
+    'time_start',
+    '2020-01-01',
+    help='ISO 8601 timestamp (inclusive) at which to start evaluation',
+)
+TIME_STOP = flags.DEFINE_string(
+    'time_stop',
+    '2020-12-31',
+    help='ISO 8601 timestamp (inclusive) at which to stop evaluation',
+)
 
 
 # pylint: disable=expression-not-assigned
 
 
+def _impose_data_selection(ds: xr.Dataset) -> xr.Dataset:
+  selection = {
+      TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value),
+  }
+  return ds.sel({k: v for k, v in selection.items() if k in ds.dims})
+
+
 def main(argv: list[str]):
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
+  source_dataset = _impose_data_selection(source_dataset)
   template = xbeam.make_template(
       source_dataset.isel({REALIZATION_NAME.value: 0}, drop=True)
   )
