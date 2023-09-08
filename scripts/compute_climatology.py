@@ -253,6 +253,13 @@ def main(argv: list[str]) -> None:
     )
 
   obs, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
+
+  # Convert object-type coordinates to string.
+  # Required to avoid: https://github.com/pydata/xarray/issues/3476
+  for coord_name, coord in obs.coords.items():
+    if coord.dtype == 'object':
+      obs[coord_name] = coord.astype(str)
+
   # TODO(shoyer): slice obs in time using START_YEAR and END_YEAR. This would
   # require some care in order to ensure input_chunks['time'] remains valid.
 
