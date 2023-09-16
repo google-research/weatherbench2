@@ -45,6 +45,13 @@ import xarray_beam as xbeam
 _DEFAULT_DERIVED_VARIABLES = [
     'wind_speed',
     '10m_wind_speed',
+    'divergence',
+    'voriticty',
+    'eddy_kinetic_energy',
+    'lapse_rate',
+    'total_column_vapor',
+    'integrated_vapor_transport',
+    'relative_humidity',
     'total_precipitation_6hr',
     'total_precipitation_24hr',
 ]
@@ -93,11 +100,11 @@ RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 
 def _add_derived_variables(
-    dataset: xr.Dataset, derived_variables: list[dvs.DerivedVariable]
+    dataset: xr.Dataset, derived_variables: dict[str, dvs.DerivedVariable]
 ) -> xr.Dataset:
-  for dv in derived_variables:
-    dataset[dv.variable_name] = dv.compute(dataset)
-  return dataset
+  return dataset.assign(
+      {k: dv.compute(dataset) for k, dv in derived_variables.items()}
+  )
 
 
 def _strip_offsets(
@@ -111,10 +118,10 @@ def _strip_offsets(
 
 
 def main(argv: list[str]) -> None:
-  derived_variables = [
-      dvs.DERIVED_VARIABLE_DICT[derived_variable]
-      for derived_variable in DERIVED_VARIABLES.value
-  ]
+  derived_variables = {
+      variable_name: dvs.DERIVED_VARIABLE_DICT[variable_name]
+      for variable_name in DERIVED_VARIABLES.value
+  }
 
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
   if RENAME_RAW_TP_NAME.value:
@@ -123,33 +130,30 @@ def main(argv: list[str]) -> None:
     )
 
   # Add derived variables to template
-  template = source_dataset
-  derived_variables_with_rechunking = []
-  derived_variables_without_rechunking = []
-  for dv in derived_variables:
-    template = template.assign(
-        {dv.variable_name: template[dv.base_variables[0]]}
+  template = source_dataset.copy(deep=False)
+  derived_variables_with_rechunking = {}
+  derived_variables_without_rechunking = {}
+  for name, dv in derived_variables.items():
+    dropped_dims = dv.all_input_core_dims - set(dv.core_dims[1])
+    variable = template[dv.base_variables[0]].isel(
+        {k: 0 for k in dropped_dims}, drop=True
     )
-    template[dv.variable_name].attrs = {}  # Strip attributes
-    if isinstance(
-        dv,
-        (
-            dvs.PrecipitationAccumulation,
-            dvs.AggregatePrecipitationAccumulation,
-        ),
-    ):
-      derived_variables_with_rechunking.append(dv)
+    template[name] = variable
+    template[name].attrs = {}  # Strip attributes
+    if 'prediction_timedelta' in dv.all_input_core_dims:
+      derived_variables_with_rechunking[name] = dv
     else:
-      derived_variables_without_rechunking.append(dv)
+      derived_variables_without_rechunking[name] = dv
   template = xbeam.make_template(template)
 
   working_chunks = dict(source_chunks)  # No rechunking
   working_chunks.update(WORKING_CHUNKS.value)
-  working_chunks.update({'prediction_timedelta': -1})
+  if 'prediction_timedelta' in source_chunks:
+    working_chunks.update({'prediction_timedelta': -1})
 
   # Define helper functions for branching
   rechunk_variables = []
-  for dv in derived_variables_with_rechunking:
+  for dv in derived_variables_with_rechunking.values():
     rechunk_variables.extend(dv.base_variables)
 
   def _is_precip(kv: tuple[xbeam.Key, xr.Dataset]) -> bool:
@@ -182,7 +186,7 @@ def main(argv: list[str]) -> None:
     )
 
     if derived_variables_with_rechunking:
-      # Rechunking branch: Only variables that require rechunking,
+      # Rechunking branch: Only variables that require rechunking in lead time,
       # i.e. precipitation, will be rechunked. Others go straight to
       # ChunksToZarr.
       pcoll_rechunk = (

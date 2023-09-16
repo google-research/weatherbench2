@@ -331,10 +331,9 @@ def main(argv: list[str]) -> None:
     deterministic_metrics['seeps'] = metrics.SEEPS(climatology=climatology)
     spatial_metrics['seeps'] = metrics.SpatialSEEPS(climatology=climatology)
 
-  derived_variables = [
-      DERIVED_VARIABLE_DICT[derived_variable]
-      for derived_variable in DERIVED_VARIABLES.value
-  ]
+  derived_variables = {
+      name: DERIVED_VARIABLE_DICT[name] for name in DERIVED_VARIABLES.value
+  }
 
   eval_configs = {
       'deterministic': config.Eval(

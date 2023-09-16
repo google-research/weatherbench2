@@ -22,20 +22,33 @@ from weatherbench2 import schema
 import xarray as xr
 
 
+# pylint: disable=invalid-name
+
+
 @dataclasses.dataclass
 class DerivedVariable:
-  """Derived variable base class.
-
-  Attributes:
-    variable_name: Name of variable to compute.
-  """
-
-  variable_name: str
+  """Derived variable base class."""
 
   @property
   def base_variables(self) -> list[str]:
     """Return a list of base variables."""
     return []
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    """Return core dimensions needed for computing this variable.
+
+    Returns a tuple, where the first element is a tuple of all core dimensions
+    for input (base) variables, and the second element is a tuple of all core
+    dimensions on the output. For more details on the concept of "core
+    dimensions", see xarray.apply_ufunc.
+    """
+    raise NotImplementedError
+
+  @property
+  def all_input_core_dims(self) -> set[str]:
+    """The set of all input core dimensions."""
+    return set().union(*self.core_dims[0])
 
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
     """Compute derived variable, returning it in a new DataArray."""
@@ -43,8 +56,8 @@ class DerivedVariable:
 
 
 @dataclasses.dataclass
-class WindSpeed(DerivedVariable):
-  """Compute wind speed.
+class _WindVariable(DerivedVariable):
+  """Compute a variable dervied from U and V wind components.
 
   Attributes:
     u_name: Name of U component.
@@ -58,9 +71,217 @@ class WindSpeed(DerivedVariable):
   def base_variables(self) -> list[str]:
     return [self.u_name, self.v_name]
 
+
+@dataclasses.dataclass
+class WindSpeed(_WindVariable):
+  """Compute wind speed."""
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return ([], []), []
+
+  @property
+  def pressure_to_single_level(self) -> bool:
+    return False
+
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
     ws = np.sqrt(dataset[self.u_name] ** 2 + dataset[self.v_name] ** 2)
     return ws
+
+
+def _zero_poles(field: xr.Dataset, epsilon: float = 1e-6):
+  cos_theta = np.cos(np.deg2rad(field.coords['latitude']))
+  return field.where(cos_theta > epsilon, 0.0)
+
+
+# TODO(shoyer): consider adding a diagnostic for calucation vertical velocity
+
+
+@dataclasses.dataclass
+class WindDivergence(_WindVariable):
+  """Compute wind divergence."""
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    lon_lat = ['longitude', 'latitude']
+    return (lon_lat, lon_lat), lon_lat
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    u = dataset[self.u_name]
+    v = dataset[self.v_name]
+    cos_theta = np.cos(np.deg2rad(dataset.coords['latitude']))
+    return _zero_poles(
+        u.differentiate('longitude') / cos_theta
+        + (v * cos_theta).differentiate('latitude') / cos_theta
+    )
+
+
+@dataclasses.dataclass
+class WindVorticity(_WindVariable):
+  """Compute wind vorticity."""
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    lon_lat = ['longitude', 'latitude']
+    return (lon_lat, lon_lat), lon_lat
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    u = dataset[self.u_name]
+    v = dataset[self.v_name]
+    cos_theta = np.cos(np.deg2rad(dataset.coords['latitude']))
+    return _zero_poles(
+        v.differentiate('longitude') / cos_theta
+        - (u * cos_theta).differentiate('latitude') / cos_theta
+    )
+
+
+@dataclasses.dataclass
+class EddyKineticEnergy(_WindVariable):
+  """Compute eddy kinetic energy.
+
+  Eddies are defined as the deviation from the instantaneous zonal mean.
+  """
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return (['level', 'longitude'], ['level', 'longitude']), ['longitude']
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    u_wind = dataset[self.u_name]
+    v_wind = dataset[self.v_name]
+    u_delta = u_wind - u_wind.mean('longitude')
+    v_delta = v_wind - v_wind.mean('longitude')
+    return (1 / 2) * (u_delta**2 + v_delta**2).integrate('level')
+
+
+@dataclasses.dataclass
+class LapseRate(DerivedVariable):
+  """Compute lapse rate in temperature."""
+
+  temperature_name: str = 'temperature'
+  geopotential_name: str = 'geopotential'
+
+  @property
+  def base_variables(self) -> list[str]:
+    return [self.temperature_name, self.geopotential_name]
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return (['level'], ['level']), ['level']
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    g = 9.81
+    temperature = dataset[self.temperature_name]
+    geopotential = dataset[self.geopotential_name]
+    dT_dp = temperature.differentiate('level')
+    dz_dp = (1 / g) * geopotential.differentiate('level')
+    return dT_dp / dz_dp
+
+
+@dataclasses.dataclass
+class TotalColumnWater(DerivedVariable):
+  """Compute total column water.
+
+  Attributes:
+    water_species_name: Name of water species to vertically integrate.
+  """
+
+  water_species_name: str = 'specific_humidity'
+
+  @property
+  def base_variables(self) -> list[str]:
+    return [self.water_species_name]
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return (['level'],), []
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    g = 9.81
+    return 1 / g * dataset[self.water_species_name].integrate('level')
+
+
+@dataclasses.dataclass
+class IntegratedWaterTransport(DerivedVariable):
+  """Compute integrated horizontal water transport in a vertical column.
+
+  Integrated vapor transport (IVT) is a useful diagnostic to include for
+  understanding atmospheric rviers. Default pressure levels to include are taken
+  from the GraphCast paper.
+
+  Attributes:
+    u_name: Name of wind U component.
+    v_name: Name of wind V component.
+    water_species_name: Name of water species to vertically integrate.
+    level_min: Minimum pressure level to include.
+    level_max: Maximum pressure level to include.
+  """
+
+  u_name: str = 'u_component_of_wind'
+  v_name: str = 'v_component_of_wind'
+  water_species_name: str = 'specific_humidity'
+  level_min: t.Optional[float] = 300
+  level_max: t.Optional[float] = 1000
+
+  @property
+  def base_variables(self) -> list[str]:
+    return [self.u_name, self.v_name, self.water_species_name]
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return (['level'], ['level']), []
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    g = 9.81
+    u_integral = (
+        (dataset[self.water_species_name] * dataset[self.u_name])
+        .sel(level=slice(self.level_min, self.level_max))
+        .integrate('level')
+    )
+    v_integral = (
+        (dataset[self.water_species_name] * dataset[self.v_name])
+        .sel(level=slice(self.level_min, self.level_max))
+        .integrate('level')
+    )
+    return (1 / g) * np.sqrt(u_integral**2 + v_integral**2)
+
+
+@dataclasses.dataclass
+class RelativeHumidity(DerivedVariable):
+  """Calculate relativity humidity from specific humidity."""
+
+  temperature_name: str = 'temperature'
+  specific_humidity_name: str = 'specific_humidity'
+  pressure_name: str = 'level'
+
+  @property
+  def base_variables(self) -> list[str]:
+    return [
+        self.temperature_name,
+        self.specific_humidity_name,
+        self.pressure_name,
+    ]
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return ([], []), []
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    # We use the same formula as MetPy's
+    # relative_humidity_from_specific_humidity.
+    #
+    # For saturation vapor pressure, we use the formula for Bolton 1980
+    # (https://doi.org/10.1175/1520-0493(1980)108<1046:TCOEPT>2.0.CO;2) for T
+    # in degrees Celsius:
+    #   6.112 e^\frac{17.67T}{T + 243.5}
+    # We assume pressure has units of hPa and temperature has units of Kelvin.
+    temperature = dataset[self.temperature_name]
+    specific_humidity = dataset[self.specific_humidity_name]
+    pressure = dataset.coords[self.pressure_name]
+    svp = 6.112 * np.exp(17.67 * (temperature - 273.15) / (temperature - 29.65))
+    mixing_ratio = specific_humidity / (1 - specific_humidity)
+    saturation_mixing_ratio = 0.622 * svp / (pressure - svp)
+    return mixing_ratio / saturation_mixing_ratio
 
 
 @dataclasses.dataclass
@@ -88,6 +309,10 @@ class PrecipitationAccumulation(DerivedVariable):
   @property
   def base_variables(self) -> list[str]:
     return [self.total_precipitation_name]
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return ([self.lead_time_name],), [self.lead_time_name]
 
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
     # Get timestep diff
@@ -158,6 +383,10 @@ class ZonalEnergySpectrum(DerivedVariable):
   @property
   def base_variables(self) -> list[str]:
     return [self.variable_name]
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return (['longitude'],), ['zonal_wavenumber']
 
   def _circumference(self, dataset: xr.Dataset) -> xr.DataArray:
     """Earth's circumference as a function of latitude."""
@@ -283,6 +512,10 @@ class AggregatePrecipitationAccumulation(DerivedVariable):
   def base_variables(self):
     return [self.raw_accumulation_name]
 
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return ([self.lead_time_name],), [self.lead_time_name]
+
   def compute(self, dataset: xr.Dataset):
     tp6h = dataset[self.raw_accumulation_name]
 
@@ -299,30 +532,44 @@ class AggregatePrecipitationAccumulation(DerivedVariable):
 # Specify dictionary of common derived variables
 DERIVED_VARIABLE_DICT = {
     'wind_speed': WindSpeed(
-        u_name='u_component_of_wind',
-        v_name='v_component_of_wind',
-        variable_name='wind_speed',
+        u_name='u_component_of_wind', v_name='v_component_of_wind'
     ),
     '10m_wind_speed': WindSpeed(
-        u_name='10m_u_component_of_wind',
-        v_name='10m_v_component_of_wind',
-        variable_name='10m_wind_speed',
+        u_name='10m_u_component_of_wind', v_name='10m_v_component_of_wind'
     ),
+    'divergence': WindDivergence(
+        u_name='u_component_of_wind', v_name='v_component_of_wind'
+    ),
+    'voriticty': WindVorticity(
+        u_name='u_component_of_wind', v_name='v_component_of_wind'
+    ),
+    'eddy_kinetic_energy': EddyKineticEnergy(
+        u_name='u_component_of_wind', v_name='v_component_of_wind'
+    ),
+    'lapse_rate': LapseRate(),
+    'total_column_vapor': TotalColumnWater(
+        water_species_name='specific_humidity'
+    ),
+    'total_column_liquid': TotalColumnWater(
+        water_species_name='specific_cloud_liquid_water_content'
+    ),
+    'total_column_ice': TotalColumnWater(
+        water_species_name='specific_cloud_ice_water_content'
+    ),
+    'integrated_vapor_transport': IntegratedWaterTransport(),
+    'relative_humidity': RelativeHumidity(),
     'total_precipitation_6hr': PrecipitationAccumulation(
         total_precipitation_name='total_precipitation',
         accumulation_hours=6,
         lead_time_name='prediction_timedelta',
-        variable_name='total_precipitation_6hr',
     ),
     'total_precipitation_24hr': PrecipitationAccumulation(
         total_precipitation_name='total_precipitation',
         accumulation_hours=24,
         lead_time_name='prediction_timedelta',
-        variable_name='total_precipitation_24hr',
     ),
     'total_precipitation_24hr_from_6hr': AggregatePrecipitationAccumulation(
         accumulation_hours=24,
         lead_time_name='prediction_timedelta',
-        variable_name='total_precipitation_24hr',
     ),
 }

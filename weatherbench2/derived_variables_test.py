@@ -91,13 +91,30 @@ class DerivedVariablesTest(absltest.TestCase):
     derived_variable = dvs.WindSpeed(
         u_name='u_component_of_wind',
         v_name='v_component_of_wind',
-        variable_name='wind_speed',
     )
 
     result = derived_variable.compute(dataset)
 
     expected = xr.DataArray([0, 5, np.NaN])
     xr.testing.assert_allclose(result, expected)
+
+  def testRelativeHumidity(self):
+    dataset = xr.Dataset(
+        {
+            'temperature': ('level', np.array([240, 280, 295, 310])),
+            'specific_humidity': ('level', np.array([1e-3, 1e-2, 2e-2, 4e-2])),
+        },
+        coords={'level': np.array([50, 200, 500, 850])},
+    )
+    derived_variable = dvs.RelativeHumidity()
+    result = derived_variable.compute(dataset)
+    expected = xr.DataArray(
+        # from metpy.calc.relative_humidity_from_specific_humidity
+        np.array([0.2116, 0.3115, 0.5937, 0.8462]),
+        dims=['level'],
+        coords=dataset.coords,
+    )
+    xr.testing.assert_allclose(result, expected, atol=1e-4)
 
   def _create_precip_dataset(self):
     lead_time = np.arange(0, 36 + 1, 6, dtype='timedelta64[h]')
@@ -116,7 +133,6 @@ class DerivedVariablesTest(absltest.TestCase):
     dataset = self._create_precip_dataset()
 
     derived_variable = dvs.PrecipitationAccumulation(
-        variable_name='total_precipitation_6hr',
         total_precipitation_name='total_precipitation',
         accumulation_hours=6,
     )
@@ -132,7 +148,6 @@ class DerivedVariablesTest(absltest.TestCase):
     dataset = self._create_precip_dataset()
 
     derived_variable = dvs.PrecipitationAccumulation(
-        variable_name='total_precipitation_24hr',
         total_precipitation_name='total_precipitation',
         accumulation_hours=24,
     )
@@ -157,7 +172,6 @@ class DerivedVariablesTest(absltest.TestCase):
     )
 
     derived_variable = dvs.AggregatePrecipitationAccumulation(
-        variable_name='total_precipitation_24hr',
         accumulation_hours=24,
     )
     result = derived_variable.compute(dataset)

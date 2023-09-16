@@ -109,7 +109,7 @@ class Eval:
       probabilistic climatology.
     against_analysis: Use forecast at t=0 as ground-truth. Warning: only for
       by-valid convention. For by-init, specify analysis dataset as obs.
-    derived_variables: List of DerivedVariable instances to compute on the fly.
+    derived_variables: dict of DerivedVariable instances to compute on the fly.
     temporal_mean: Compute temporal mean (over time/init_time) for metrics.
     output_format: Wether to save to 'netcdf' or 'zarr'.
   """
@@ -125,8 +125,8 @@ class Eval:
   probabilistic_climatology_end_year: t.Optional[int] = None
   probabilistic_climatology_hour_interval: t.Optional[int] = None
   against_analysis: t.Optional[bool] = False
-  derived_variables: list[DerivedVariable] = dataclasses.field(
-      default_factory=list
+  derived_variables: t.Dict[str, DerivedVariable] = dataclasses.field(
+      default_factory=dict
   )
   temporal_mean: t.Optional[bool] = True
   # output_format='zarr' is also supported, but may be buggy due to

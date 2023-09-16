@@ -237,7 +237,7 @@ def _add_base_variables(
   """
   data_config = copy.deepcopy(data_config)
 
-  for derived_variable in eval_config.derived_variables:
+  for derived_variable in eval_config.derived_variables.values():
     # Add base variables
     data_config.selection.variables = list(
         set(data_config.selection.variables).union(
@@ -382,10 +382,10 @@ def _metric_and_region_loop(
 ) -> xr.Dataset:
   """Compute metric results looping over metrics and regions in eval config."""
   # Compute derived variables
-  for dv in eval_config.derived_variables:
-    logging.info(f'Logging: derived_variable: {dv}')
-    forecast[dv.variable_name] = dv.compute(forecast)
-    truth[dv.variable_name] = dv.compute(truth)
+  for name, dv in eval_config.derived_variables.items():
+    logging.info(f'Logging: derived_variable {name!r}: {dv}')
+    forecast[name] = dv.compute(forecast)
+    truth[name] = dv.compute(truth)
 
   results = []
   for name, metric in eval_config.metrics.items():
