@@ -304,9 +304,45 @@ python compute_ensemble_mean.py -- \
   --realization_name=number
 ```
 
+## Compute statistical moments
+
+This script computes statistical moments of every variable in the input
+dataset per vertical level. Expectations are taken with respect to longitude,
+latitude, and time. 
+
+```
+usage: compute_statistical_moments.py [-h] 
+                                  [--input_path INPUT_PATH] 
+                                  [--output_path OUTPUT_PATH]
+                                  [--start_year START_YEAR] 
+                                  [--end_year END_YEAR] 
+                                  [--rechunk_itemsize RECHUNK_ITEMSIZE] 
+                                  [--runner BEAM_RUNNER]
+
+```
+
+_Command options_:
+
+* `--input_path`: (required) Input Zarr path
+* `--output_path`: (required) Output Zarr path
+* `--start_year`: Inclusive start year of climatology. Default: `1990`
+* `--end_year`: Inclusive end year of climatology. Default: `2020`
+* `--rechunk_itemsize`: Itemsize for rechunking.. Default: `4`
+* `--runner`: Beam runner. Use `DirectRunner` for local execution.
+
+*Example*
+
+```bash
+python compute_statistical_moments.py \
+  --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+  --output_path=PATH \
+  --start_year=1990 \
+  --end_year=2019
+```
+
 (regridding)=
 ## Regrid
-Only rectalinear grids (one dimensional lat/lon coordinates) on the input Zarr file are supported, but irregular spacing is OK.
+Only rectilinear grids (one dimensional lat/lon coordinates) on the input Zarr file are supported, but irregular spacing is OK.
 
 ```
 usage: regrid.py [-h] 
