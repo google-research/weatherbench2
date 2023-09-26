@@ -565,7 +565,7 @@ class _EvaluateAllMetrics(beam.PTransform):
       truth: Optional[xr.Dataset] = None,
   ) -> tuple[xbeam.Key, tuple[xr.Dataset, xr.Dataset]]:
     if truth is None:
-      truth = xr.Dataset()
+      raise ValueError('`truth` must not be `None`')
     truth_chunk = truth.sel(time=forecast_chunk.valid_time).compute()
     return key, (forecast_chunk, truth_chunk)
 
@@ -603,7 +603,7 @@ class _EvaluateAllMetrics(beam.PTransform):
       variables: Optional[list[str]] = None,
   ) -> tuple[xbeam.Key, tuple[xr.Dataset, xr.Dataset]]:
     if truth is None:
-      truth = xr.Dataset()
+      raise ValueError('`truth` must not be `None`')
     if variables is None:
       variables = list()
     forecast_chunk, truth_chunk = chunks
