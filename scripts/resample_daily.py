@@ -34,6 +34,16 @@ BEAM_RUNNER = flags.DEFINE_string(
     None,
     help='beam.runners.Runner',
 )
+METHOD = flags.DEFINE_string(
+    'method',
+    'resample',
+    help='resample or roll',
+)
+PERIOD = flags.DEFINE_string(
+    'period',
+    '1d',
+    help='int + d or w',
+)
 STATISTICS = flags.DEFINE_list(
     'statistics',
     ['mean'],
@@ -65,7 +75,8 @@ def resample_in_time_chunk(
     obs_key: xbeam.Key,
     obs_chunk: xr.Dataset,
     *,
-    resampled_frequency: str = '1d',
+    method: str = 'resample',
+    period: str = '1d',
     statistic: str = 'mean',
     add_statistic_suffix: bool = False,
 ) -> tuple[xbeam.Key, xr.Dataset]:
@@ -74,7 +85,8 @@ def resample_in_time_chunk(
   Args:
     obs_key: An xarray beam key into a data chunk.
     obs_chunk: The data chunk.
-    resampled_frequency: The time frequency of the resampled data.
+    method: Resample or roll.
+    period: The time frequency of the resampled data.
     statistic: The statistic used for time aggregation. It can be `mean`, `min`,
       or `max`.
     add_statistic_suffix: Whether to append the statistic name as a suffix to
@@ -84,14 +96,27 @@ def resample_in_time_chunk(
     The resampled data chunk and its key.
   """
   rsmp_key = obs_key.with_offsets(time=None)
-  rsmp_chunk = obs_chunk.resample(time=resampled_frequency)
 
-  if statistic == 'mean':
-    rsmp_chunk = rsmp_chunk.mean()
-  elif statistic == 'min':
-    rsmp_chunk = rsmp_chunk.min()
-  elif statistic == 'max':
-    rsmp_chunk = rsmp_chunk.max()
+  if method == 'roll':
+    # Rolling resamples weekly data from daily data.
+    rolling_window = 7 * int(period[0:-1])
+    if statistic == 'min':
+      rsmp_chunk = obs_chunk.rolling(time=rolling_window).min()
+    elif statistic == 'max':
+      rsmp_chunk = obs_chunk.rolling(time=rolling_window).max()
+    else:
+      rsmp_chunk = obs_chunk.rolling(time=rolling_window).mean()
+    rsmp_chunk = rsmp_chunk.assign_coords(
+        time=rsmp_chunk.time - np.timedelta64(rolling_window - 1, 'D')
+    )
+  else:
+    rsmp_chunk = obs_chunk.resample(time=period)
+    if statistic == 'mean':
+      rsmp_chunk = rsmp_chunk.mean()
+    elif statistic == 'min':
+      rsmp_chunk = rsmp_chunk.min()
+    elif statistic == 'max':
+      rsmp_chunk = rsmp_chunk.max()
 
   # Append time statistic to var name.
   if add_statistic_suffix:
@@ -116,11 +141,39 @@ def main(argv: abc.Sequence[str]) -> None:
 
   # Get output times at daily resolution
   orig_times = obs.coords['time'].values
-  daily_times = np.arange(
-      orig_times.min(),
-      orig_times.max() + np.timedelta64(1, 'D'),
-      dtype='datetime64[D]',
-  )
+  if METHOD.value == 'roll':
+    if PERIOD.value[-1] != 'w':
+      raise NotImplementedError(
+          'Rolling for output with temporal resolution other than weekly is not'
+          ' implemented.'
+      )
+    elif orig_times[1] - orig_times[0] != np.timedelta64(1, 'D'):
+      raise NotImplementedError(
+          'Rolling on input data with temporal resolution other than 1d is not'
+          ' implemented.'
+      )
+    else:
+      # Rolling resamples from daily to weekly.
+      # Shifts days to match data after rolling window processing.
+      rolling_window = 7 * int(PERIOD.value[0:-1])
+      daily_times = np.arange(
+          orig_times.min() - np.timedelta64(rolling_window - 1, 'D'),
+          orig_times.max() - np.timedelta64(rolling_window - 2, 'D'),
+          dtype='datetime64[D]',
+      )
+  elif METHOD.value == 'resample':
+    if PERIOD.value[-1] == 'w':
+      raise NotImplementedError(
+          'Resample for weekly output is not implemented.'
+      )
+    else:
+      daily_times = np.arange(
+          orig_times.min(),
+          orig_times.max() + np.timedelta64(1, 'D'),
+          dtype='datetime64[D]',
+      )
+  else:
+    raise ValueError(f'Method {METHOD.value} not supported.')
 
   input_chunks_without_time = {
       k: v for k, v in input_chunks.items() if k != 'time'
@@ -172,7 +225,8 @@ def main(argv: abc.Sequence[str]) -> None:
       pcoll_tmp = pcoll | f'{stat}' >> beam.MapTuple(
           functools.partial(
               resample_in_time_chunk,
-              resampled_frequency='1d',
+              method=METHOD.value,
+              period=PERIOD.value,
               statistic=stat,
               add_statistic_suffix=ADD_STATISTIC_SUFFIX.value,
           )
