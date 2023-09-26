@@ -324,7 +324,7 @@ class SpatialSEEPS(Metric):
   climatology: xr.Dataset
   dry_threshold_mm: float = 0.25
   precip_name: str = "total_precipitation_24hr"
-  min_p1: float = 0.01
+  min_p1: float = 0.1
   max_p1: float = 0.85
 
   @functools.cached_property

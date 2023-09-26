@@ -328,8 +328,26 @@ def main(argv: list[str]) -> None:
       'mae': metrics.SpatialMAE(),
   }
   if COMPUTE_SEEPS.value:
-    deterministic_metrics['seeps'] = metrics.SEEPS(climatology=climatology)
-    spatial_metrics['seeps'] = metrics.SpatialSEEPS(climatology=climatology)
+    deterministic_metrics['seeps_24hr'] = metrics.SEEPS(
+        climatology=climatology,
+        precip_name='total_precipitation_24hr',
+        dry_threshold_mm=0.25,
+    )
+    deterministic_metrics['seeps_6hr'] = metrics.SEEPS(
+        climatology=climatology,
+        precip_name='total_precipitation_6hr',
+        dry_threshold_mm=0.1,
+    )
+    spatial_metrics['seeps_24hr'] = metrics.SpatialSEEPS(
+        climatology=climatology,
+        precip_name='total_precipitation_24hr',
+        dry_threshold_mm=0.25,
+    )
+    spatial_metrics['seels_6hr'] = metrics.SpatialSEEPS(
+        climatology=climatology,
+        precip_name='total_precipitation_6hr',
+        dry_threshold_mm=0.1,
+    )
 
   derived_variables = {
       name: DERIVED_VARIABLE_DICT[name] for name in DERIVED_VARIABLES.value
