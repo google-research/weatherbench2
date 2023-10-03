@@ -44,4 +44,4 @@ jobs:
         pip install -e .[tests]
     - name: Lint with pyink
       run: |
-        pyink --check .
+        pyink --check --diff --color .

@@ -18,6 +18,7 @@ import dataclasses
 import typing as t
 
 import numpy as np
+import scipy.integrate
 from weatherbench2 import schema
 import xarray as xr
 
@@ -74,19 +75,28 @@ class _WindVariable(DerivedVariable):
 
 @dataclasses.dataclass
 class WindSpeed(_WindVariable):
-  """Compute wind speed."""
+  """Compute wind speed.
+
+  Attributes:
+    u_name: Name of U component.
+    v_name: Name of V component.
+  """
+
+  u_name: str
+  v_name: str
+
+  @property
+  def base_variables(self) -> list[str]:
+    return [self.u_name, self.v_name]
 
   @property
   def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
     return ([], []), []
 
-  @property
-  def pressure_to_single_level(self) -> bool:
-    return False
-
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
-    ws = np.sqrt(dataset[self.u_name] ** 2 + dataset[self.v_name] ** 2)
-    return ws
+    u = dataset[self.u_name]
+    v = dataset[self.v_name]
+    return np.sqrt(u**2 + v**2)
 
 
 def _zero_poles(field: xr.Dataset, epsilon: float = 1e-6):
@@ -94,11 +104,50 @@ def _zero_poles(field: xr.Dataset, epsilon: float = 1e-6):
   return field.where(cos_theta > epsilon, 0.0)
 
 
-# TODO(shoyer): consider adding a diagnostic for calucation vertical velocity
+_METERS_PER_DEGREE = 2 * np.pi * schema.EARTH_RADIUS_M / 360
+
+
+def _d_dx(field: xr.DataArray) -> xr.DataArray:
+  latitude = field.coords['latitude']
+  cos_theta = np.cos(np.deg2rad(latitude))
+  # TODO(shoyer): use a custom calculation with roll() instead of
+  # differentiate() to calculate rolling over 360 to 0 degrees properly.
+  return _zero_poles(
+      field.differentiate('longitude') / cos_theta / _METERS_PER_DEGREE
+  )
+
+
+def _d_dy(field: xr.DataArray) -> xr.DataArray:
+  return field.differentiate('latitude') / _METERS_PER_DEGREE
+
+
+def _divergence(u: xr.DataArray, v: xr.DataArray) -> xr.DataArray:
+  return _d_dx(u) + _d_dy(v)
+
+
+def _curl(u: xr.DataArray, v: xr.DataArray) -> xr.DataArray:
+  return _d_dx(v) - _d_dy(u)
 
 
 @dataclasses.dataclass
-class WindDivergence(_WindVariable):
+class _3DWindVariable(DerivedVariable):
+  """Compute a variable dervied from 3D U and V wind components.
+
+  Attributes:
+    u_name: Name of U component.
+    v_name: Name of V component.
+  """
+
+  u_name: str = 'u_component_of_wind'
+  v_name: str = 'v_component_of_wind'
+
+  @property
+  def base_variables(self) -> list[str]:
+    return [self.u_name, self.v_name]
+
+
+@dataclasses.dataclass
+class WindDivergence(_3DWindVariable):
   """Compute wind divergence."""
 
   @property
@@ -109,15 +158,11 @@ class WindDivergence(_WindVariable):
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
     u = dataset[self.u_name]
     v = dataset[self.v_name]
-    cos_theta = np.cos(np.deg2rad(dataset.coords['latitude']))
-    return _zero_poles(
-        u.differentiate('longitude') / cos_theta
-        + (v * cos_theta).differentiate('latitude') / cos_theta
-    )
+    return _divergence(u, v)
 
 
 @dataclasses.dataclass
-class WindVorticity(_WindVariable):
+class WindVorticity(_3DWindVariable):
   """Compute wind vorticity."""
 
   @property
@@ -128,15 +173,44 @@ class WindVorticity(_WindVariable):
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
     u = dataset[self.u_name]
     v = dataset[self.v_name]
-    cos_theta = np.cos(np.deg2rad(dataset.coords['latitude']))
-    return _zero_poles(
-        v.differentiate('longitude') / cos_theta
-        - (u * cos_theta).differentiate('latitude') / cos_theta
-    )
+    return _curl(u, v)
 
 
 @dataclasses.dataclass
-class EddyKineticEnergy(_WindVariable):
+class VerticalVelocity(_3DWindVariable):
+  r"""Compute vertical wind velocity, assuming the hydrostatic approximation.
+
+  To calculate ω, we integrate the continuity equation [1] in pressure
+  coordinates:
+    ∇_p · u + ∂ω/∂p = 0
+    ω = -∫ dp ∇_p · u
+
+  [1] See section 8.6.1 from Durran, D. R. Numerical Methods for Fluid Dynamics:
+  With Applications to Geophysics. (Springer, New York, NY, 2010).
+  """
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    zxy = ['level', 'longitude', 'latitude']
+    return (zxy, zxy), zxy
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    u = dataset[self.u_name]
+    v = dataset[self.v_name]
+    divergence = _divergence(u, v)
+    pascals_per_hpa = 100
+    pressure = pascals_per_hpa * dataset.coords['level']
+    axis = divergence.dims.index('level')
+    # TODO(shoyer): consider masking out vertical wind in locations below the
+    # surface of the Earth (geopotential < geopotential_at_surface).
+    vertical_wind = scipy.integrate.cumulative_trapezoid(
+        -divergence.values, x=pressure, axis=axis, initial=0
+    )
+    return divergence.copy(data=vertical_wind)
+
+
+@dataclasses.dataclass
+class EddyKineticEnergy(_3DWindVariable):
   """Compute eddy kinetic energy.
 
   Eddies are defined as the deviation from the instantaneous zonal mean.
@@ -537,15 +611,10 @@ DERIVED_VARIABLE_DICT = {
     '10m_wind_speed': WindSpeed(
         u_name='10m_u_component_of_wind', v_name='10m_v_component_of_wind'
     ),
-    'divergence': WindDivergence(
-        u_name='u_component_of_wind', v_name='v_component_of_wind'
-    ),
-    'voriticty': WindVorticity(
-        u_name='u_component_of_wind', v_name='v_component_of_wind'
-    ),
-    'eddy_kinetic_energy': EddyKineticEnergy(
-        u_name='u_component_of_wind', v_name='v_component_of_wind'
-    ),
+    'divergence': WindDivergence(),
+    'vorticity': WindVorticity(),
+    'vertical_velocity': WindVorticity(),
+    'eddy_kinetic_energy': EddyKineticEnergy(),
     'lapse_rate': LapseRate(),
     'total_column_vapor': TotalColumnWater(
         water_species_name='specific_humidity'
