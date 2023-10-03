@@ -69,11 +69,13 @@ WORKING_CHUNKS = flag_utils.DEFINE_chunks(
         'e.g., "longitude=10,latitude=10". They may not include "time".'
     ),
 )
+DAILY_ACCUMULATIVE_VARS = ('total_precipitation_24hr',)
 
 
 def resample_in_time_chunk(
     obs_key: xbeam.Key,
     obs_chunk: xr.Dataset,
+    daily_times: np.ndarray,
     *,
     method: str = 'resample',
     period: str = '1d',
@@ -85,6 +87,7 @@ def resample_in_time_chunk(
   Args:
     obs_key: An xarray beam key into a data chunk.
     obs_chunk: The data chunk.
+    daily_times: The time coordinate data.
     method: Resample or roll.
     period: The time frequency of the resampled data.
     statistic: The statistic used for time aggregation. It can be `mean`, `min`,
@@ -110,16 +113,23 @@ def resample_in_time_chunk(
         time=rsmp_chunk.time - np.timedelta64(rolling_window - 1, 'D')
     )
   else:
-    rsmp_chunk = obs_chunk.resample(time=period)
-    if statistic == 'mean':
-      rsmp_chunk = rsmp_chunk.mean()
+    if list(obs_chunk.keys())[0] in DAILY_ACCUMULATIVE_VARS:
+      # Shifts time by 1h so the time denotes the accumulative precipitation
+      # value in the following hour.
+      obs_chunk = obs_chunk.assign_coords(
+          time=obs_chunk.time - np.timedelta64(1, 'h')
+      )
+      rsmp_chunk = obs_chunk.resample(time=period).sum()
+      rsmp_chunk = rsmp_chunk.sel(time=daily_times)
     elif statistic == 'min':
-      rsmp_chunk = rsmp_chunk.min()
+      rsmp_chunk = obs_chunk.resample(time=period).min()
     elif statistic == 'max':
-      rsmp_chunk = rsmp_chunk.max()
+      rsmp_chunk = obs_chunk.resample(time=period).max()
+    else:
+      rsmp_chunk = obs_chunk.resample(time=period).mean()
 
   # Append time statistic to var name.
-  if add_statistic_suffix:
+  if add_statistic_suffix and statistic in ('min', 'max'):
     for var in rsmp_chunk:
       rsmp_chunk = rsmp_chunk.rename({var: f'{var}_{statistic}'})
     rsmp_key = rsmp_key.replace(
@@ -186,7 +196,8 @@ def main(argv: abc.Sequence[str]) -> None:
   out_working_chunks = dict(working_chunks, time=-1)
 
   output_chunks = input_chunks.copy()
-
+  if 'total_precipitation' in obs.variables:
+    obs = obs.rename({'total_precipitation': 'total_precipitation_24hr'})
   rsmp_template = (
       xbeam.make_template(obs)
       .isel(time=0, drop=True)
@@ -194,15 +205,47 @@ def main(argv: abc.Sequence[str]) -> None:
           time=daily_times,
       )
   )
-  if ADD_STATISTIC_SUFFIX.value:
+  add_statistic_suffix = ADD_STATISTIC_SUFFIX.value
+  # A set to record duplicate statistics for accumlative variables which have
+  # single value for all statistics.
+  duplicate_stat_set = ()
+  if len(STATISTICS.value) > 1:
+    # Statistic suffix needs to be added when processing different statistics to
+    # store in the same file.
+    add_statistic_suffix = True
+    # Adds duplicate statistics into set for accumalative variables.
+    # Only applies to 'resample' method.
+    if METHOD.value == 'resample':
+      if (
+          len(STATISTICS.value) == 2
+          and 'min' in STATISTICS.value
+          and 'max' in STATISTICS.value
+      ):
+        duplicate_stat_set = {'min'}
+      else:
+        duplicate_stat_set = set(STATISTICS.value).intersection({'min', 'max'})
+
+  def _is_not_duplicated(kv: tuple[xbeam.Key, xr.Dataset], stat: str) -> bool:
+    key, _ = kv
+    assert len(key.vars) == 1, key
+    (var,) = key.vars
+    if stat in duplicate_stat_set and var in DAILY_ACCUMULATIVE_VARS:
+      return False
+    return True
+
+  if add_statistic_suffix:
     raw_vars = list(rsmp_template)
     # Append time statistic to var name.
     for var in raw_vars:
-      for stat in STATISTICS.value:
-        rsmp_template = rsmp_template.assign(
-            {f'{var}_{stat}': rsmp_template[var]}
-        )
-      rsmp_template = rsmp_template.drop(var)
+      for stat in set(STATISTICS.value).intersection({'min', 'max'}):
+        if METHOD.value == 'resample' and var in DAILY_ACCUMULATIVE_VARS:
+          continue
+        else:
+          rsmp_template = rsmp_template.assign(
+              {f'{var}_{stat}': rsmp_template[var]}
+          )
+          if 'mean' not in STATISTICS.value:
+            rsmp_template = rsmp_template.drop(var)
 
   itemsize = max(var.dtype.itemsize for var in rsmp_template.values())
 
@@ -222,13 +265,19 @@ def main(argv: abc.Sequence[str]) -> None:
     # Branches to compute statistics
     pcolls = []
     for stat in STATISTICS.value:
-      pcoll_tmp = pcoll | f'{stat}' >> beam.MapTuple(
-          functools.partial(
-              resample_in_time_chunk,
-              method=METHOD.value,
-              period=PERIOD.value,
-              statistic=stat,
-              add_statistic_suffix=ADD_STATISTIC_SUFFIX.value,
+      pcoll_tmp = (
+          pcoll
+          | beam.Filter(functools.partial(_is_not_duplicated, stat=stat))
+          | f'{stat}'
+          >> beam.MapTuple(
+              functools.partial(
+                  resample_in_time_chunk,
+                  daily_times=daily_times,
+                  method=METHOD.value,
+                  period=PERIOD.value,
+                  statistic=stat,
+                  add_statistic_suffix=add_statistic_suffix,
+              )
           )
       )
       pcolls.append(pcoll_tmp)
