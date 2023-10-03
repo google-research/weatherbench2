@@ -16,6 +16,7 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 from weatherbench2 import metrics
+from weatherbench2 import regions
 from weatherbench2 import schema
 from weatherbench2 import utils
 import xarray as xr
@@ -46,7 +47,7 @@ def get_random_truth_and_forecast(
   return truth, forecast
 
 
-class MetricsTest(absltest.TestCase):
+class MetricsTest(parameterized.TestCase):
 
   def test_get_lat_weights(self):
     ds = xr.Dataset(coords={'latitude': np.array([-75, -45, -15, 15, 45, 75])})
@@ -67,7 +68,7 @@ class MetricsTest(absltest.TestCase):
     expected = xr.DataArray(expected_data, coords=ds.coords, dims=['latitude'])
     xr.testing.assert_allclose(expected, weights)
 
-  def testWindVectorRMSE(self):
+  def test_wind_vector_rmse(self):
     wv = metrics.WindVectorRMSE(
         u_name='u_component_of_wind',
         v_name='v_component_of_wind',
@@ -111,6 +112,27 @@ class MetricsTest(absltest.TestCase):
 
     expected = np.array([0, 10, np.NaN])
     np.testing.assert_allclose(result, expected)
+
+  @parameterized.named_parameters(
+      dict(testcase_name='inf', invalid_value=np.inf),
+      dict(testcase_name='nan', invalid_value=np.nan),
+  )
+  def test_rmse_over_invalid_region(self, invalid_value):
+    rmse = metrics.RMSE()
+    truth = xr.Dataset(
+        {'wind_speed': ('latitude', [0.0, invalid_value, 0.0])},
+        coords={'latitude': [-45, 0, 45]},
+    ).expand_dims(['time', 'longitude'])
+    forecast = truth + 1
+
+    actual = rmse.compute(forecast, truth)
+    expected = xr.Dataset({'wind_speed': np.nan})
+    xr.testing.assert_allclose(actual, expected)
+
+    region = regions.ExtraTropicalRegion()
+    actual = rmse.compute(forecast, truth, region=region)
+    expected = xr.Dataset({'wind_speed': 1.0})
+    xr.testing.assert_allclose(actual, expected)
 
 
 class CRPSTest(parameterized.TestCase):

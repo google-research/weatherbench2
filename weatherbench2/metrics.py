@@ -120,6 +120,8 @@ def _spatial_average(
   weights = get_lat_weights(dataset)
   if region is not None:
     dataset, weights = region.apply(dataset, weights)
+    # ignore NaN/Inf values in regions with zero weight
+    dataset = dataset.where(weights > 0, 0)
   return dataset.weighted(weights).mean(
       ["latitude", "longitude"], skipna=skipna
   )

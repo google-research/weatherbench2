@@ -49,6 +49,8 @@ _DEFAULT_DERIVED_VARIABLES = [
     'vorticity',
     'vertical_velocity',
     'eddy_kinetic_energy',
+    'geostrophic_wind_speed',
+    'ageostrophic_wind_speed',
     'lapse_rate',
     'total_column_vapor',
     'integrated_vapor_transport',

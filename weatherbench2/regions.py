@@ -83,9 +83,15 @@ class SliceRegion(Region):
         [dataset.longitude.sel(longitude=s) for s in lons], dim='longitude'
     )
 
+    weight_indexers = {}
+    if 'latitude' in weights.dims:
+      weight_indexers['latitude'] = lats
+    if 'longitude' in weights.dims:
+      weight_indexers['longitude'] = lons
+
     return (
         dataset.sel(latitude=lats, longitude=lons),
-        weights,
+        weights.sel(weight_indexers),
     )
 
 

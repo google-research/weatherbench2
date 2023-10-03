@@ -228,6 +228,91 @@ class EddyKineticEnergy(_3DWindVariable):
     return (1 / 2) * (u_delta**2 + v_delta**2).integrate('level')
 
 
+def _geostrophic_wind(
+    geopotential: xr.DataArray,
+) -> t.Tuple[xr.DataArray, xr.DataArray]:
+  omega = 7.292e-5  # radians / second
+  coriolis_parameter = (
+      2 * omega * np.sin(np.deg2rad(geopotential.coords['latitude']))
+  )
+  # Geostrophic wind is inf on the equator. We don't clip it to ensure that the
+  # user makes an intentional choice about how handle these invalid values.
+  return (
+      -_d_dy(geopotential) / coriolis_parameter,
+      +_d_dx(geopotential) / coriolis_parameter,
+  )
+
+
+@dataclasses.dataclass
+class _GeostrophicWindVariable(DerivedVariable):
+  geopotential_name: str = 'geopotential'
+
+  @property
+  def base_variables(self) -> list[str]:
+    return [self.geopotential_name]
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    lon_lat = ['longitude', 'latitude']
+    return (lon_lat,), lon_lat
+
+
+@dataclasses.dataclass
+class GeostrophicWindSpeed(_GeostrophicWindVariable):
+  """Calculate geostrophic wind speed.
+
+  Geostrophic wind is only meaningful when the Coriolis force is significant
+  (small Rossby number), i.e., away from the equator, where it is undefined.
+
+  This was suggested as a diagnostic for physical balance in AI weather models
+  by Massimo Bonavita in https://arxiv.org/abs/2309.08473
+  """
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    u, v = _geostrophic_wind(dataset[self.geopotential_name])
+    return np.sqrt(u**2 + v**2)
+
+
+class UComponentOfGeostrophicWind(_GeostrophicWindVariable):
+  """East-west component of geostrophic wind."""
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    u, _ = _geostrophic_wind(dataset[self.geopotential_name])
+    return u
+
+
+class VComponentOfGeostrophicWind(_GeostrophicWindVariable):
+  """North-south component of geostrophic wind."""
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    _, v = _geostrophic_wind(dataset[self.geopotential_name])
+    return v
+
+
+@dataclasses.dataclass
+class AgeostrophicWindSpeed(DerivedVariable):
+  """Calculate ageostrophic wind speed."""
+
+  u_name: str = 'u_component_of_wind'
+  v_name: str = 'v_component_of_wind'
+  geopotential_name: str = 'geopotential'
+
+  @property
+  def base_variables(self) -> list[str]:
+    return [self.u_name, self.v_name, self.geopotential_name]
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    lon_lat = ['longitude', 'latitude']
+    return (lon_lat, lon_lat, lon_lat), lon_lat
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    u = dataset[self.u_name]
+    v = dataset[self.v_name]
+    u_geo, v_geo = _geostrophic_wind(dataset[self.geopotential_name])
+    return np.sqrt((u - u_geo) ** 2 + (v - v_geo) ** 2)
+
+
 @dataclasses.dataclass
 class LapseRate(DerivedVariable):
   """Compute lapse rate in temperature."""
@@ -615,6 +700,10 @@ DERIVED_VARIABLE_DICT = {
     'vorticity': WindVorticity(),
     'vertical_velocity': WindVorticity(),
     'eddy_kinetic_energy': EddyKineticEnergy(),
+    'geostrophic_wind_speed': GeostrophicWindSpeed(),
+    'u_component_of_geostrophic_wind': UComponentOfGeostrophicWind(),
+    'v_component_of_geostrophic_wind': VComponentOfGeostrophicWind(),
+    'ageostrophic_wind_speed': AgeostrophicWindSpeed(),
     'lapse_rate': LapseRate(),
     'total_column_vapor': TotalColumnWater(
         water_species_name='specific_humidity'
