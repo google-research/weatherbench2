@@ -698,7 +698,7 @@ DERIVED_VARIABLE_DICT = {
     ),
     'divergence': WindDivergence(),
     'vorticity': WindVorticity(),
-    'vertical_velocity': WindVorticity(),
+    'vertical_velocity': VerticalVelocity(),
     'eddy_kinetic_energy': EddyKineticEnergy(),
     'geostrophic_wind_speed': GeostrophicWindSpeed(),
     'u_component_of_geostrophic_wind': UComponentOfGeostrophicWind(),

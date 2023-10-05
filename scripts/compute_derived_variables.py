@@ -70,6 +70,15 @@ DERIVED_VARIABLES = flags.DEFINE_list(
         'during evaluation.'
     ),
 )
+PREEXISTING_VARIABLES_TO_REMOVE = flags.DEFINE_list(
+    'preexisting_variables_to_remove',
+    [],
+    help=(
+        'Comma delimited list of variables to remove from the source data, '
+        'if they exist. This is useful to allow for overriding source dataset '
+        'variables with dervied variables of the same name.'
+    ),
+)
 RENAME_RAW_TP_NAME = flags.DEFINE_bool(
     'rename_raw_tp_name', False, 'Rename raw tp name to "total_precipitation".'
 )
@@ -127,10 +136,30 @@ def main(argv: list[str]) -> None:
   }
 
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
+
+  # Validate and clean-up the source datset.
   if RENAME_RAW_TP_NAME.value:
     source_dataset = source_dataset.rename(
         {RAW_TP_NAME.value: 'total_precipitation'}
     )
+
+  for var_name in PREEXISTING_VARIABLES_TO_REMOVE.value:
+    if var_name in source_dataset:
+      del source_dataset[var_name]
+
+  for var_name, dv in derived_variables.items():
+    if var_name in source_dataset:
+      raise ValueError(
+          f'cannot compute {var_name!r} because it already exists in the source'
+          ' dataset. Consider including it in '
+          '--preexisting_variables_to_remove.'
+      )
+    if not set(dv.base_variables) <= source_dataset.keys():
+      raise ValueError(
+          f'cannot compute {var_name!r} because its base variables '
+          f'{dv.base_variables} are not found in the source dataset:\n'
+          f'{source_dataset}'
+      )
 
   # Add derived variables to template
   template = source_dataset.copy(deep=False)
