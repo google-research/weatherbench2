@@ -27,8 +27,8 @@ Example Usage:
     --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-1440x721.zarr \
     --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-6h-64x33.zarr \
     --output_chunks="time=100" \
-    --latitude_nodes=64 \
-    --longitude_nodes=33 \
+    --longitude_nodes=64 \
+    --latitude_nodes=33 \
     --latitude_spacing=equiangular_with_poles \
     --regridding_method=conservative \
     --runner=DataflowRunner \
@@ -101,15 +101,15 @@ def main(argv):
     lat_stop = 90
   else:
     assert LATITUDE_SPACING.value == 'equiangular_without_poles'
-    lat_start = -90 + 0.5 * 180 / LONGITUDE_NODES.value
-    lat_stop = 90 - 0.5 * 180 / LONGITUDE_NODES.value
+    lat_start = -90 + 0.5 * 180 / LATITUDE_NODES.value
+    lat_stop = 90 - 0.5 * 180 / LATITUDE_NODES.value
 
   old_lon = source_ds.coords['longitude'].data
   old_lat = source_ds.coords['latitude'].data
 
-  new_lon = np.linspace(0, 360, num=LATITUDE_NODES.value, endpoint=False)
+  new_lon = np.linspace(0, 360, num=LONGITUDE_NODES.value, endpoint=False)
   new_lat = np.linspace(
-      lat_start, lat_stop, num=LONGITUDE_NODES.value, endpoint=True
+      lat_start, lat_stop, num=LATITUDE_NODES.value, endpoint=True
   )
 
   regridder_cls = {
