@@ -12,41 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-r"""Ensemble mean (over REALIZATION dimension) of a forecast dataset.
+r"""Computes average over dimensions of a forecast dataset.
 
-Example Usage:
+Example of getting the (average) vertical profile of temperature, by latitude.
   ```
   export BUCKET=my-bucket
   export PROJECT=my-project
-  export REGION=us-central1
 
-  python scripts/compute_ensemble_mean.py \
+  python scripts/compute_averages.py \
     --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
-    --output_path=gs://$BUCKET/datasets/era5/$USER/1959-2022-ensemble-means.zarr \
+    --output_path=gs://$BUCKET/datasets/era5/$USER/temperature-vertical-profile.zarr \
     --runner=DataflowRunner \
     -- \
     --project=$PROJECT \
+    --averaging_dims=time,longitude \
+    --variables=temperature \
     --temp_location=gs://$BUCKET/tmp/ \
     --setup_file=./setup.py \
     --requirements_file=./scripts/dataflow-requirements.txt \
-    --job_name=compute-ensemble-mean-$USER
+    --job_name=compute-vertical-profile-$USER
   ```
 """
 from absl import app
 from absl import flags
 import apache_beam as beam
+from weatherbench2 import metrics
 import xarray as xr
 import xarray_beam as xbeam
-
-REALIZATION = 'realization'
 
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='Input Zarr path')
 OUTPUT_PATH = flags.DEFINE_string('output_path', None, help='Output Zarr path')
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
-REALIZATION_NAME = flags.DEFINE_string(
-    'realization_name',
-    REALIZATION,
-    'Name of realization/member/number dimension.',
+
+AVERAGING_DIMS = flags.DEFINE_list(
+    'averaging_dims',
+    None,
+    help=(
+        'Comma delimited list of dimensions to average over. Required.  If'
+        ' "latitude" is included, the averaging with be area weighted.'
+    ),
 )
 TIME_DIM = flags.DEFINE_string(
     'time_dim', 'time', help='Name for the time dimension to slice data on.'
@@ -61,36 +65,71 @@ TIME_STOP = flags.DEFINE_string(
     '2020-12-31',
     help='ISO 8601 timestamp (inclusive) at which to stop evaluation',
 )
+LEVELS = flags.DEFINE_list(
+    'levels',
+    None,
+    help=(
+        'Comma delimited list of pressure levels to compute spectra on. If'
+        ' empty, compute on all levels of --input_path'
+    ),
+)
+VARIABLES = flags.DEFINE_list(
+    'variables',
+    None,
+    help=(
+        'Comma delimited list of data variables to include in output.  '
+        'If empty, compute on all data_vars of --input_path'
+    ),
+)
 
 
 # pylint: disable=expression-not-assigned
 
 
 def _impose_data_selection(ds: xr.Dataset) -> xr.Dataset:
+  if VARIABLES.value is not None:
+    ds = ds[VARIABLES.value]
   selection = {
       TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value),
   }
-  return ds.sel({k: v for k, v in selection.items() if k in ds.dims})
+  if LEVELS.value:
+    selection['level'] = [float(l) for l in LEVELS.value]
+  ds = ds.sel({k: v for k, v in selection.items() if k in ds.dims})
+  return ds
 
 
 def main(argv: list[str]):
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
   source_dataset = _impose_data_selection(source_dataset)
   template = xbeam.make_template(
-      source_dataset.isel({REALIZATION_NAME.value: 0}, drop=True)
+      source_dataset.isel({d: 0 for d in AVERAGING_DIMS.value}, drop=True)
   )
   target_chunks = {
-      k: v for k, v in source_chunks.items() if k != REALIZATION_NAME.value
+      k: v for k, v in source_chunks.items() if k not in AVERAGING_DIMS.value
   }
 
+  if 'latitude' in AVERAGING_DIMS.value:
+    weights = metrics.get_lat_weights(source_dataset)
+  else:
+    weights = None
+
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
+    chunked = root | xbeam.DatasetToChunks(
+        source_dataset, source_chunks, split_vars=True
+    )
+
+    if weights is not None:
+      chunked = chunked | beam.MapTuple(
+          lambda k, v: (k, v * weights.reindex_like(v))
+      )
+
     (
-        root
-        | xbeam.DatasetToChunks(source_dataset, source_chunks, split_vars=True)
-        | xbeam.Mean(REALIZATION_NAME.value, skipna=False)
+        chunked
+        | xbeam.Mean(AVERAGING_DIMS.value, skipna=False)
         | xbeam.ChunksToZarr(OUTPUT_PATH.value, template, target_chunks)
     )
 
 
 if __name__ == '__main__':
   app.run(main)
+  flags.mark_flag_as_required(['averaging_dims'])
