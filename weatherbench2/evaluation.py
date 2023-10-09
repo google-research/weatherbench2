@@ -584,12 +584,19 @@ class _EvaluateAllMetrics(beam.PTransform):
     # Load the data, using a separate thread for each variable
     num_threads = len(variables)
     time_dim = 'valid_time' if self.data_config.by_init else 'time'
+    time_selection = dict(dayofyear=forecast_chunk[time_dim].dt.dayofyear)
+    if 'hour' in set(climatology.coords):
+      time_selection['hour'] = forecast_chunk[time_dim].dt.hour
+    try:
+      climatology_chunk = climatology[variables]
+    except KeyError:
+      clim_var_dict = {variable + '_mean': variable for variable in variables}
+      climatology_chunk = climatology[list(clim_var_dict.keys())].rename(
+          clim_var_dict
+      )
+
     climatology_chunk = (
-        climatology[variables]
-        .sel(
-            dayofyear=forecast_chunk[time_dim].dt.dayofyear,
-            hour=forecast_chunk[time_dim].dt.hour,
-        )
+        climatology_chunk.sel(time_selection)
         .chunk()
         .compute(num_workers=num_threads)
     )

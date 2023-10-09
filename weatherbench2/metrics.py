@@ -288,13 +288,19 @@ class ACC(Metric):
       time_dim = "valid_time"
     else:
       time_dim = "time"
-    climatology_chunk = self.climatology[list(forecast.keys())]
+    try:
+      climatology_chunk = self.climatology[list(forecast.keys())]
+    except KeyError:
+      clim_var_dict = {key + "_mean": key for key in forecast.keys()}
+      climatology_chunk = self.climatology[list(clim_var_dict.keys())].rename(
+          clim_var_dict
+      )
     if hasattr(forecast, "level"):
       climatology_chunk = climatology_chunk.sel(level=forecast.level)
-    climatology_chunk = climatology_chunk.sel(
-        dayofyear=forecast[time_dim].dt.dayofyear,
-        hour=forecast[time_dim].dt.hour,
-    ).compute()
+    time_selection = dict(dayofyear=forecast[time_dim].dt.dayofyear)
+    if "hour" in set(climatology_chunk.coords):
+      time_selection["hour"] = forecast[time_dim].dt.hour
+    climatology_chunk = climatology_chunk.sel(time_selection).compute()
     forecast_anom = forecast - climatology_chunk
     truth_anom = truth - climatology_chunk
     return _spatial_average(

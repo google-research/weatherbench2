@@ -134,6 +134,24 @@ class MetricsTest(parameterized.TestCase):
     expected = xr.Dataset({'wind_speed': 1.0})
     xr.testing.assert_allclose(actual, expected)
 
+  def test_daily_avg_acc(self):
+    kwargs = dict(time_resolution='1 day')
+    truth, forecast = get_random_truth_and_forecast(**kwargs)
+    climatology = truth.isel(time=0, drop=True).expand_dims(
+        dayofyear=366,
+    )
+    climatology_mean = (
+        truth.isel(time=0, drop=True)
+        .expand_dims(
+            dayofyear=366,
+        )
+        .rename({'geopotential': 'geopotential_mean'})
+    )
+    # Check compatibility with climatological data from wb2 scripts
+    acc1 = metrics.ACC(climatology).compute_chunk(forecast, truth)
+    acc2 = metrics.ACC(climatology_mean).compute_chunk(forecast, truth)
+    xr.testing.assert_allclose(acc1, acc2)
+
 
 class CRPSTest(parameterized.TestCase):
 
