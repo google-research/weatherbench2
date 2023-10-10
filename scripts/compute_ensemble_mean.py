@@ -26,7 +26,6 @@ Example Usage:
     --runner=DataflowRunner \
     -- \
     --project=$PROJECT \
-    --region=$REGION \
     --temp_location=gs://$BUCKET/tmp/ \
     --setup_file=./setup.py \
     --requirements_file=./scripts/dataflow-requirements.txt \
@@ -88,7 +87,7 @@ def main(argv: list[str]):
     (
         root
         | xbeam.DatasetToChunks(source_dataset, source_chunks, split_vars=True)
-        | xbeam.Mean(REALIZATION_NAME.value)
+        | xbeam.Mean(REALIZATION_NAME.value, skipna=False)
         | xbeam.ChunksToZarr(OUTPUT_PATH.value, template, target_chunks)
     )
 
