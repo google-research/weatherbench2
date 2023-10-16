@@ -81,6 +81,11 @@ VARIABLES = flags.DEFINE_list(
         'If empty, compute on all data_vars of --input_path'
     ),
 )
+FANOUT = flags.DEFINE_integer(
+    'fanout',
+    None,
+    help='Beam CombineFn fanout. Might be required for large dataset.',
+)
 
 
 # pylint: disable=expression-not-assigned
@@ -125,7 +130,7 @@ def main(argv: list[str]):
 
     (
         chunked
-        | xbeam.Mean(AVERAGING_DIMS.value, skipna=False)
+        | xbeam.Mean(AVERAGING_DIMS.value, skipna=False, fanout=FANOUT.value)
         | xbeam.ChunksToZarr(OUTPUT_PATH.value, template, target_chunks)
     )
 
