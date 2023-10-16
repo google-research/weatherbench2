@@ -77,7 +77,9 @@ def main(argv: list[str]):
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
   source_dataset = _impose_data_selection(source_dataset)
   template = xbeam.make_template(
-      source_dataset.isel({REALIZATION_NAME.value: 0}, drop=True)
+      source_dataset.isel({REALIZATION_NAME.value: 0}, drop=True),
+      # coordinates should not be lazy
+      lazy_vars=source_dataset.data_vars.keys(),
   )
   target_chunks = {
       k: v for k, v in source_chunks.items() if k != REALIZATION_NAME.value
