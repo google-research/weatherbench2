@@ -94,7 +94,7 @@ def select_climatology(
     del chunk.coords['dayofyear']
 
   for variable_name in chunk:
-    key = xbeam.Key({'time': time_slice.start}, vars={variable_name})
+    key = xbeam.Key({'time': time_slice.start}, vars={variable_name})  # pytype: disable=wrong-arg-types
     yield key, chunk[[variable_name]]
 
 

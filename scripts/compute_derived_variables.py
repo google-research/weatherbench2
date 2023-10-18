@@ -225,7 +225,7 @@ def main(argv: list[str]) -> None:
           pcoll
           | beam.Filter(_is_precip)
           | 'RechunkIn'
-          >> xbeam.Rechunk(
+          >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
               source_dataset.sizes,
               source_chunks,
               working_chunks,
@@ -239,7 +239,7 @@ def main(argv: list[str]) -> None:
               )
           )
           | 'RechunkOut'
-          >> xbeam.Rechunk(
+          >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
               source_dataset.sizes,
               working_chunks,
               source_chunks,

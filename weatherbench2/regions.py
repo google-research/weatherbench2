@@ -65,7 +65,7 @@ class SliceRegion(Region):
       default_factory=lambda: slice(None, None)
   )
 
-  def apply(
+  def apply(  # pytype: disable=signature-mismatch
       self, dataset: xr.Dataset, weights: xr.DataArray
   ) -> tuple[xr.Dataset, xr.DataArray]:
     """Returns dataset sliced according to lat/lon_sliceparameters."""
@@ -101,7 +101,7 @@ class ExtraTropicalRegion(Region):
 
   threshold_lat: t.Optional[float] = 20
 
-  def apply(
+  def apply(  # pytype: disable=signature-mismatch
       self, dataset: xr.Dataset, weights: xr.DataArray
   ) -> tuple[xr.Dataset, xr.DataArray]:
     """Returns weights multiplied with a boolean mask to exclude tropics."""
@@ -123,7 +123,7 @@ class LandRegion(Region):
   land_sea_mask: xr.DataArray
   threshold: t.Optional[float] = None
 
-  def apply(
+  def apply(  # pytype: disable=signature-mismatch
       self, dataset: xr.Dataset, weights: xr.DataArray
   ) -> tuple[xr.Dataset, xr.DataArray]:
     """Returns weights multiplied with a boolean land mask."""

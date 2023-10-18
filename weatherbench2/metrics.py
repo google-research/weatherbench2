@@ -291,7 +291,7 @@ class ACC(Metric):
     try:
       climatology_chunk = self.climatology[list(forecast.keys())]
     except KeyError:
-      clim_var_dict = {key + "_mean": key for key in forecast.keys()}
+      clim_var_dict = {key + "_mean": key for key in forecast.keys()}  # pytype: disable=unsupported-operands
       climatology_chunk = self.climatology[list(clim_var_dict.keys())].rename(
           clim_var_dict
       )

@@ -146,7 +146,7 @@ class SEEPSThreshold:
     not_dry = ds.where(~is_dry)
     heavy_threshold = not_dry
     if weights is not None:
-      heavy_threshold = heavy_threshold.weighted(weights)
+      heavy_threshold = heavy_threshold.weighted(weights)  # pytype: disable=wrong-arg-types
     heavy_threshold = heavy_threshold.quantile(2 / 3, dim=dim)
     out = xr.Dataset({
         f'{self.var}_seeps_threshold': heavy_threshold.drop('quantile'),
@@ -331,7 +331,7 @@ def main(argv: list[str]) -> None:
             obs, input_chunks, split_vars=True, num_threads=16
         )
         | 'RechunkIn'
-        >> xbeam.Rechunk(
+        >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
             obs.sizes,
             input_chunks,
             in_working_chunks,
@@ -381,7 +381,7 @@ def main(argv: list[str]) -> None:
         pcolls
         | beam.Flatten()
         | 'RechunkOut'
-        >> xbeam.Rechunk(
+        >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
             clim_template.sizes,
             out_working_chunks,
             output_chunks,

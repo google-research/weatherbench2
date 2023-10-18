@@ -187,12 +187,12 @@ def iter_padding_chunks(
 
   time_index = template.indexes[TIME]
   delta_index = template.indexes[DELTA]
-  assert time_index.is_monotonic_increasing
-  assert delta_index.is_monotonic_increasing
+  assert time_index.is_monotonic_increasing  # pytype: disable=attribute-error
+  assert delta_index.is_monotonic_increasing  # pytype: disable=attribute-error
 
   def make_chunks(time, delta):
-    i = time_index.get_loc(time)
-    j = delta_index.get_loc(delta)
+    i = time_index.get_loc(time)  # pytype: disable=attribute-error
+    j = delta_index.get_loc(delta)  # pytype: disable=attribute-error
     key = xarray_beam.Key({TIME: i, DELTA: j})
     chunk = base_chunk.assign_coords(time=[time], prediction_timedelta=[delta])
     for key, chunk in xarray_beam.split_variables(key, chunk):
