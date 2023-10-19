@@ -140,7 +140,7 @@ class WindVectorRMSE(Metric):
 
   Attributes:
     u_name: Name of U component.
-    v_name: Name of v component.
+    v_name: Name of V component.
     vector_name: Name of wind vector to be computed.
   """
 
@@ -793,3 +793,7 @@ class EnergyScoreSkill(EnsembleMetric):
     """Energy score skill, averaged over space, for a time chunk of data."""
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
     return _spatial_average_l2_norm(forecast - truth).mean(self.ensemble_dim)
+
+
+# TODO(shoyer): Consider adding WindVectorEnergyScore based on a pair of wind
+# components, as a sort of probabilistic variant of WindVectorRMSE.

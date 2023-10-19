@@ -236,7 +236,8 @@ def _geostrophic_wind(
       2 * omega * np.sin(np.deg2rad(geopotential.coords['latitude']))
   )
   # Geostrophic wind is inf on the equator. We don't clip it to ensure that the
-  # user makes an intentional choice about how handle these invalid values.
+  # user makes an intentional choice about how handle these invalid values
+  # (e.g., by evaluating over a region).
   return (
       -_d_dy(geopotential) / coriolis_parameter,
       +_d_dx(geopotential) / coriolis_parameter,
@@ -245,6 +246,8 @@ def _geostrophic_wind(
 
 @dataclasses.dataclass
 class _GeostrophicWindVariable(DerivedVariable):
+  """Base class for geostrophic wind variables."""
+
   geopotential_name: str = 'geopotential'
 
   @property
@@ -290,8 +293,8 @@ class VComponentOfGeostrophicWind(_GeostrophicWindVariable):
 
 
 @dataclasses.dataclass
-class AgeostrophicWindSpeed(DerivedVariable):
-  """Calculate ageostrophic wind speed."""
+class _AgeostrophicWindVariable(DerivedVariable):
+  """Base class for ageostrophic wind variables."""
 
   u_name: str = 'u_component_of_wind'
   v_name: str = 'v_component_of_wind'
@@ -306,11 +309,33 @@ class AgeostrophicWindSpeed(DerivedVariable):
     lon_lat = ['longitude', 'latitude']
     return (lon_lat, lon_lat, lon_lat), lon_lat
 
+
+class AgeostrophicWindSpeed(_AgeostrophicWindVariable):
+  """Calculate ageostrophic wind speed."""
+
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
     u = dataset[self.u_name]
     v = dataset[self.v_name]
     u_geo, v_geo = _geostrophic_wind(dataset[self.geopotential_name])
     return np.sqrt((u - u_geo) ** 2 + (v - v_geo) ** 2)
+
+
+class UComponentOfAgeostrophicWind(_AgeostrophicWindVariable):
+  """East-west component of ageostrophic wind."""
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    u = dataset[self.u_name]
+    u_geo, _ = _geostrophic_wind(dataset[self.geopotential_name])
+    return u - u_geo
+
+
+class VComponentOfAgeostrophicWind(_AgeostrophicWindVariable):
+  """North-south component of ageostrophic wind."""
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    v = dataset[self.v_name]
+    _, v_geo = _geostrophic_wind(dataset[self.geopotential_name])
+    return v - v_geo
 
 
 @dataclasses.dataclass
@@ -704,6 +729,8 @@ DERIVED_VARIABLE_DICT = {
     'u_component_of_geostrophic_wind': UComponentOfGeostrophicWind(),
     'v_component_of_geostrophic_wind': VComponentOfGeostrophicWind(),
     'ageostrophic_wind_speed': AgeostrophicWindSpeed(),
+    'u_component_of_ageostrophic_wind': UComponentOfAgeostrophicWind(),
+    'v_component_of_ageostrophic_wind': VComponentOfAgeostrophicWind(),
     'lapse_rate': LapseRate(),
     'total_column_vapor': TotalColumnWater(
         water_species_name='specific_humidity'

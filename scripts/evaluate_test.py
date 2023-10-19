@@ -30,6 +30,11 @@ class WB2Evaluation(absltest.TestCase):
         'u_component_of_wind',
         'v_component_of_wind',
     ]
+    derived_variables = [
+        'wind_speed',
+        'u_component_of_ageostrophic_wind',
+        'v_component_of_ageostrophic_wind',
+    ]
     variables_2d = ['2m_temperature']
     truth = schema.mock_truth_data(
         variables_3d=variables_3d,
@@ -49,7 +54,9 @@ class WB2Evaluation(absltest.TestCase):
         variables_2d=variables_2d,
     )
     climatology = climatology.assign(
-        wind_speed=climatology['u_component_of_wind']
+        wind_speed=climatology['u_component_of_wind'],
+        u_component_of_ageostrophic_wind=climatology['u_component_of_wind'],
+        v_component_of_ageostrophic_wind=climatology['u_component_of_wind'],
     )
 
     truth_path = self.create_tempdir('truth').full_path
@@ -80,7 +87,7 @@ class WB2Evaluation(absltest.TestCase):
         eval_configs=','.join(eval_configs),
         use_beam=use_beam,
         variables=variables_3d + variables_2d,
-        derived_variables=['wind_speed'],
+        derived_variables=derived_variables,
     ):
       evaluate.main([])
 
@@ -91,12 +98,20 @@ class WB2Evaluation(absltest.TestCase):
       with self.subTest(config_name):
         results_path = os.path.join(output_dir, f'{config_name}.nc')
         actual = xarray.open_dataset(results_path)
+        extra_out_vars = [
+            'wind_speed',
+            'wind_vector',
+            'u_component_of_ageostrophic_wind',
+            'v_component_of_ageostrophic_wind',
+            'ageostrophic_wind_vector',
+        ]
         self.assertEqual(
-            set(actual),
-            set(variables_3d + variables_2d + ['wind_speed', 'wind_vector']),
+            set(actual), set(variables_3d + variables_2d + extra_out_vars)
         )
         self.assertEqual(actual['geopotential'].sizes, expected_sizes_3d)
         self.assertEqual(actual['2m_temperature'].sizes, expected_sizes_2d)
+        self.assertIn('wind_vector', actual)
+        self.assertIn('ageostrophic_wind_vector', actual)
 
   def test_in_memory(self):
     self._test(use_beam=False)

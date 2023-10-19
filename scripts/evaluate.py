@@ -217,28 +217,29 @@ FANOUT = flags.DEFINE_integer(
 def _wind_vector_rmse():
   """Defines Wind Vector RMSEs if U/V components are in variables."""
   wind_vector_rmse = []
-  if (
-      'u_component_of_wind' in VARIABLES.value
-      and 'v_component_of_wind' in VARIABLES.value
-  ):
-    wind_vector_rmse.append(
-        metrics.WindVectorRMSE(
-            u_name='u_component_of_wind',
-            v_name='v_component_of_wind',
-            vector_name='wind_vector',
-        )
-    )
-  if (
-      '10m_u_component_of_wind' in VARIABLES.value
-      and '10m_v_component_of_wind' in VARIABLES.value
-  ):
-    wind_vector_rmse.append(
-        metrics.WindVectorRMSE(
-            u_name='10m_u_component_of_wind',
-            v_name='10m_v_component_of_wind',
-            vector_name='10m_wind_vector',
-        )
-    )
+  available = set(VARIABLES.value).union(DERIVED_VARIABLES.value)
+  for u_name, v_name, vector_name in [
+      ('u_component_of_wind', 'v_component_of_wind', 'wind_vector'),
+      ('10m_u_component_of_wind', '10m_v_component_of_wind', '10m_wind_vector'),
+      (
+          'u_component_of_geostrophic_wind',
+          'v_component_of_geostrophic_wind',
+          'geostrophic_wind_vector',
+      ),
+      (
+          'u_component_of_ageostrophic_wind',
+          'v_component_of_ageostrophic_wind',
+          'ageostrophic_wind_vector',
+      ),
+  ]:
+    if u_name in available and v_name in available:
+      wind_vector_rmse.append(
+          metrics.WindVectorRMSE(
+              u_name=u_name,
+              v_name=v_name,
+              vector_name=vector_name,
+          )
+      )
   return wind_vector_rmse
 
 
