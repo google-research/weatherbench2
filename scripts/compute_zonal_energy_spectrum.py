@@ -91,6 +91,11 @@ AVERAGING_DIMS = flags.DEFINE_list(
         ' average.'
     ),
 )
+FANOUT = flags.DEFINE_integer(
+    'fanout',
+    None,
+    help='Beam CombineFn fanout. Might be required for large dataset.',
+)
 
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
@@ -199,7 +204,7 @@ def main(argv: list[str]) -> None:
         )
         | xbeam.SplitVariables()
         | beam.MapTuple(_strip_offsets)
-        | xbeam.Mean(AVERAGING_DIMS.value)
+        | xbeam.Mean(AVERAGING_DIMS.value, fanout=FANOUT.value)
         | xbeam.ChunksToZarr(
             OUTPUT_PATH.value, template, output_chunks, num_threads=16
         )
