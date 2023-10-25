@@ -797,3 +797,96 @@ class EnergyScoreSkill(EnsembleMetric):
 
 # TODO(shoyer): Consider adding WindVectorEnergyScore based on a pair of wind
 # components, as a sort of probabilistic variant of WindVectorRMSE.
+
+
+@dataclasses.dataclass
+class RankHistogram(EnsembleMetric):
+  """Histogram of truth's rank with respect to forecast ensemble members.
+
+  Given a K member ensemble {Xᵢ}, and ground truth Y, the rank of Y is the count
+  of ensemble members less than Y. This class expresses that rank with one-hot
+  encoding, which facilitates averaging/summation (typically over time) to form
+  rank histograms. The histograms will have K+1 bins, and are indexed by 'bin'.
+
+  This class also allows aggregation of the bins into num_bins ≤ K + 1 provided
+  num_bins evently divides K + 1. This reduces the size of output files, but is
+  equivalent to averaging default results along the 'bin' dimension.
+
+  If these one-hot encodings are averaged over N times, a well calibrated
+  forecast should contain roughly equal values in the bins. The bin variance
+  will be (num_bins - 1) / (N num_bins²). Since the expected value is
+  1 / num_bins, the relative error is
+    Sqrt(variance) / expected = Sqrt((num_bins - 1) / N).
+  """
+
+  def __init__(
+      self,
+      ensemble_dim: str = REALIZATION,
+      num_bins: t.Optional[int] = None,
+  ):
+    """Initializes a RankHistogram.
+
+    Args:
+      ensemble_dim: Dimension indexing ensemble member.
+      num_bins: Number of bins in histogram. If None, the number of bins will be
+        `ensemble_size + 1`. If provided, `num_bins` must evenly divide into
+        `ensemble_size + 1`.
+    """
+    super().__init__(ensemble_dim=ensemble_dim)
+    self.num_bins = num_bins
+
+  def _num_bins_actual(self, ensemble_size: int) -> int:
+    default_n_bins = ensemble_size + 1
+    if self.num_bins is None:
+      return default_n_bins
+    if default_n_bins % self.num_bins:
+      raise ValueError(
+          f"Cannot bin data with {ensemble_size=} into {self.num_bins} bins"
+      )
+    return self.num_bins
+
+  def _bin_ranks(self, ensemble_size: int, ranks: xr.DataArray):
+    """Transforms ensemble rank into bin membership."""
+    default_n_bins = ensemble_size + 1
+    num_bins = self._num_bins_actual(ensemble_size)
+    reduction_factor = default_n_bins // num_bins
+    if reduction_factor == 1:
+      return ranks
+    else:
+      return ranks // reduction_factor
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """Computes one-hot encoding of rank on a chunk of forecast/truth."""
+    # Create a fake ensemble member for truth. This is for concatenation.
+    truth_realization = forecast[self.ensemble_dim].data.min() - 1
+    truth = truth.assign_coords({self.ensemble_dim: truth_realization})
+    # Forecast typically already has an ensemble coord...but sometimes it will
+    # have an ensemble *dim* but not a coord, and this will mess up xr.concat.
+    forecast = forecast.assign_coords(
+        {self.ensemble_dim: forecast[self.ensemble_dim]}
+    )
+    combined = xr.concat([truth, forecast], dim=self.ensemble_dim)
+
+    def array_rank_one_hot(da: xr.DataArray) -> xr.DataArray:
+      ensemble_size = forecast.sizes[self.ensemble_dim]
+      num_bins = self._num_bins_actual(ensemble_size)
+      # order has the same dims as da, which is
+      #   concat([truth, forecast], ensemble_dim)
+      order = da.argsort(axis=da.dims.index(self.ensemble_dim))
+      # Since we *prepended* truth to forecast, argmin will give the location of
+      # truth in the results of argsort. Therefore, ranks is the positional
+      # order of the truth realization.
+      # ranks has the same dims as forecast, with ensemble_dim dropped.
+      ranks = order.argmin(self.ensemble_dim)
+      ranks = self._bin_ranks(ensemble_size, ranks)
+      return ranks.expand_dims(bins=np.arange(num_bins), axis=-1).copy(
+          # data will have shape ranks.shape + [num_bins].
+          data=np.eye(num_bins)[ranks],
+      )
+
+    return combined.map(array_rank_one_hot, keep_attrs=False)

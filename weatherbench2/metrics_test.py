@@ -18,6 +18,7 @@ import numpy as np
 from weatherbench2 import metrics
 from weatherbench2 import regions
 from weatherbench2 import schema
+from weatherbench2 import test_utils
 from weatherbench2 import utils
 import xarray as xr
 
@@ -229,6 +230,66 @@ class CRPSTest(parameterized.TestCase):
     xr.testing.assert_allclose(
         crps, _crps_brute_force(forecast, truth)['score']
     )
+
+
+class RankHistogramTest(parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      dict(testcase_name='EnsembleSize1', ensemble_size=1),
+      dict(testcase_name='EnsembleSize10', ensemble_size=10),
+      dict(testcase_name='EnsembleSize2', ensemble_size=2),
+      dict(testcase_name='EnsembleSize9_NumBins5', ensemble_size=9, num_bins=5),
+  )
+  def test_well_and_mis_calibrated(self, ensemble_size, num_bins=None):
+    num_bins = ensemble_size + 1 if num_bins is None else num_bins
+    # Forecast and truth come from same distribution
+    truth, forecast = get_random_truth_and_forecast(
+        ensemble_size=ensemble_size,
+        # Get enough days so our sample size is large.
+        time_start='2019-12-01',
+        time_stop='2019-12-10',
+        levels=(0, 1, 2, 3, 4),
+    )
+
+    # level=0 is well calibrated
+    # level=1,2 are under/over dispersed
+    forecast.loc[{'level': 1}] *= 0.1
+    forecast.loc[{'level': 2}] *= 10
+    # level=3,4 are skew left/right
+    forecast.loc[{'level': 3}] -= 1
+    forecast.loc[{'level': 4}] += 1
+
+    one_hot_ranks = metrics.RankHistogram(
+        ensemble_dim='realization', num_bins=num_bins
+    ).compute_chunk(forecast, truth)
+
+    expected_sizes = {
+        d: s for d, s in forecast.sizes.items() if d != 'realization'
+    } | {'bins': num_bins}
+    self.assertEqual(expected_sizes, one_hot_ranks.sizes)
+
+    # Average over dimensions where forecast is iid. I.e., not 'bins' or 'level'
+    averaging_dims = ['prediction_timedelta', 'time', 'latitude', 'longitude']
+    sample_size = np.prod([one_hot_ranks.sizes[d] for d in averaging_dims])
+    rtol = 5 * np.sqrt((num_bins - 1) / sample_size)  # 5 standard errors.
+
+    hist = one_hot_ranks.mean(averaging_dims).geopotential
+
+    # Recall level=0 is well calibrated.
+    np.testing.assert_allclose(1 / num_bins, hist.sel(level=0), rtol=rtol)
+
+    # num_bins=2 does not have enough resolution to detect under/over dispersed.
+    if num_bins > 2:
+      convex = hist.sel(level=1).data  # Under dispersed ==> convex.
+      test_utils.assert_strictly_decreasing(convex[: len(convex) // 2 + 1])
+      test_utils.assert_strictly_increasing(convex[len(convex) // 2 :])
+      concave = hist.sel(level=2).data  # Over dispersed ==> concave.
+      test_utils.assert_strictly_increasing(concave[: len(concave) // 2 + 1])
+      test_utils.assert_strictly_decreasing(concave[len(concave) // 2 :])
+
+    # level=3,4 are skew left/right
+    test_utils.assert_strictly_increasing(hist.sel(level=3))
+    test_utils.assert_strictly_decreasing(hist.sel(level=4))
 
 
 class EnsembleMeanRMSEAndStddevTest(parameterized.TestCase):

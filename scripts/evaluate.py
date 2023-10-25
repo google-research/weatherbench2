@@ -425,6 +425,20 @@ def main(argv: list[str]) -> None:
           against_analysis=False,
           derived_variables=derived_variables,
       ),
+      'probabilistic_spatial': config.Eval(
+          metrics={
+              'rank_histogram': metrics.RankHistogram(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+          },
+          against_analysis=False,
+          derived_variables=derived_variables,
+          evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
+          probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
+          probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
+          probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
+          output_format='zarr',
+      ),
   }
   if not set(EVAL_CONFIGS.value.split(',')).issubset(eval_configs):
     raise flags.UnrecognizedFlagError(
