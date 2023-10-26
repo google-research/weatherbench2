@@ -112,7 +112,7 @@ def _d_dx(field: xr.DataArray) -> xr.DataArray:
   cos_theta = np.cos(np.deg2rad(latitude))
   # TODO(shoyer): use a custom calculation with roll() instead of
   # differentiate() to calculate rolling over 360 to 0 degrees properly.
-  return _zero_poles(
+  return _zero_poles(  # pytype: disable=bad-return-type
       field.differentiate('longitude') / cos_theta / _METERS_PER_DEGREE
   )
 
