@@ -52,7 +52,7 @@ class WB2ExpandClimatologyTest(absltest.TestCase):
     input_path = self.create_tempdir('input_path').full_path
     output_path = self.create_tempdir('output_path').full_path
 
-    climatology.chunk({'dayofyear': 31}).to_zarr(input_path)
+    climatology.chunk({'dayofyear': 31, 'level': 1}).to_zarr(input_path)
 
     with flagsaver.flagsaver(
         input_path=input_path,
@@ -65,6 +65,8 @@ class WB2ExpandClimatologyTest(absltest.TestCase):
 
     actual = xarray.open_zarr(output_path)
     xarray.testing.assert_allclose(actual, expected)
+    self.assertEqual(actual.chunks['time'][0], 4 * 31)
+    self.assertEqual(actual.chunks['level'][0], 1)
 
 
 if __name__ == '__main__':
