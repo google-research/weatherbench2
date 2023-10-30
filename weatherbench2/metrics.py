@@ -1029,3 +1029,87 @@ class RankHistogram(EnsembleMetric):
       )
 
     return combined.map(array_rank_one_hot, keep_attrs=False)
+
+
+def central_reliability(hist: xr.Dataset) -> xr.Dataset:
+  """Computes reliability diagram for central histogram probabilities.
+
+  Roughtly speaking, a forecast X with median μ is considered to have
+  "central reliability" with respect to truth Y, if for δ > 0,
+     P[μ - δ < X < μ - δ] = P[μ - δ < Y < μ - δ].
+  Since there is only one truth value, the right hand side cannot be computed
+  directly. Instead, one often uses a rank histogram.
+
+  For a rank histogram hist with N bins [0, ..., N-1], the probability that
+  truth had value less extreme than the 2k + N % 2 central ensemble members is
+     prob[k] = hist.sel(bins=central_slice[k]).sum('bins')
+  where for k ∈ {0, ..., N // 2 - 1 + N % 2},
+     central_slice[k] = slice(N // 2 - (k + 1) + N % 2, N // 2 + (k + 1))
+  defines the length 2(k + 1) - N % 2 slice of central bins.
+
+  The result is indexed by the desired probabilities, obtained for a perfectly
+  calibrated forecast. These are, for even N,
+     desired_prob[k] = 2(k + 1) / N,
+  and for odd N,
+     desired_prob[k] = (2k + 1) / N.
+
+  Args:
+    hist: Dataset with 'bins' dimension of length >= 3, indexing probabilities.
+      For example, the returned values of `RankHistogram`, possibly after
+      averaging over time or other non-bin dimensions.
+
+  Returns:
+    Dataset of central reliability values, indexed by 'desired_prob'.
+  """
+
+  n_bins = len(hist.bins)
+  if n_bins < 3:
+    raise ValueError(f"Too few bins. {n_bins=} but should be >= 3")
+
+  # To efficiently compute the reliability, we use cumsum, rather than directly
+  # following the docstring.
+  left_hist = hist.sel(bins=slice(None, n_bins // 2 - 1))
+  right_hist = hist.sel(bins=slice(n_bins // 2 + n_bins % 2, None))
+  linear_bins = left_hist.bins.data
+  probs = (
+      (
+          # Must reverse left_hist, so that we are doing a cumsum from the
+          # inside out.
+          left_hist.reindex(bins=left_hist.bins[::-1]).assign_coords(
+              bins=linear_bins
+          )
+          # Must assign right_hist with bins [0, 1, ...]
+          + right_hist.assign_coords(bins=linear_bins)
+      )
+      .cumsum("bins")
+      .rename(bins="prob_index")
+  )
+
+  desired_prob_unnormalized = np.ones((len(probs.prob_index),))
+
+  if n_bins % 2:
+    # If odd bins, there is a midpoint probability that doesn't get lumped into
+    # the cumsum.
+    probs = probs.assign_coords(prob_index=linear_bins + 1)
+    center_prob = hist.sel(bins=n_bins // 2, drop=True)
+    probs = xr.concat(
+        [center_prob.expand_dims(prob_index=[0]), center_prob + probs],
+        dim="prob_index",
+    )
+    desired_prob_unnormalized = np.concatenate(
+        # The midpoint probability is made from 1 bin, whereas the others are
+        # from two.
+        ([0.5], desired_prob_unnormalized)
+    )
+  else:
+    # Ensure the dim is also a coord.
+    probs = probs.assign_coords(prob_index=probs.prob_index)
+
+  desired_prob_unnormalized = np.cumsum(desired_prob_unnormalized)
+  probs = probs.assign_coords(
+      desired_prob=(
+          "prob_index",  # Corresponding dimension.
+          desired_prob_unnormalized / desired_prob_unnormalized[-1],
+      )
+  )
+  return probs.swap_dims({"prob_index": "desired_prob"})
