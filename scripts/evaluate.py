@@ -196,9 +196,11 @@ INPUT_CHUNKS = flag_utils.DEFINE_chunks(
     'input_chunks',
     'time=1',
     help=(
-        'chunk sizes overriding input chunks to use for loading forecast and '
-        'observation data. By default, omitted dimension names are loaded in '
-        'one chunk.'
+        'chunk sizes overriding input chunks to use for loading forecast and'
+        ' observation data. By default, omitted dimension names are loaded in'
+        ' one chunk. Metrics should be embarrassingly parallel across chunked'
+        ' dimensions. In particular, output variables should contain these'
+        ' dimensions.'
     ),
 )
 USE_BEAM = flags.DEFINE_bool(
@@ -433,9 +435,6 @@ def main(argv: list[str]) -> None:
       ),
       'probabilistic_spatial': config.Eval(
           metrics={
-              'rank_histogram': metrics.RankHistogram(
-                  ensemble_dim=ENSEMBLE_DIM.value
-              ),
               'crps': metrics.SpatialCRPS(ensemble_dim=ENSEMBLE_DIM.value),
               'crps_spread': metrics.SpatialCRPSSpread(
                   ensemble_dim=ENSEMBLE_DIM.value
@@ -447,6 +446,20 @@ def main(argv: list[str]) -> None:
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
               'ensemble_variance': metrics.SpatialEnsembleVariance(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+          },
+          against_analysis=False,
+          derived_variables=derived_variables,
+          evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
+          probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
+          probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
+          probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
+          output_format='zarr',
+      ),
+      'probabilistic_spatial_histograms': config.Eval(
+          metrics={
+              'rank_histogram': metrics.RankHistogram(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
           },

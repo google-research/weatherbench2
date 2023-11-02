@@ -566,7 +566,13 @@ class _EvaluateAllMetrics(beam.PTransform):
   ) -> tuple[xbeam.Key, tuple[xr.Dataset, xr.Dataset]]:
     if truth is None:
       raise ValueError('`truth` must not be `None`')
-    truth_chunk = truth.sel(time=forecast_chunk.valid_time).compute()
+    non_time_chunks = set(forecast_chunk.dims).intersection(
+        set(self.input_chunks) - {'init_time', 'lead_time'}
+    )
+    truth_chunk = truth.sel(
+        {'time': forecast_chunk.valid_time}
+        | {k: forecast_chunk[k] for k in non_time_chunks}
+    ).compute()
     return key, (forecast_chunk, truth_chunk)
 
   def _climatology_like_forecast_chunk(

@@ -24,7 +24,8 @@ from . import evaluate
 
 class WB2Evaluation(absltest.TestCase):
 
-  def _test(self, use_beam=True):
+  def _test(self, use_beam=True, input_chunks=None):
+    input_chunks = input_chunks or {}
     variables_3d = [
         'geopotential',
         'u_component_of_wind',
@@ -83,7 +84,7 @@ class WB2Evaluation(absltest.TestCase):
         runner='DirectRunner',
         by_init=False,
         regions=['global', 'tropics', 'extra-tropics', 'europe'],
-        input_chunks=dict(time=-1),
+        input_chunks=input_chunks,
         eval_configs=','.join(eval_configs),
         use_beam=use_beam,
         variables=variables_3d + variables_2d,
@@ -114,10 +115,16 @@ class WB2Evaluation(absltest.TestCase):
         self.assertIn('ageostrophic_wind_vector', actual)
 
   def test_in_memory(self):
-    self._test(use_beam=False)
+    self._test(use_beam=False, input_chunks=dict(time=-1))
 
   def test_beam(self):
-    self._test(use_beam=True)
+    self._test(use_beam=True, input_chunks=dict(time=-1))
+
+  def test_beam_time_chunk_125(self):
+    self._test(use_beam=True, input_chunks=dict(time=125))
+
+  def test_beam_longitude_chunk_20(self):
+    self._test(use_beam=True, input_chunks=dict(time=-1, longitude=20))
 
 
 if __name__ == '__main__':
