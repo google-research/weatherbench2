@@ -394,7 +394,13 @@ def main(argv: list[str]) -> None:
               'ensemble_mean_rmse': metrics.EnsembleMeanRMSE(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
+              'ensemble_mean_mse': metrics.EnsembleMeanMSE(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
               'ensemble_stddev': metrics.EnsembleStddev(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'ensemble_variance': metrics.EnsembleVariance(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
           },
@@ -428,6 +434,19 @@ def main(argv: list[str]) -> None:
       'probabilistic_spatial': config.Eval(
           metrics={
               'rank_histogram': metrics.RankHistogram(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'crps': metrics.SpatialCRPS(ensemble_dim=ENSEMBLE_DIM.value),
+              'crps_spread': metrics.SpatialCRPSSpread(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'crps_skill': metrics.SpatialCRPSSkill(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'ensemble_mean_mse': metrics.SpatialEnsembleMeanMSE(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'ensemble_variance': metrics.SpatialEnsembleVariance(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
           },

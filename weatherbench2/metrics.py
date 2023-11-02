@@ -549,6 +549,52 @@ class CRPSSkill(EnsembleMetric):
     )
 
 
+@dataclasses.dataclass
+class SpatialCRPS(EnsembleMetric):
+  """CRPS without spatial averaging."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """CRPS, averaged over space, for a time chunk of data."""
+    return SpatialCRPSSkill(self.ensemble_dim).compute_chunk(
+        forecast, truth, region=region
+    ) - 0.5 * SpatialCRPSSpread(self.ensemble_dim).compute_chunk(
+        forecast, truth, region=region
+    )
+
+
+@dataclasses.dataclass
+class SpatialCRPSSpread(EnsembleMetric):
+  """CRPSSpread without spatial averaging."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """CRPSSpread, averaged over space, for a time chunk of data."""
+    return _pointwise_crps_spread(forecast, truth, self.ensemble_dim)
+
+
+@dataclasses.dataclass
+class SpatialCRPSSkill(EnsembleMetric):
+  """CRPSSkill without spatial averaging."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """CRPSSkill, averaged over space, for a time chunk of data."""
+    return _pointwise_crps_skill(forecast, truth, self.ensemble_dim)
+
+
 def _pointwise_crps_spread(
     forecast: xr.Dataset, truth: xr.Dataset, ensemble_dim: str
 ) -> xr.Dataset:
@@ -646,12 +692,66 @@ class EnsembleStddev(EnsembleMetric):
       return xr.zeros_like(
           # Compute the average, even though we return zeros_like. Why? Because,
           # this will preserve the scalar values of lat/lon coords correctly.
-          _spatial_average(forecast, region=region).mean(self.ensemble_dim)
+          _spatial_average(forecast, region=region).mean(
+              self.ensemble_dim, skipna=False
+          )
       )
     else:
       return _spatial_average_l2_norm(
-          forecast.std(self.ensemble_dim, ddof=1), region=region
+          forecast.std(self.ensemble_dim, ddof=1, skipna=False), region=region
       )
+
+
+@dataclasses.dataclass
+class EnsembleVariance(EnsembleMetric):
+  """The variance of an ensemble of forecasts."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """EnsembleVariance, averaged over space, for a time chunk of data."""
+    del truth  # unused
+    n_ensemble = _get_n_ensemble(forecast, self.ensemble_dim)
+
+    if n_ensemble == 1:
+      return xr.zeros_like(
+          # Compute the average, even though we return zeros_like. Why? Because,
+          # this will preserve the scalar values of lat/lon coords correctly.
+          _spatial_average(forecast, region=region).mean(
+              self.ensemble_dim, skipna=False
+          )
+      )
+    else:
+      return _spatial_average(
+          forecast.var(self.ensemble_dim, ddof=1, skipna=False), region=region
+      )
+
+
+@dataclasses.dataclass
+class SpatialEnsembleVariance(EnsembleMetric):
+  """Ensemble variance without spatial averaging."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """Ensemble variance, for a time chunk of data."""
+    del truth  # unused
+    n_ensemble = _get_n_ensemble(forecast, self.ensemble_dim)
+
+    if n_ensemble == 1:
+      return xr.zeros_like(
+          # Compute the average, even though we return zeros_like. Why? Because,
+          # this will preserve the scalar values of lat/lon coords correctly.
+          forecast
+      ).mean(self.ensemble_dim, skipna=False)
+    else:
+      return forecast.var(self.ensemble_dim, ddof=1, skipna=False)
 
 
 @dataclasses.dataclass
@@ -692,8 +792,43 @@ class EnsembleMeanRMSE(EnsembleMetric):
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
 
     return _spatial_average_l2_norm(
-        truth - forecast.mean(self.ensemble_dim), region=region
+        truth - forecast.mean(self.ensemble_dim, skipna=False), region=region
     )
+
+
+@dataclasses.dataclass
+class EnsembleMeanMSE(EnsembleMetric):
+  """Mean square error between the ensemble mean and ground truth."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """EnsembleMeanRMSE, averaged over space, for a time chunk of data."""
+    _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
+
+    return _spatial_average(
+        (truth - forecast.mean(self.ensemble_dim, skipna=False)) ** 2,
+        region=region,
+    )
+
+
+@dataclasses.dataclass
+class SpatialEnsembleMeanMSE(EnsembleMetric):
+  """EnsembleMeanMSE (MSE, not RMSE), without spatial averaging."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """Squared error in the ensemble mean, for a time chunk of data."""
+    _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
+
+    return (truth - forecast.mean(self.ensemble_dim, skipna=False)) ** 2
 
 
 @dataclasses.dataclass
@@ -771,13 +906,15 @@ class EnergyScoreSpread(EnsembleMetric):
       return xr.zeros_like(
           # Compute the average, even though we return zeros_like. Why? Because,
           # this will preserve the scalar values of lat/lon coords correctly.
-          _spatial_average(forecast, region=region).mean(self.ensemble_dim)
+          _spatial_average(forecast, region=region).mean(
+              self.ensemble_dim, skipna=False
+          )
       )
     else:
       return _spatial_average_l2_norm(
           self._ensemble_slice(forecast, slice(None, -1))
           - self._ensemble_slice(forecast, slice(1, None)),
-      ).mean(self.ensemble_dim)
+      ).mean(self.ensemble_dim, skipna=False)
 
 
 @dataclasses.dataclass
@@ -792,7 +929,9 @@ class EnergyScoreSkill(EnsembleMetric):
   ) -> xr.Dataset:
     """Energy score skill, averaged over space, for a time chunk of data."""
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
-    return _spatial_average_l2_norm(forecast - truth).mean(self.ensemble_dim)
+    return _spatial_average_l2_norm(forecast - truth).mean(
+        self.ensemble_dim, skipna=False
+    )
 
 
 # TODO(shoyer): Consider adding WindVectorEnergyScore based on a pair of wind
