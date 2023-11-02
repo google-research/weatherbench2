@@ -116,7 +116,7 @@ def _make_derived_variables_ds(
 def _make_template(
     source: xr.Dataset,
     derived_variables: t.Sequence[ZonalEnergySpectrum],
-) -> xr.DataArray:
+) -> xr.Dataset:
   """Makes a template with shape equivalent to making derived ds on source."""
   # Shorten source along these dims.
   # Exclude some dims from shortening since they are necessary for proper
@@ -148,6 +148,7 @@ def _output_dims(source: xr.Dataset, include_averaging_dims: bool) -> list[str]:
   """Dimensions in the output, in canonical order."""
   dims = []
   for d in source.dims:
+    assert isinstance(d, str), f'{type(d)=} not a supported dimension type'
     if d == 'longitude':
       dims.append('zonal_wavenumber')
     elif include_averaging_dims or d not in AVERAGING_DIMS.value:
