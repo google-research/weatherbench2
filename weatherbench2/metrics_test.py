@@ -292,6 +292,136 @@ class RankHistogramTest(parameterized.TestCase):
     test_utils.assert_strictly_decreasing(hist.sel(level=4))
 
 
+class CentralReliabilityTest(parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      dict(testcase_name='NBins1', n_bins=1),
+      dict(testcase_name='NBins2', n_bins=2),
+  )
+  def test_n_bins_too_small_raises(self, n_bins):
+    hist = xr.Dataset(
+        {'temperature': ('bins', np.ones((n_bins,)) / n_bins)},
+        coords={'bins': np.arange(n_bins)},
+    )
+    with self.assertRaisesRegex(ValueError, 'Too few bins'):
+      metrics.central_reliability(hist)
+
+  @parameterized.named_parameters(
+      dict(testcase_name='NBins3', n_bins=3),
+      dict(testcase_name='NBins4', n_bins=4),
+      dict(testcase_name='NBins10', n_bins=10),
+      dict(testcase_name='NBins11', n_bins=11),
+  )
+  def test_perfectly_calibrated_histogram(self, n_bins):
+    hist = xr.Dataset(
+        {'temperature': ('bins', np.ones((n_bins,)) / n_bins)},
+        coords={'bins': np.arange(n_bins)},
+    )
+    reliability = metrics.central_reliability(hist)
+    self.assertLen(reliability.desired_prob, n_bins // 2 + n_bins % 2)
+
+    expected_prob_unnormalized = np.ones((n_bins // 2,))
+    if n_bins % 2:
+      expected_prob_unnormalized = np.concatenate(
+          ([0.5], expected_prob_unnormalized)
+      )
+    expected_prob = np.cumsum(expected_prob_unnormalized) / np.sum(
+        expected_prob_unnormalized
+    )
+
+    # Since perfectly calibrated, the expected and desired probs are equal.
+    expected_ds = xr.Dataset(
+        {'temperature': ('desired_prob', expected_prob)},
+        coords={
+            # desired_prob is the dimension.
+            # prob_index is a range, whose dimension is desired_prob
+            'desired_prob': expected_prob,
+            'prob_index': ('desired_prob', np.arange(len(expected_prob))),
+        },
+    )
+    xr.testing.assert_allclose(expected_ds, reliability)
+
+  def test_a_particular_length_3_histogram(self):
+    hist = xr.Dataset(
+        {'temperature': ('bins', [0.2, 0.1, 0.7])},
+        coords={'bins': np.arange(3)},
+    )
+    reliability = metrics.central_reliability(hist)
+
+    expected_prob = [0.1, 1.0]
+    desired_prob = [1 / 3, 1.0]
+    expected_ds = xr.Dataset(
+        {'temperature': ('desired_prob', expected_prob)},
+        coords={
+            # desired_prob is the dimension.
+            # prob_index is a range, whose dimension is desired_prob
+            'desired_prob': desired_prob,
+            'prob_index': ('desired_prob', np.arange(len(expected_prob))),
+        },
+    )
+    xr.testing.assert_allclose(expected_ds, reliability)
+
+  def test_a_particular_length_5_histogram(self):
+    hist = xr.Dataset(
+        {'temperature': ('bins', [0.2, 0.0, 0.1, 0.1, 0.6])},
+        coords={'bins': np.arange(5)},
+    )
+    reliability = metrics.central_reliability(hist)
+
+    expected_prob = [0.1, 0.2, 1.0]
+    desired_prob = [1 / 5, 2 / 5 + 1 / 5, 1]
+    expected_ds = xr.Dataset(
+        {'temperature': ('desired_prob', expected_prob)},
+        coords={
+            # desired_prob is the dimension.
+            # prob_index is a range, whose dimension is desired_prob
+            'desired_prob': desired_prob,
+            'prob_index': ('desired_prob', np.arange(len(expected_prob))),
+        },
+    )
+    xr.testing.assert_allclose(expected_ds, reliability)
+
+  def test_a_particular_length_4_histogram(self):
+    hist = xr.Dataset(
+        {'temperature': ('bins', [0.1, 0.1, 0.5, 0.3])},
+        coords={'bins': np.arange(4)},
+    )
+    reliability = metrics.central_reliability(hist)
+
+    expected_prob = [0.6, 1.0]
+    desired_prob = [1 / 2, 1.0]
+    expected_ds = xr.Dataset(
+        {'temperature': ('desired_prob', expected_prob)},
+        coords={
+            # desired_prob is the dimension.
+            # prob_index is a range, whose dimension is desired_prob
+            'desired_prob': desired_prob,
+            'prob_index': ('desired_prob', np.arange(len(expected_prob))),
+        },
+    )
+    xr.testing.assert_allclose(expected_ds, reliability)
+
+  def test_a_particular_length_6_histogram(self):
+    hist = xr.Dataset(
+        {'temperature': ('bins', [0.1, 0.1, 0.3, 0.2, 0.0, 0.3])},
+        coords={'bins': np.arange(6)},
+    )
+    reliability = metrics.central_reliability(hist)
+
+    expected_prob = [0.5, 0.6, 1.0]
+    desired_prob = [1 / 3, 2 / 3, 1]
+    expected_ds = xr.Dataset(
+        {'temperature': ('desired_prob', expected_prob)},
+        coords={
+            # desired_prob is the dimension.
+            # prob_index is a range, whose dimension is desired_prob
+            'desired_prob': desired_prob,
+            'prob_index': ('desired_prob', np.arange(len(expected_prob))),
+        },
+    )
+    xr.testing.assert_allclose(expected_ds, reliability)
+
+
 class EnsembleMeanRMSEAndStddevTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
