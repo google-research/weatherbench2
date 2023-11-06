@@ -393,6 +393,10 @@ def main(argv: list[str]) -> None:
       'probabilistic': config.Eval(
           metrics={
               'crps': metrics.CRPS(ensemble_dim=ENSEMBLE_DIM.value),
+              'crps_spread': metrics.CRPSSpread(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'crps_skill': metrics.CRPSSkill(ensemble_dim=ENSEMBLE_DIM.value),
               'ensemble_mean_rmse': metrics.EnsembleMeanRMSE(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
@@ -416,10 +420,6 @@ def main(argv: list[str]) -> None:
       ),
       'ensemble_forecast_vs_era_experimental_metrics': config.Eval(
           metrics={
-              'crps_spread': metrics.CRPSSpread(
-                  ensemble_dim=ENSEMBLE_DIM.value
-              ),
-              'crps_skill': metrics.CRPSSkill(ensemble_dim=ENSEMBLE_DIM.value),
               'energy_score': metrics.EnergyScore(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
