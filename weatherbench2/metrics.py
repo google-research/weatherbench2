@@ -453,6 +453,16 @@ class EnsembleMetric(Metric):
         {self.ensemble_dim: np.arange(ds.dims[self.ensemble_dim])}
     )
 
+  def compute(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """Evaluate this metric on datasets with full temporal coverages."""
+    result = super().compute(forecast, truth, region=region)
+    return result.assign_attrs(ensemble_size=forecast[self.ensemble_dim].size)
+
 
 @dataclasses.dataclass
 class CRPS(EnsembleMetric):

@@ -170,6 +170,10 @@ class CRPSTest(parameterized.TestCase):
         metrics.CRPS().compute_chunk(forecast, truth),
     )
 
+    self.assertEqual(
+        ensemble_size, metrics.CRPS().compute(forecast, truth).ensemble_size
+    )
+
   def test_ensemble_size_1_gives_mae(self):
     truth, forecast = get_random_truth_and_forecast(ensemble_size=1)
 
