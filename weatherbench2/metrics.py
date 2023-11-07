@@ -657,6 +657,66 @@ def _rank_ds(ds: xr.Dataset, dim: str) -> xr.Dataset:
 
 
 @dataclasses.dataclass
+class GaussianCRPS(Metric):
+  """The spread measure associated with CRPS, E|X - X'|."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """CRPSSpread, averaged over space, for a time chunk of data."""
+    return _spatial_average(
+        _pointwise_gaussian_crps(forecast, truth),
+        region=region,
+    )
+
+
+def _pointwise_gaussian_crps(
+    forecast: xr.Dataset, truth: xr.Dataset
+) -> xr.Dataset:
+  r"""Returns pointwise CRPS of a Gaussian distribution with mean and std values.
+
+  CRPS of a Gaussian distribution with mean value m and standard deviation s
+  can be computed as
+
+  CRPS(F_(m,s), y) = s * {(y-m)/s * [2G((y-m)/s) - 1] + 2g((y-m)/s) -
+  1/\sqrt(\pi))}
+
+  where G and g denote the CDF and PDF of a standard Gaussian distribution,
+  respectively.
+  References:
+  [Gneiting, Raftery, Westveld III, Goldman, 2005], Calibrated Probabilistic
+  Forecasting Using Ensemble Model Output Statistics and Minimum CRPS Estimation
+  DOI: https://doi.org/10.1175/MWR2904.1
+
+  Args:
+    forecast: A forecast dataset.
+    truth: A ground truth dataset.
+
+  Returns:
+    xr.Dataset: Pointwise calculated crps for a Gaussian distribution.
+  """
+  var_list = []
+  dataset = {}
+  for var in forecast.keys():
+    if f"{var}_std" in forecast.keys():
+      var_list.append(var)
+  for var_name in var_list:
+    norm_diff = (forecast[var_name] - truth[var_name]) / forecast[
+        f"{var_name}_std"
+    ]
+    value = forecast[f"{var_name}_std"] * (
+        norm_diff * (2 * xr.apply_ufunc(stats.norm.cdf, norm_diff.load()) - 1)
+        + 2 * xr.apply_ufunc(stats.norm.pdf, norm_diff.load())
+        - 1 / np.sqrt(np.pi)
+    )
+    dataset[var_name] = value
+  return xr.Dataset(dataset, coords=forecast.coords)
+
+
+@dataclasses.dataclass
 class EnsembleStddev(EnsembleMetric):
   """The standard deviation of an ensemble of forecasts.
 

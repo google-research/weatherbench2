@@ -236,6 +236,29 @@ class CRPSTest(parameterized.TestCase):
     )
 
 
+class GaussianCRPSTest(parameterized.TestCase):
+
+  def test_gaussian_crps(self):
+    forecast = schema.mock_forecast_data(
+        variables_3d=[],
+        variables_2d=['2m_temperature', '2m_temperature_std'],
+        time_start='2022-01-01',
+        time_stop='2022-01-02',
+        lead_stop='1 day',
+    )
+    truth = schema.mock_truth_data(
+        variables_3d=[],
+        variables_2d=['2m_temperature'],
+        time_start='2022-01-01',
+        time_stop='2022-01-20',
+    )
+    forecast = forecast + 1.0
+    truth = truth + 1.02
+    result = metrics.GaussianCRPS().compute(forecast, truth)
+    expected = np.array([0.23385455, 0.23385455])
+    np.testing.assert_allclose(result['2m_temperature'].values, expected)
+
+
 class RankHistogramTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
