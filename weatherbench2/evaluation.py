@@ -678,7 +678,7 @@ class _EvaluateAllMetrics(beam.PTransform):
       )
       forecast_pipeline |= beam.MapTuple(
           self._climatology_like_forecast_chunk,
-          probabilistic_climatology=probabilistic_climatology,
+          climatology=probabilistic_climatology,
           variables=variables,
       )
     elif self.eval_config.evaluate_persistence:

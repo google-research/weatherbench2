@@ -39,7 +39,7 @@ class Region:
 
   def apply(
       self, dataset: xr.Dataset, weights: xr.DataArray
-  ) -> tuple[xr.Dataset, xr.Dataset]:
+  ) -> tuple[xr.Dataset, xr.DataArray]:
     """Apply region selection to dataset and/or weights.
 
     Args:
@@ -48,8 +48,8 @@ class Region:
 
     Returns:
       dataset: Potentially modified (sliced) dataset.
-      weights: Potentially modified weights dataset, to be used in combination
-      with dataset, e.g. in _spatial_average().
+      weights: Potentially modified weights data array, to be used in
+      combination with dataset, e.g. in _spatial_average().
     """
     raise NotImplementedError
 
@@ -128,6 +128,31 @@ class LandRegion(Region):
   ) -> tuple[xr.Dataset, xr.DataArray]:
     """Returns weights multiplied with a boolean land mask."""
     land_weights = self.land_sea_mask
+    # Make sure lsm has same dtype for lat/lon
+    land_weights = land_weights.assign_coords(
+        latitude=land_weights.latitude.astype(dataset.latitude.dtype),
+        longitude=land_weights.longitude.astype(dataset.longitude.dtype),
+    )
     if self.threshold is not None:
       land_weights = (land_weights > self.threshold).astype(float)
     return dataset, weights * land_weights
+
+
+@dataclasses.dataclass
+class CombinedRegion(Region):
+  """Sequentially applies regions selections.
+
+  Allows for combination of e.g. SliceRegion and LandRegion.
+
+  Attributes:
+    regions: List of Region instances
+  """
+
+  regions: list[Region] = dataclasses.field(default_factory=list)
+
+  def apply(  # pytype: disable=signature-mismatch
+      self, dataset: xr.Dataset, weights: xr.DataArray
+  ) -> tuple[xr.Dataset, xr.DataArray]:
+    for region in self.regions:
+      dataset, weights = region.apply(dataset, weights)
+    return dataset, weights

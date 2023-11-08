@@ -47,6 +47,8 @@ from weatherbench2 import evaluation
 from weatherbench2 import flag_utils
 from weatherbench2 import metrics
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
+from weatherbench2.regions import CombinedRegion
+from weatherbench2.regions import LandRegion
 from weatherbench2.regions import SliceRegion
 import xarray as xr
 
@@ -91,7 +93,9 @@ EVALUATE_PERSISTENCE = flags.DEFINE_bool(
 EVALUATE_CLIMATOLOGY = flags.DEFINE_bool(
     'evaluate_climatology',
     False,
-    'Evaluate climatology forecast specified in climatology path',
+    'Evaluate climatology forecast specified in climatology path. Note that'
+    ' this will not work for probabilistic evaluation. Please use the'
+    ' EVALUATE_PROBABILISTIC_CLIMATOLOGY flag.',
 )
 EVALUATE_PROBABILISTIC_CLIMATOLOGY = flags.DEFINE_bool(
     'evaluate_probabilistic_climatology',
@@ -120,6 +124,15 @@ REGIONS = flags.DEFINE_list(
     help=(
         'Comma delimited list of predefined regions to evaluate. "all" for all'
         'predefined regions.'
+    ),
+)
+LSM_DATASET = flags.DEFINE_string(
+    'lsm_dataset',
+    None,
+    help=(
+        'Dataset containing land-sea-mask at same resolution of datasets to be'
+        ' evaluated. Required if region with land-sea-mask is picked. If None,'
+        ' defaults to observation dataset.'
     ),
 )
 COMPUTE_SEEPS = flags.DEFINE_bool(
@@ -305,6 +318,23 @@ def main(argv: list[str]) -> None:
       'arctic': SliceRegion(lat_slice=slice(60, 90)),
       'antarctic': SliceRegion(lat_slice=slice(-90, -60)),
   }
+  try:
+    if LSM_DATASET.value:
+      land_sea_mask = xr.open_zarr(LSM_DATASET.value)['land_sea_mask'].compute()
+    else:
+      land_sea_mask = xr.open_zarr(OBS_PATH.value)['land_sea_mask'].compute()
+    land_regions = {
+        'global_land': LandRegion(land_sea_mask=land_sea_mask),
+        'extra-tropics_land': CombinedRegion(
+            regions=[
+                SliceRegion(lat_slice=[slice(None, -20), slice(20, None)]),
+                LandRegion(land_sea_mask=land_sea_mask),
+            ]
+        ),
+    }
+    predefined_regions = predefined_regions | land_regions
+  except KeyError:
+    print('No land_sea_mask found.')
   if REGIONS.value == ['all']:
     regions = predefined_regions
   elif REGIONS.value is None:
