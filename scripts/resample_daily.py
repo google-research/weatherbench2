@@ -257,7 +257,7 @@ def main(argv: abc.Sequence[str]) -> None:
             obs, input_chunks, split_vars=True, num_threads=NUM_THREADS.value
         )
         | 'RechunkIn'
-        >> xbeam.Rechunk(
+        >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
             obs.sizes, input_chunks, in_working_chunks, itemsize=itemsize
         )
     )
@@ -287,7 +287,7 @@ def main(argv: abc.Sequence[str]) -> None:
         pcolls
         | beam.Flatten()
         | 'RechunkOut'
-        >> xbeam.Rechunk(
+        >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
             rsmp_template.sizes,
             out_working_chunks,
             output_chunks,
