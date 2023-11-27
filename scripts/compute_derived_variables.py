@@ -34,6 +34,7 @@ Example Usage:
     --job_name=compute-derived-variables-$USER
   ```
 """
+import ast
 from absl import app
 from absl import flags
 import apache_beam as beam
@@ -90,6 +91,14 @@ RAW_TP_NAME = flags.DEFINE_string(
         ' "total_precipitation_6hr" for backwards compatibility.'
     ),
 )
+RENAME_VARIABLES = flags.DEFINE_string(
+    'rename_variables',
+    None,
+    help=(
+        'Dictionary of variable to rename to standard names. E.g. {"2t":'
+        ' "2m_temperature"}'
+    ),
+)
 WORKING_CHUNKS = flag_utils.DEFINE_chunks(
     'working_chunks',
     '',
@@ -142,6 +151,17 @@ def main(argv: list[str]) -> None:
     source_dataset = source_dataset.rename(
         {RAW_TP_NAME.value: 'total_precipitation'}
     )
+
+  rename_variables = (
+      ast.literal_eval(RENAME_VARIABLES.value)
+      if RENAME_VARIABLES.value
+      else None
+  )
+  if rename_variables:
+    source_dataset = source_dataset.rename(rename_variables)
+    source_chunks = {
+        rename_variables.get(k, k): v for k, v in source_chunks.items()
+    }
 
   for var_name in PREEXISTING_VARIABLES_TO_REMOVE.value:
     if var_name in source_dataset:
