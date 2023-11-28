@@ -21,6 +21,8 @@
     metrics.Bias
     metrics.SpatialBias
     metrics.ACC
+    metrics.SEEPS
+    metrics.SpatialSEEPS
 ```
 
 ### Probabilistic Metrics
@@ -30,13 +32,22 @@
 
     metrics.EnsembleMetric
     metrics.CRPS
+    metrics.SpatialCRPS
     metrics.CRPSSpread
+    metrics.SpatialCRPSSpread
     metrics.CRPSSkill
+    metrics.SpatialCRPSSkill
     metrics.EnsembleStddev
+    metrics.EnsembleVariance
+    metrics.SpatialEnsembleVariance
     metrics.EnsembleMeanRMSE
+    metrics.EnsembleMeanMSE
+    metrics.SpatialEnsembleMeanMSE
     metrics.EnergyScore
     metrics.EnergyScoreSpread
     metrics.EnergyScoreSkill
+    metrics.RankHistogram
+    metrics.GaussianCRPS
 ```
 
 ## Config
@@ -63,6 +74,7 @@
     regions.SliceRegion
     regions.ExtraTropicalRegion
     regions.LandRegion
+    regions.CombinedRegion
 ```
 
 ## Derived Variables
@@ -73,6 +85,18 @@
 
     derived_variables.DerivedVariable
     derived_variables.WindSpeed
+    derived_variables.WindDivergence
+    derived_variables.WindVorticity
+    derived_variables.VerticalVelocity
+    derived_variables.EddyKineticEnergy
+    derived_variables.GeostrophicWindSpeed
+    derived_variables.AgeostrophicWindSpeed
+    derived_variables.UComponentOfAgeostrophicWind
+    derived_variables.VComponentOfAgeostrophicWind
+    derived_variables.LapseRate
+    derived_variables.TotalColumnWater
+    derived_variables.IntegratedWaterTransport
+    derived_variables.RelativeHumidity
     derived_variables.PrecipitationAccumulation
     derived_variables.AggregatePrecipitationAccumulation
     derived_variables.ZonalEnergySpectrum

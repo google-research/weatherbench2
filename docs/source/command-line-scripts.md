@@ -19,7 +19,9 @@ usage: evaluate.py [-h]
                          [--probabilistic_climatology_start_year PROBABILISTIC_CLIMATOLOGY_START_YEAR] 
                          [--probabilistic_climatology_end_year PROBABILISTIC_CLIMATOLOGY_END_YEAR] 
                          [--probabilistic_climatology_hour_interval PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL]
-                         [--add_land_region]
+                         [--regions REGIONS]
+                         [--lsm_dataset LSM_DATASET]
+                         [--compute_seeps]
                          [--eval_configs EVAL_CONFIGS]
                          [--ensemble_dim ENSEMBLE_DIM]
                          [--rename_variables RENAME_VARIABLES]
@@ -53,7 +55,9 @@ _Command options_:
       for probabilistic climatology
 * `--probabilistic_climatology_hour_interval`: Hour interval to compute 
       probabilistic climatology. Default: 6
-* `--add_land_region`: Add land-only evaluation. `land_sea_mask` must be in observation dataset.
+* `--regions`: Comma delimited list of predefined regions to evaluate. "all" for all predefined regions.
+* `--lsm_dataset`: Dataset containing land-sea-mask at same resolution of datasets to be evaluated. Required if region with land-sea-mask is picked. If None, defaults to observation dataset.
+* `--compute_seeps`: Compute SEEPS for total_precipitation.
 * `--eval_configs`: Comma-separated list of evaluation configs to run. See details below. Default: `deterministic`
 * `--ensemble_dim`: Ensemble dimension name for ensemble metrics. Default: `number`.
 * `--rename_variables`: Dictionary of variable to rename to standard names. E.g. {"2t": "2m_temperature"}
@@ -70,59 +74,8 @@ _Command options_:
 * `--beam_runner`: Beam runner
 * `--fanout`: Beam CombineFn fanout. Might be required for large dataset. Default: `None`
 
-*Predefined evaluation configs*
+[Predefined evaluation configs](https://github.com/google-research/weatherbench2/blob/main/scripts/evaluate.py#L389)
 
-```
-deterministic_metrics = {
-  'rmse': RMSE(wind_vector_rmse=_wind_vector_rmse()),
-  'mse': MSE(),
-  'acc': ACC(climatology=climatology),
-}
-
-eval_configs = {
-  'deterministic': config.Eval(
-      metrics=deterministic_metrics,
-      against_analysis=False,
-      regions=regions,
-      derived_variables=derived_variables,
-      evaluate_persistence=EVALUATE_PERSISTENCE.value,
-      evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
-  ),
-  'deterministic_spatial': config.Eval(
-      metrics={'bias': SpatialBias(), 'mse': SpatialMSE()},
-      against_analysis=False,
-      derived_variables=derived_variables,
-      evaluate_persistence=EVALUATE_PERSISTENCE.value,
-      evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
-  ),
-  'deterministic_temporal': config.Eval(
-      metrics=deterministic_metrics,
-      against_analysis=False,
-      regions=regions,
-      derived_variables=derived_variables,
-      evaluate_persistence=EVALUATE_PERSISTENCE.value,
-      evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
-      temporal_mean=False,
-  ),
-  'probabilistic': config.Eval(
-      metrics={
-          'crps': CRPS(ensemble_dim=ENSEMBLE_DIM.value),
-          'ensemble_mean_rmse': EnsembleMeanRMSE(
-              ensemble_dim=ENSEMBLE_DIM.value
-          ),
-          'ensemble_stddev': EnsembleStddev(
-              ensemble_dim=ENSEMBLE_DIM.value
-          ),
-      },
-      against_analysis=False,
-      derived_variables=derived_variables,
-      evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
-      probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
-      probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
-      probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
-  ),
-}
-```
 
 *Example*
 
@@ -149,6 +102,7 @@ This scripts computes a day-of-year, hour-of-day climatology with optional smoot
 usage: compute_climatology.py [-h] 
                                   [--input_path INPUT_PATH] 
                                   [--output_path OUTPUT_PATH]
+                                  [--frequency FREQUENCY]
                                   [--hour_interval HOUR_INTERVAL] 
                                   [--window_size WINDOW_SIZE] 
                                   [--start_year START_YEAR] 
@@ -160,7 +114,7 @@ usage: compute_climatology.py [-h]
                                   [--add_statistic_suffix]
                                   [--method METHOD]
                                   [--seeps_dry_threshold_mm SEEPS_DRY_THRESHOLD_MM]
-                                  [--beam_runner BEAM_RUNNER]
+                                  [--runner RUNNER]
 
 ```
 
@@ -168,6 +122,7 @@ _Command options_:
 
 * `--input_path`: (required) Input Zarr path
 * `--output_path`: (required) Output Zarr path
+* `--frequency`: Frequency of the computed climatology. "hourly": Compute the climatology per day of year and hour of day. "daily": Compute the climatology per day of year.
 * `--hour_interval`: Which intervals to compute hourly climatology for. Default: `1`
 * `--window_size`: Window size in days to average over. Default: `61` 
 * `--start_year`: Inclusive start year of climatology. Default: `1990`
@@ -179,7 +134,7 @@ _Command options_:
 * `--add_statistic_suffix`: Add suffix of statistic to variable name. Required for >1 statistic.
 * `--method`: Computation method to use. "explicit": Stack years first, apply rolling and then compute weighted statistic over (year, rolling_window). "fast": Compute statistic over day-of-year first and then apply weighted smoothing. Mathematically equivalent for mean but different for nonlinear statistics. Default: `explicit`
 * `--seeps_dry_threshold_mm`: Dict defining dry threshold for SEEPS quantile computation for each precipitation variable. In mm. Default: `"{'total_precipitation_24hr':0.25, 'total_precipitation_6hr':0.1}"`
-* `--beam_runner`: Beam runner. Use `DirectRunner` for local execution.
+* `--runner`: Beam runner. Use `DirectRunner` for local execution.
 
 *Example*
 
@@ -203,9 +158,11 @@ Computes derived variables, adds them to the original dataset and saves it as a 
 usage: compute_derived_variables.py [-h] 
                                         [--input_path INPUT_PATH] 
                                         [--output_path OUTPUT_PATH]
-                                        [--derived_variables DERIVED_VARIABLES] 
+                                        [--derived_variables DERIVED_VARIABLES]
+                                        [--preexisting_variables_to_remove PREEXISTING_VARIABLES_TO_REMOVE]
                                         [--raw_tp_name RAW_TP_NAME] 
                                         [--rename_raw_tp_name] 
+                                        [--rename_variables RENAME_VARIABLES]
                                         [--working_chunks WORKING_CHUNKS] 
                                         [--rechunk_itemsize RECHUNK_ITEMSIZE] 
                                         [--max_mem_gb MAX_MEM_GB] 
@@ -216,9 +173,11 @@ _Command options_:
 
 * `--input_path`: (required) Input Zarr path
 * `--output_path`: (required) Output Zarr path
-* `--derived_variables`: (required) Comma delimited list of derived variables to compute. Default: `wind_speed,10m_wind_speed,total_precipitation_6hr,total_precipitation_24hr`
+* `--derived_variables`: Comma delimited list of derived variables to compute. By default, tries to compute all derived variables.
+* `--preexisting_variables_to_remove`: Comma delimited list of variables to remove from the source data, if they exist. This is useful to allow for overriding source dataset variables with dervied variables of the same name.
 * `--raw_tp_name`: Raw name of total precipitation variables. Use "total_precipitation_6hr" for backwards compatibility. 
 * `--rename_raw_tp_name`: Rename raw tp name to "total_precipitation".
+* `--rename_variables`: Dictionary of variable to rename to standard names. E.g. {"2t":"2m_temperature"}
 * `--working_chunks`: Chunk sizes overriding input chunks to use for computing aggregations e.g., "longitude=10,latitude=10". No need to add prediction_timedelta=-1, this is automatically added for aggregation variables. Default: `None`, i.e. input chunks
 * `--rechunk_itemsize`: Itemsize for rechunking. Default: `4`
 * `--max_mem_gb`: Max memory for rechunking in GB. Default: `1`
@@ -250,6 +209,7 @@ usage: compute_zonal_energy_spectrum.py [-h]
                                             [--time_stop TIME_STOP] 
                                             [--levels LEVELS] 
                                             [--averaging_dims AVERAGING_DIMS]
+                                            [--fanout FANOUT]
                                             [--runner RUNNER] 
 ```
 
@@ -263,12 +223,13 @@ _Command options_:
 * `--time_stop`: ISO 8601 timestamp (inclusive) at which to stop evaluation. Default: `2020-12-31`
 * `--levels`: Comma delimited list of pressure levels to compute spectra on. If empty, compute on all levels of --input_path. Default: `500,700,850`
 * `--averaging_dims`: Comma delimited list of variables to average over. If empty, do not average. Default: `time`
+* `--fanout`: Beam CombineFn fanout. Might be required for large dataset.
 * `--runner`: Beam runner. Use `DirectRunner` for local execution.
 
 *Example*
 
 ```bash
-python compute_zonal_power_spectrum.py \
+python compute_zonal_energy_spectrum.py \
   --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-240x121_equiangular_with_poles_conservative.zarr  \
   --output_path=PATH \
   --time_start=2020 \
@@ -284,6 +245,9 @@ To use the ensemble mean in deterministic evaluation, we first must compute the 
 usage: compute_ensemble_mean.py [-h] 
                                     [--input_path INPUT_PATH] 
                                     [--output_path OUTPUT_PATH]
+                                    [--time_dim TIME_DIM] 
+                                    [--time_start TIME_START] 
+                                    [--time_stop TIME_STOP] 
                                     [--realization_name REALIZATION_NAME]
                                     [--runner RUNNER] 
 ```
@@ -292,6 +256,9 @@ _Command options_:
 
 * `--input_path`: (required) Input Zarr path
 * `--output_path`: (required) Output Zarr path
+* `--time_dim`: Name for the time dimension to slice data on. Default: `time`
+* `--time_start`: ISO 8601 timestamp (inclusive) at which to start evaluation. Default: `2020-01-01'`
+* `--time_stop`: ISO 8601 timestamp (inclusive) at which to stop evaluation. Default: `2020-12-31`
 * `--realization_name`: Name of realization/member/number dimension. Default: `realization`
 * `--runner`: Beam runner. Use `DirectRunner` for local execution.
 
@@ -384,6 +351,83 @@ python regrid.py \
   --regridding_method=conservative
 ```
 
+(compute_averages)=
+## Compute averages
+Computes average over dimensions of a forecast dataset.
+
+```
+usage: compute_averages.py [-h] 
+                 [--input_path INPUT_PATH]
+                 [--output_path OUTPUT_PATH]
+                 [--output_chunks OUTPUT_CHUNKS]
+                 [--time_dim TIME_DIM] 
+                 [--time_start TIME_START] 
+                 [--time_stop TIME_STOP] 
+                 [--variables VARIABLES]
+                 [--fanout FANOUT]
+                 [--runner RUNNER]
+```
+
+_Command options_:
+
+* `--input_path`: (required) Input Zarr path
+* `--output_path`: (required) Output Zarr path
+* `--time_dim`: Name for the time dimension to slice data on. Default: `time`
+* `--time_start`: ISO 8601 timestamp (inclusive) at which to start evaluation. Default: `2020-01-01'`
+* `--time_stop`: ISO 8601 timestamp (inclusive) at which to stop evaluation. Default: `2020-12-31`
+* `--variables`: Comma delimited list of data variables to include in output. If empty, compute on all data_vars of --input_path.
+* `--fanout`: Beam CombineFn fanout. Might be required for large dataset.
+* `--runner`: Beam runner. Use `DirectRunner` for local execution.
+
+*Example*
+
+```bash
+python compute_averages.py \
+    --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/era5/$USER/temperature-vertical-profile.zarr \
+    --runner=DataflowRunner \
+    -- \
+    --project=$PROJECT \
+    --averaging_dims=time,longitude \
+    --variables=temperature \
+    --temp_location=gs://$BUCKET/tmp/ \
+    --setup_file=./setup.py \
+    --requirements_file=./scripts/dataflow-requirements.txt \
+    --job_name=compute-vertical-profile-$USER
+```
+
+(resample_daily)=
+## Resample daily
+Computes average over dimensions of a forecast dataset.
+
+```
+usage: resample_daily.py [-h] 
+                 [--input_path INPUT_PATH]
+                 [--output_path OUTPUT_PATH]
+                 [--method METHOD]
+                 [--period PERIOD]
+                 [--statistics STATISTICS]
+                 [--add_statistic_suffix]
+                 [--num_threads NUM_THREADS]
+                 [--start_year START_YEAR]
+                 [--end_year END_YEAR]
+                 [--working_chunks WORKING_CHUNKS]
+                 [--beam_runner BEAM_RUNNER]
+```
+
+_Command options_:
+
+* `--input_path`: (required) Input Zarr path
+* `--output_path`: (required) Output Zarr path
+* `--method`: resample or roll
+* `--period`: int + d or w
+* `--statistics`: Output resampled time statistics, from "mean", "min", or "max".
+* `--add_statistic_suffix`: Add suffix of statistic to variable name. Required for >1 statistic.
+* `--num_threads`: Number of chunks to load in parallel per worker.
+* `--start_year`: Start year (inclusive).
+* `--end_year`: End year (inclusive).
+* `--working_chunks`: Spatial chunk sizes to use during time downsampling, e.g., "longitude=10,latitude=10". They may not include "time".
+* `--beam_runner`: Beam runner. Use `DirectRunner` for local execution.
 
 ## Expand climatology
 
