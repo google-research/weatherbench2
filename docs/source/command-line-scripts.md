@@ -174,7 +174,7 @@ _Command options_:
 * `--input_path`: (required) Input Zarr path
 * `--output_path`: (required) Output Zarr path
 * `--derived_variables`: Comma delimited list of derived variables to compute. By default, tries to compute all derived variables.
-* `--preexisting_variables_to_remove`: Comma delimited list of variables to remove from the source data, if they exist. This is useful to allow for overriding source dataset variables with dervied variables of the same name.
+* `--preexisting_variables_to_remove`: Comma delimited list of variables to remove from the source data, if they exist. This is useful to allow for overriding source dataset variables with derived variables of the same name.
 * `--raw_tp_name`: Raw name of total precipitation variables. Use "total_precipitation_6hr" for backwards compatibility. 
 * `--rename_raw_tp_name`: Rename raw tp name to "total_precipitation".
 * `--rename_variables`: Dictionary of variable to rename to standard names. E.g. {"2t":"2m_temperature"}
