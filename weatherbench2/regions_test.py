@@ -43,7 +43,7 @@ class RegionsTest(absltest.TestCase):
     lsm = lsm.where(lsm.latitude < 1.0, 1)
     land_region = regions.LandRegion(lsm)
 
-    rmse = metrics.RMSE()
+    rmse = metrics.RMSESqrtBeforeTimeAvg()
 
     results = rmse.compute(forecast, truth, region=land_region)
     np.testing.assert_allclose(results['2m_temperature'].values, 0.0)

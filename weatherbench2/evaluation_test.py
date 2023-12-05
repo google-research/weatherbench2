@@ -86,13 +86,13 @@ class EvaluationTest(absltest.TestCase):
     eval_configs = {
         'forecast_vs_era': config.Eval(
             metrics={
-                'rmse': metrics.RMSE(),
+                'rmse': metrics.RMSESqrtBeforeTimeAvg(),
                 'acc': metrics.ACC(climatology=climatology),
             },
             against_analysis=False,
         ),
         'forecast_vs_era_by_region': config.Eval(
-            metrics={'rmse': metrics.RMSE()},
+            metrics={'rmse': metrics.RMSESqrtBeforeTimeAvg()},
             against_analysis=False,
             regions=regions,
         ),
@@ -101,7 +101,7 @@ class EvaluationTest(absltest.TestCase):
             against_analysis=False,
         ),
         'forecast_vs_era_temporal': config.Eval(
-            metrics={'rmse': metrics.RMSE()},
+            metrics={'rmse': metrics.RMSESqrtBeforeTimeAvg()},
             against_analysis=False,
             temporal_mean=False,
         ),

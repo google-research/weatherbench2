@@ -93,8 +93,8 @@ class WB2Evaluation(absltest.TestCase):
       evaluate.main([])
 
     for config_name in eval_configs:
-      expected_sizes_2d = {'metric': 5, 'lead_time': 4, 'region': 4}
-      expected_sizes_3d = {'metric': 5, 'lead_time': 4, 'region': 4, 'level': 3}
+      expected_sizes_2d = {'metric': 4, 'lead_time': 4, 'region': 4}
+      expected_sizes_3d = {'metric': 4, 'lead_time': 4, 'region': 4, 'level': 3}
 
       with self.subTest(config_name):
         results_path = os.path.join(output_dir, f'{config_name}.nc')

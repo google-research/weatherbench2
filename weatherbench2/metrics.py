@@ -135,8 +135,8 @@ def _spatial_average_l2_norm(
 
 
 @dataclasses.dataclass
-class WindVectorRMSE(Metric):
-  """Compute wind vector RMSE. See WB2 paper for definition.
+class WindVectorMSE(Metric):
+  """Compute wind vector mean square error. See WB2 paper for definition.
 
   Attributes:
     u_name: Name of U component.
@@ -155,25 +155,57 @@ class WindVectorRMSE(Metric):
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
     diff = forecast - truth
-    result = np.sqrt(
-        _spatial_average(
-            diff[self.u_name] ** 2 + diff[self.v_name] ** 2,
-            region=region,
-        )
+    result = _spatial_average(
+        diff[self.u_name] ** 2 + diff[self.v_name] ** 2,
+        region=region,
     )
     return result
 
 
 @dataclasses.dataclass
-class RMSE(Metric):
-  """Root mean squared error.
+class WindVectorRMSESqrtBeforeTimeAvg(Metric):
+  """Compute wind vector RMSE. See WB2 paper for definition.
+
+  This SqrtBeforeTimeAvg metric takes a square root before any time averaging.
+  Most users will prefer to use WindVectorMSE and then take a square root in
+  user code after running the evaluate script.
 
   Attributes:
-    wind_vector_rmse: Optionally provide list of WindVectorRMSE instances to
-      compute.
+    u_name: Name of U component.
+    v_name: Name of V component.
+    vector_name: Name of wind vector to be computed.
   """
 
-  wind_vector_rmse: t.Optional[list[WindVectorRMSE]] = None
+  u_name: str
+  v_name: str
+  vector_name: str
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    mse = WindVectorMSE(
+        u_name=self.u_name, v_name=self.v_name, vector_name=self.vector_name
+    ).compute_chunk(forecast, truth, region=region)
+    return np.sqrt(mse)
+
+
+@dataclasses.dataclass
+class RMSESqrtBeforeTimeAvg(Metric):
+  """Root mean squared error.
+
+  This SqrtBeforeTimeAvg metric takes a square root before any time averaging.
+  Most users will prefer to use MSE and then take a square root in user
+  code after running the evaluate script.
+
+  Attributes:
+    wind_vector_rmse: Optionally provide list of WindVectorRMSESqrtBeforeTimeAvg
+      instances to compute.
+  """
+
+  wind_vector_rmse: t.Optional[list[WindVectorRMSESqrtBeforeTimeAvg]] = None
 
   def compute_chunk(
       self,
@@ -192,7 +224,14 @@ class RMSE(Metric):
 
 @dataclasses.dataclass
 class MSE(Metric):
-  """Mean squared error."""
+  """Mean squared error.
+
+  Attributes:
+    wind_vector_mse: Optionally provide list of WindVectorMSE instances to
+      compute.
+  """
+
+  wind_vector_mse: t.Optional[list[WindVectorMSE]] = None
 
   def compute_chunk(
       self,
@@ -200,7 +239,13 @@ class MSE(Metric):
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
-    return _spatial_average((forecast - truth) ** 2, region=region)
+    results = _spatial_average((forecast - truth) ** 2, region=region)
+    if self.wind_vector_mse is not None:
+      for wv in self.wind_vector_mse:
+        results[wv.vector_name] = wv.compute_chunk(
+            forecast, truth, region=region
+        )
+    return results
 
 
 @dataclasses.dataclass
@@ -717,14 +762,15 @@ def _pointwise_gaussian_crps(
 
 
 @dataclasses.dataclass
-class EnsembleStddev(EnsembleMetric):
+class EnsembleStddevSqrtBeforeTimeAvg(EnsembleMetric):
   """The standard deviation of an ensemble of forecasts.
 
-  This forms the SPREAD component of the traditional spread-skill-ratio. See
-  [Garg & Rasp & Thuerey, 2022].
+  This SqrtBeforeTimeAvg metric takes a square root before any time averaging.
+  Most users will prefer to use EnsembleVariance and then take a square root in
+  user code after running the evaluate script.
 
   Given predictive ensemble Xₜ at times t = (1,..., T),
-    EnsembleStddev := (1 / T) Σₜ ‖σ(Xₜ)‖
+    EnsembleStddevSqrtBeforeTimeAvg := (1 / T) Σₜ ‖σ(Xₜ)‖
   Above σ(Xₜ) is element-wise standard deviation, and ‖⋅‖ is an area-weighted
   L2 norm.
 
@@ -737,15 +783,6 @@ class EnsembleStddev(EnsembleMetric):
 
   NaN values propagate through and result in NaN in the corresponding output
   position.
-
-  We use the unbiased estimator of σ(Xₜ) (dividing by n_ensemble - 1). If
-  n_ensemble = 1, we return zero for the stddev. This choice allows
-  EnsembleStddev to behave in the spread-skill-ratio as expected.
-
-  References:
-  [Garg & Rasp & Thuerey, 2022], WeatherBench Probability: A benchmark dataset
-    for probabilistic medium-range weather forecasting along with deep learning
-    baseline models.
   """
 
   def compute_chunk(
@@ -754,7 +791,7 @@ class EnsembleStddev(EnsembleMetric):
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
-    """EnsembleStddev, averaged over space, for a time chunk of data."""
+    """Ensemble Stddev, averaged over space, for a time chunk of data."""
     del truth  # unused
     n_ensemble = _get_n_ensemble(forecast, self.ensemble_dim)
 
@@ -825,15 +862,16 @@ class SpatialEnsembleVariance(EnsembleMetric):
 
 
 @dataclasses.dataclass
-class EnsembleMeanRMSE(EnsembleMetric):
+class EnsembleMeanRMSESqrtBeforeTimeAvg(EnsembleMetric):
   """RMSE between the ensemble mean and ground truth.
 
-  This forms the SKILL component of the traditional spread-skill-ratio. See
-  [Garg & Rasp & Thuerey, 2022].
+  This SqrtBeforeTimeAvg metric takes a square root before any time averaging.
+  Most users will prefer to use EnsembleMeanMSE and then take a square root in
+  user code after running the evaluate script.
 
   Given ground truth Yₜ, and predictive ensemble Xₜ, both at times
   t = (1,..., T),
-    EnsembleMeanRMSE := (1 / T) Σₜ ‖Y - E(Xₜ)‖.
+    EnsembleMeanRMSESqrtBeforeTimeAvg := (1 / T) Σₜ ‖Y - E(Xₜ)‖.
   Above, `E` is ensemble average, and ‖⋅‖ is an area-weighted L2 norm.
 
   Estimation is done separately for each tendency, level, and lag time.
@@ -845,11 +883,6 @@ class EnsembleMeanRMSE(EnsembleMetric):
 
   NaN values propagate through and result in NaN in the corresponding output
   position.
-
-  References:
-  [Garg & Rasp & Thuerey, 2022], WeatherBench Probability: A benchmark dataset
-    for probabilistic medium-range weather forecasting along with deep learning
-    baseline models.
   """
 
   def compute_chunk(
@@ -1005,7 +1038,7 @@ class EnergyScoreSkill(EnsembleMetric):
 
 
 # TODO(shoyer): Consider adding WindVectorEnergyScore based on a pair of wind
-# components, as a sort of probabilistic variant of WindVectorRMSE.
+# components, as a sort of probabilistic variant of WindVectorMSE.
 
 
 @dataclasses.dataclass
