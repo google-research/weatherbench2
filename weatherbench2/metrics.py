@@ -335,8 +335,17 @@ class ACC(Metric):
       time_dim = "time"
     try:
       climatology_chunk = self.climatology[list(forecast.keys())]
-    except KeyError:
+    except KeyError as e:
+      not_found = set(forecast.keys()).difference(self.climatology.data_vars)
       clim_var_dict = {key + "_mean": key for key in forecast.keys()}  # pytype: disable=unsupported-operands
+      not_found_means = set(clim_var_dict).difference(
+          self.climatology.data_vars
+      )
+      if not_found and not_found_means:
+        raise KeyError(
+            f"Did not find {not_found} forecast keys in climatology. Appending "
+            "'mean' did not help"
+        ) from e
       climatology_chunk = self.climatology[list(clim_var_dict.keys())].rename(
           clim_var_dict
       )
