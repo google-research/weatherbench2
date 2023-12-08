@@ -355,13 +355,15 @@ def main(argv: list[str]) -> None:
   climatology = evaluation.make_latitude_increasing(climatology)
 
   deterministic_metrics = {
-      'rmse': metrics.RMSESqrtBeforeTimeAvg(
-          wind_vector_rmse=_wind_vector_error('rmse')
-      ),
       'mse': metrics.MSE(wind_vector_mse=_wind_vector_error('mse')),
       'acc': metrics.ACC(climatology=climatology),
       'bias': metrics.Bias(),
       'mae': metrics.MAE(),
+  }
+  rmse_metrics = {
+      'rmse_sqrt_before_time_avg': metrics.RMSESqrtBeforeTimeAvg(
+          wind_vector_rmse=_wind_vector_error('rmse')
+      ),
   }
   spatial_metrics = {
       'bias': metrics.SpatialBias(),
@@ -412,7 +414,7 @@ def main(argv: list[str]) -> None:
           output_format='zarr',
       ),
       'deterministic_temporal': config.Eval(
-          metrics=deterministic_metrics,
+          metrics=deterministic_metrics | rmse_metrics,
           against_analysis=False,
           regions=regions,
           derived_variables=derived_variables,
@@ -435,13 +437,7 @@ def main(argv: list[str]) -> None:
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
               'crps_skill': metrics.CRPSSkill(ensemble_dim=ENSEMBLE_DIM.value),
-              'ensemble_mean_rmse': metrics.EnsembleMeanRMSESqrtBeforeTimeAvg(
-                  ensemble_dim=ENSEMBLE_DIM.value
-              ),
               'ensemble_mean_mse': metrics.EnsembleMeanMSE(
-                  ensemble_dim=ENSEMBLE_DIM.value
-              ),
-              'ensemble_stddev': metrics.EnsembleStddevSqrtBeforeTimeAvg(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
               'ensemble_variance': metrics.EnsembleVariance(
@@ -466,6 +462,16 @@ def main(argv: list[str]) -> None:
               ),
               'energy_score_skill': metrics.EnergyScoreSkill(
                   ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'ensemble_mean_rmse_sqrt_before_time_avg': (
+                  metrics.EnsembleMeanRMSESqrtBeforeTimeAvg(
+                      ensemble_dim=ENSEMBLE_DIM.value
+                  )
+              ),
+              'ensemble_stddev_sqrt_before_time_avg': (
+                  metrics.EnsembleStddevSqrtBeforeTimeAvg(
+                      ensemble_dim=ENSEMBLE_DIM.value
+                  )
               ),
           },
           against_analysis=False,
