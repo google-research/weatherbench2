@@ -70,7 +70,7 @@ class MetricsTest(parameterized.TestCase):
     xr.testing.assert_allclose(expected, weights)
 
   def test_wind_vector_rmse(self):
-    wv = metrics.WindVectorRMSE(
+    wv = metrics.WindVectorRMSESqrtBeforeTimeAvg(
         u_name='u_component_of_wind',
         v_name='v_component_of_wind',
         vector_name='wind_vector',
@@ -119,7 +119,7 @@ class MetricsTest(parameterized.TestCase):
       dict(testcase_name='nan', invalid_value=np.nan),
   )
   def test_rmse_over_invalid_region(self, invalid_value):
-    rmse = metrics.RMSE()
+    rmse = metrics.RMSESqrtBeforeTimeAvg()
     truth = xr.Dataset(
         {'wind_speed': ('latitude', [0.0, invalid_value, 0.0])},
         coords={'latitude': [-45, 0, 45]},
@@ -460,8 +460,12 @@ class EnsembleMeanRMSEAndStddevTest(parameterized.TestCase):
   def test_on_random_dataset(self, ensemble_size):
     truth, forecast = get_random_truth_and_forecast(ensemble_size=ensemble_size)
 
-    rmse = metrics.EnsembleMeanRMSE().compute_chunk(forecast, truth)
-    ensemble_stddev = metrics.EnsembleStddev().compute_chunk(forecast, truth)
+    rmse = metrics.EnsembleMeanRMSESqrtBeforeTimeAvg().compute_chunk(
+        forecast, truth
+    )
+    ensemble_stddev = metrics.EnsembleStddevSqrtBeforeTimeAvg().compute_chunk(
+        forecast, truth
+    )
 
     for dataset in [rmse, ensemble_stddev]:
       self.assertEqual(
@@ -496,7 +500,11 @@ class EnsembleMeanRMSEAndStddevTest(parameterized.TestCase):
     truth, forecast = get_random_truth_and_forecast(ensemble_size=10)
     truth += 1000
 
-    mean_rmse = metrics.EnsembleMeanRMSE().compute_chunk(forecast, truth).mean()
+    mean_rmse = (
+        metrics.EnsembleMeanRMSESqrtBeforeTimeAvg()
+        .compute_chunk(forecast, truth)
+        .mean()
+    )
 
     # Dominated by bias of 1000
     np.testing.assert_allclose(1000, mean_rmse.geopotential.values, rtol=1e-3)
@@ -504,7 +512,11 @@ class EnsembleMeanRMSEAndStddevTest(parameterized.TestCase):
   def test_perfect_prediction_zero_rmse(self):
     truth, unused_forecast = get_random_truth_and_forecast(ensemble_size=10)
     forecast = truth.expand_dims({metrics.REALIZATION: 1})
-    mean_rmse = metrics.EnsembleMeanRMSE().compute_chunk(forecast, truth).mean()
+    mean_rmse = (
+        metrics.EnsembleMeanRMSESqrtBeforeTimeAvg()
+        .compute_chunk(forecast, truth)
+        .mean()
+    )
 
     xr.testing.assert_allclose(xr.zeros_like(mean_rmse), mean_rmse)
 

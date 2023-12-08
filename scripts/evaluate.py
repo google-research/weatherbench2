@@ -229,9 +229,15 @@ FANOUT = flags.DEFINE_integer(
 )
 
 
-def _wind_vector_rmse():
-  """Defines Wind Vector RMSEs if U/V components are in variables."""
-  wind_vector_rmse = []
+def _wind_vector_error(err_type: str):
+  """Defines Wind Vector [R]MSEs if U/V components are in variables."""
+  if err_type == 'mse':
+    cls = metrics.WindVectorMSE
+  elif err_type == 'rmse':
+    cls = metrics.WindVectorRMSESqrtBeforeTimeAvg
+  else:
+    raise ValueError(f'Unrecognized {err_type=}')
+  wind_vector_error = []
   available = set(VARIABLES.value).union(DERIVED_VARIABLES.value)
   for u_name, v_name, vector_name in [
       ('u_component_of_wind', 'v_component_of_wind', 'wind_vector'),
@@ -248,14 +254,14 @@ def _wind_vector_rmse():
       ),
   ]:
     if u_name in available and v_name in available:
-      wind_vector_rmse.append(
-          metrics.WindVectorRMSE(
+      wind_vector_error.append(
+          cls(
               u_name=u_name,
               v_name=v_name,
               vector_name=vector_name,
           )
       )
-  return wind_vector_rmse
+  return wind_vector_error
 
 
 def main(argv: list[str]) -> None:
@@ -349,8 +355,10 @@ def main(argv: list[str]) -> None:
   climatology = evaluation.make_latitude_increasing(climatology)
 
   deterministic_metrics = {
-      'rmse': metrics.RMSE(wind_vector_rmse=_wind_vector_rmse()),
-      'mse': metrics.MSE(),
+      'rmse': metrics.RMSESqrtBeforeTimeAvg(
+          wind_vector_rmse=_wind_vector_error('rmse')
+      ),
+      'mse': metrics.MSE(wind_vector_mse=_wind_vector_error('mse')),
       'acc': metrics.ACC(climatology=climatology),
       'bias': metrics.Bias(),
       'mae': metrics.MAE(),
@@ -427,13 +435,13 @@ def main(argv: list[str]) -> None:
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
               'crps_skill': metrics.CRPSSkill(ensemble_dim=ENSEMBLE_DIM.value),
-              'ensemble_mean_rmse': metrics.EnsembleMeanRMSE(
+              'ensemble_mean_rmse': metrics.EnsembleMeanRMSESqrtBeforeTimeAvg(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
               'ensemble_mean_mse': metrics.EnsembleMeanMSE(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
-              'ensemble_stddev': metrics.EnsembleStddev(
+              'ensemble_stddev': metrics.EnsembleStddevSqrtBeforeTimeAvg(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
               'ensemble_variance': metrics.EnsembleVariance(
