@@ -337,6 +337,12 @@ def main(argv: list[str]) -> None:
                 LandRegion(land_sea_mask=land_sea_mask),
             ]
         ),
+        'tropics_land': CombinedRegion(
+            regions=[
+                SliceRegion(lat_slice=slice(-20, 20)),
+                LandRegion(land_sea_mask=land_sea_mask),
+            ]
+        ),
     }
     predefined_regions = predefined_regions | land_regions
   except KeyError:
