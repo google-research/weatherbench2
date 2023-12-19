@@ -258,6 +258,45 @@ class GaussianCRPSTest(parameterized.TestCase):
     expected = np.array([0.23385455, 0.23385455])
     np.testing.assert_allclose(result['2m_temperature'].values, expected)
 
+  def test_convergence_gaussian_crps(self):
+    """Tests that the ensemble CRPS converges to analytical formula."""
+    forecast = schema.mock_forecast_data(
+        variables_3d=[],
+        variables_2d=['2m_temperature', '2m_temperature_std'],
+        time_start='2022-01-01',
+        time_stop='2022-01-02',
+        lead_stop='1 day',
+    )
+    ens_forecast = schema.mock_forecast_data(
+        variables_3d=[],
+        variables_2d=['2m_temperature'],
+        time_start='2022-01-01',
+        time_stop='2022-01-02',
+        lead_stop='1 day',
+        ensemble_size=5000,
+    )
+    truth = schema.mock_truth_data(
+        variables_3d=[],
+        variables_2d=['2m_temperature'],
+        time_start='2022-01-01',
+        time_stop='2022-01-20',
+    )
+    forecast['2m_temperature'] = forecast['2m_temperature'] + 0.1
+    forecast['2m_temperature_std'] = forecast['2m_temperature_std'] + 1.0
+    ens_forecast['2m_temperature'] = (
+        ens_forecast['2m_temperature']
+        + np.random.randn(*ens_forecast['2m_temperature'].shape)
+        + 0.1
+    )
+
+    result = metrics.GaussianCRPS().compute(forecast, truth)
+    result2 = metrics.CRPS().compute(ens_forecast, truth)
+    np.testing.assert_allclose(
+        result['2m_temperature'].values,
+        result2['2m_temperature'].values,
+        rtol=2e-2,
+    )
+
 
 class GaussianVarianceTest(parameterized.TestCase):
 
