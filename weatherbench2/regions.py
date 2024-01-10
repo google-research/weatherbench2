@@ -38,13 +38,14 @@ class Region:
   """
 
   def apply(
-      self, dataset: xr.Dataset, weights: xr.DataArray
+      self, dataset: xr.Dataset, weights: xr.DataArray, **kwargs
   ) -> tuple[xr.Dataset, xr.DataArray]:
     """Apply region selection to dataset and/or weights.
 
     Args:
       dataset: Spatial metric, i.e. RMSE
       weights: Weights dataset, i.e. latitude weights
+      **kwargs: Arguments for specific regions
 
     Returns:
       dataset: Potentially modified (sliced) dataset.
@@ -56,7 +57,14 @@ class Region:
 
 @dataclasses.dataclass
 class SliceRegion(Region):
-  """Latitude-longitude box selection."""
+  """Latitude-longitude box selection.
+
+  Attributes:
+    lat_slice: One or more latitude slices to be included in evaluation.
+    lon_slice: One or more longitude slices to be included in evaluation.
+    above_ground_climatology: (Optional) Mask for above ground regions with
+      level dimension.
+  """
 
   lat_slice: t.Optional[t.Union[slice, list[slice]]] = dataclasses.field(
       default_factory=lambda: slice(None, None)
@@ -64,6 +72,7 @@ class SliceRegion(Region):
   lon_slice: t.Optional[t.Union[slice, list[slice]]] = dataclasses.field(
       default_factory=lambda: slice(None, None)
   )
+  above_ground_climatology: t.Optional[xr.DataArray] = None
 
   def apply(  # pytype: disable=signature-mismatch
       self, dataset: xr.Dataset, weights: xr.DataArray
@@ -83,12 +92,35 @@ class SliceRegion(Region):
         [dataset.longitude.sel(longitude=s) for s in lons], dim='longitude'
     )
 
+    if self.above_ground_climatology is not None:
+      time_selection = dict(dayofyear=dataset['valid_time'].dt.dayofyear)
+      if 'hour' in set(self.above_ground_climatology.coords):
+        time_selection['hour'] = dataset['valid_time'].dt.hour
+      above_ground_weights = self.above_ground_climatology.sel(
+          time_selection
+      ).compute()
+
+      # Above ground weights depend on level
+      # Need to explicitly add weights only for 3D variables
+      if isinstance(dataset, xr.Dataset):
+        above_ground_weights_per_var = xr.Dataset()
+        for v in dataset:
+          if 'level' in dataset[v].dims:
+            above_ground_weights_per_var[v] = above_ground_weights
+          else:  # No weights necessary for 2D variables
+            above_ground_weights_per_var[v] = xr.ones_like(dataset[v])
+      else:
+        if 'level' in dataset.dims:
+          above_ground_weights_per_var = above_ground_weights
+        else:  # No weights necessary for 2D variables
+          above_ground_weights_per_var = xr.ones_like(dataset)
+      weights = weights * above_ground_weights_per_var
+
     weight_indexers = {}
     if 'latitude' in weights.dims:
       weight_indexers['latitude'] = lats
     if 'longitude' in weights.dims:
       weight_indexers['longitude'] = lons
-
     return (
         dataset.sel(latitude=lats, longitude=lons),
         weights.sel(weight_indexers),
@@ -102,7 +134,7 @@ class ExtraTropicalRegion(Region):
   threshold_lat: t.Optional[float] = 20
 
   def apply(  # pytype: disable=signature-mismatch
-      self, dataset: xr.Dataset, weights: xr.DataArray
+      self, dataset: xr.Dataset, weights: xr.DataArray, **kwargs
   ) -> tuple[xr.Dataset, xr.DataArray]:
     """Returns weights multiplied with a boolean mask to exclude tropics."""
     region_weights = (np.abs(dataset.latitude) >= 20).astype(float)
@@ -124,7 +156,7 @@ class LandRegion(Region):
   threshold: t.Optional[float] = None
 
   def apply(  # pytype: disable=signature-mismatch
-      self, dataset: xr.Dataset, weights: xr.DataArray
+      self, dataset: xr.Dataset, weights: xr.DataArray, **kwargs
   ) -> tuple[xr.Dataset, xr.DataArray]:
     """Returns weights multiplied with a boolean land mask."""
     land_weights = self.land_sea_mask
@@ -151,8 +183,8 @@ class CombinedRegion(Region):
   regions: list[Region] = dataclasses.field(default_factory=list)
 
   def apply(  # pytype: disable=signature-mismatch
-      self, dataset: xr.Dataset, weights: xr.DataArray
+      self, dataset: xr.Dataset, weights: xr.DataArray, **kwargs
   ) -> tuple[xr.Dataset, xr.DataArray]:
     for region in self.regions:
-      dataset, weights = region.apply(dataset, weights)
+      dataset, weights = region.apply(dataset, weights, **kwargs)
     return dataset, weights

@@ -713,6 +713,23 @@ class AggregatePrecipitationAccumulation(DerivedVariable):
     return accumulation
 
 
+@dataclasses.dataclass
+class AboveGround(DerivedVariable):
+  """Computes whether grid point is above ground."""
+
+  @property
+  def base_variables(self):
+    return ['geopotential', 'geopotential_at_surface']
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return ([], []), []
+
+  def compute(self, dataset: xr.Dataset):
+    above_ground = dataset['geopotential'] >= dataset['geopotential_at_surface']
+    return above_ground.astype('float32')
+
+
 # Specify dictionary of common derived variables
 DERIVED_VARIABLE_DICT = {
     'wind_speed': WindSpeed(
@@ -757,4 +774,5 @@ DERIVED_VARIABLE_DICT = {
         accumulation_hours=24,
         lead_time_name='prediction_timedelta',
     ),
+    'above_ground': AboveGround(),
 }
