@@ -35,6 +35,8 @@ class Selection:
     levels: List of pressure levels.
     lat_slice: Latitude range in degrees.
     lon_slice: Longitude range in degrees.
+    aux_variables: Sequence of auxiliary forecast variables required for certain
+      evaluation metrics.
   """
 
   variables: t.Sequence[str]
@@ -46,6 +48,7 @@ class Selection:
   lon_slice: t.Optional[slice] = dataclasses.field(
       default_factory=lambda: slice(None, None)
   )
+  aux_variables: t.Optional[t.Sequence[str]] = None
 
 
 @dataclasses.dataclass
