@@ -174,6 +174,11 @@ VARIABLES = flags.DEFINE_list(
     _DEFAULT_VARIABLES,
     help='Comma delimited list of variables to select from weather.',
 )
+AUX_VARIABLES = flags.DEFINE_list(
+    'aux_variables',
+    None,
+    help='Comma delimited list of auxiliary variables for metric evaluation.',
+)
 DERIVED_VARIABLES = flags.DEFINE_list(
     'derived_variables',
     [],
@@ -268,6 +273,7 @@ def main(argv: list[str]) -> None:
   """Run all WB2 metrics."""
   selection = config.Selection(
       variables=VARIABLES.value,
+      aux_variables=AUX_VARIABLES.value,
       levels=[int(level) for level in LEVELS.value],
       time_slice=slice(TIME_START.value, TIME_STOP.value),
   )
@@ -520,6 +526,15 @@ def main(argv: list[str]) -> None:
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
           probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
           output_format='zarr',
+      ),
+      'gaussian': config.Eval(
+          metrics={
+              'crps': metrics.GaussianCRPS(),
+              'ensemble_variance': metrics.GaussianVariance(),
+          },
+          against_analysis=False,
+          regions=regions,
+          derived_variables=derived_variables,
       ),
   }
   if not set(EVAL_CONFIGS.value.split(',')).issubset(eval_configs):
