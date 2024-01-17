@@ -133,9 +133,9 @@ def compute_relative_metrics(
   return relative
 
 
-def compute_spread_skill_ratio(dataset: xr.Dataset) -> xr.Dataset:
-  spread = dataset.sel(metric='ensemble_stddev')
-  skill = dataset.sel(metric='ensemble_mean_rmse')
+def compute_spread_skill_ratio(da: xr.DataArray) -> xr.DataArray:
+  spread = da.sel(metric='ensemble_stddev')
+  skill = da.sel(metric='ensemble_mean_rmse')
   ratio = spread / skill
   ratio = ratio.where(ratio.lead_time > np.timedelta64(0))
   return ratio

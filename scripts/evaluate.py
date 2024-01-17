@@ -174,6 +174,11 @@ VARIABLES = flags.DEFINE_list(
     _DEFAULT_VARIABLES,
     help='Comma delimited list of variables to select from weather.',
 )
+AUX_VARIABLES = flags.DEFINE_list(
+    'aux_variables',
+    None,
+    help='Comma delimited list of auxiliary variables for metric evaluation.',
+)
 DERIVED_VARIABLES = flags.DEFINE_list(
     'derived_variables',
     [],
@@ -229,9 +234,15 @@ FANOUT = flags.DEFINE_integer(
 )
 
 
-def _wind_vector_rmse():
-  """Defines Wind Vector RMSEs if U/V components are in variables."""
-  wind_vector_rmse = []
+def _wind_vector_error(err_type: str):
+  """Defines Wind Vector [R]MSEs if U/V components are in variables."""
+  if err_type == 'mse':
+    cls = metrics.WindVectorMSE
+  elif err_type == 'rmse':
+    cls = metrics.WindVectorRMSESqrtBeforeTimeAvg
+  else:
+    raise ValueError(f'Unrecognized {err_type=}')
+  wind_vector_error = []
   available = set(VARIABLES.value).union(DERIVED_VARIABLES.value)
   for u_name, v_name, vector_name in [
       ('u_component_of_wind', 'v_component_of_wind', 'wind_vector'),
@@ -248,20 +259,21 @@ def _wind_vector_rmse():
       ),
   ]:
     if u_name in available and v_name in available:
-      wind_vector_rmse.append(
-          metrics.WindVectorRMSE(
+      wind_vector_error.append(
+          cls(
               u_name=u_name,
               v_name=v_name,
               vector_name=vector_name,
           )
       )
-  return wind_vector_rmse
+  return wind_vector_error
 
 
 def main(argv: list[str]) -> None:
   """Run all WB2 metrics."""
   selection = config.Selection(
       variables=VARIABLES.value,
+      aux_variables=AUX_VARIABLES.value,
       levels=[int(level) for level in LEVELS.value],
       time_slice=slice(TIME_START.value, TIME_STOP.value),
   )
@@ -331,6 +343,12 @@ def main(argv: list[str]) -> None:
                 LandRegion(land_sea_mask=land_sea_mask),
             ]
         ),
+        'tropics_land': CombinedRegion(
+            regions=[
+                SliceRegion(lat_slice=slice(-20, 20)),
+                LandRegion(land_sea_mask=land_sea_mask),
+            ]
+        ),
     }
     predefined_regions = predefined_regions | land_regions
   except KeyError:
@@ -349,11 +367,15 @@ def main(argv: list[str]) -> None:
   climatology = evaluation.make_latitude_increasing(climatology)
 
   deterministic_metrics = {
-      'rmse': metrics.RMSE(wind_vector_rmse=_wind_vector_rmse()),
-      'mse': metrics.MSE(),
+      'mse': metrics.MSE(wind_vector_mse=_wind_vector_error('mse')),
       'acc': metrics.ACC(climatology=climatology),
       'bias': metrics.Bias(),
       'mae': metrics.MAE(),
+  }
+  rmse_metrics = {
+      'rmse_sqrt_before_time_avg': metrics.RMSESqrtBeforeTimeAvg(
+          wind_vector_rmse=_wind_vector_error('rmse')
+      ),
   }
   spatial_metrics = {
       'bias': metrics.SpatialBias(),
@@ -404,7 +426,7 @@ def main(argv: list[str]) -> None:
           output_format='zarr',
       ),
       'deterministic_temporal': config.Eval(
-          metrics=deterministic_metrics,
+          metrics=deterministic_metrics | rmse_metrics,
           against_analysis=False,
           regions=regions,
           derived_variables=derived_variables,
@@ -427,13 +449,7 @@ def main(argv: list[str]) -> None:
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
               'crps_skill': metrics.CRPSSkill(ensemble_dim=ENSEMBLE_DIM.value),
-              'ensemble_mean_rmse': metrics.EnsembleMeanRMSE(
-                  ensemble_dim=ENSEMBLE_DIM.value
-              ),
               'ensemble_mean_mse': metrics.EnsembleMeanMSE(
-                  ensemble_dim=ENSEMBLE_DIM.value
-              ),
-              'ensemble_stddev': metrics.EnsembleStddev(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
               'ensemble_variance': metrics.EnsembleVariance(
@@ -458,6 +474,16 @@ def main(argv: list[str]) -> None:
               ),
               'energy_score_skill': metrics.EnergyScoreSkill(
                   ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'ensemble_mean_rmse_sqrt_before_time_avg': (
+                  metrics.EnsembleMeanRMSESqrtBeforeTimeAvg(
+                      ensemble_dim=ENSEMBLE_DIM.value
+                  )
+              ),
+              'ensemble_stddev_sqrt_before_time_avg': (
+                  metrics.EnsembleStddevSqrtBeforeTimeAvg(
+                      ensemble_dim=ENSEMBLE_DIM.value
+                  )
               ),
           },
           against_analysis=False,
@@ -500,6 +526,15 @@ def main(argv: list[str]) -> None:
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
           probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
           output_format='zarr',
+      ),
+      'gaussian': config.Eval(
+          metrics={
+              'crps': metrics.GaussianCRPS(),
+              'ensemble_variance': metrics.GaussianVariance(),
+          },
+          against_analysis=False,
+          regions=regions,
+          derived_variables=derived_variables,
       ),
   }
   if not set(EVAL_CONFIGS.value.split(',')).issubset(eval_configs):

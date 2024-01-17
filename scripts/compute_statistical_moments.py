@@ -154,7 +154,8 @@ def main(argv: list[str]) -> None:
       )
       # Rechunk in time
       pcoll_time = pcoll_tmp | f'RechunkTime_{order}' >> xbeam.Rechunk(
-          space_reduce_template.sizes,
+          # Convert to string to satisfy pytype.
+          {str(k): v for k, v in space_reduce_template.sizes.items()},
           reduce_working_chunks,
           time_working_chunks,
           itemsize=RECHUNK_ITEMSIZE.value,
