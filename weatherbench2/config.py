@@ -16,13 +16,15 @@
 
 import dataclasses
 import typing as t
-
+import numpy as np
+from weatherbench2 import data_readers
 from weatherbench2.derived_variables import DerivedVariable
 from weatherbench2.metrics import Metric
-from weatherbench2.regions import ExtraTropicalRegion
-from weatherbench2.regions import LandRegion
-from weatherbench2.regions import Region
-from weatherbench2.regions import SliceRegion
+# from weatherbench2.regions import ExtraTropicalRegion
+# from weatherbench2.regions import LandRegion
+# from weatherbench2.regions import Region
+# from weatherbench2.regions import SliceRegion
+from weatherbench2.aggregations import Aggregation
 
 
 @dataclasses.dataclass
@@ -35,12 +37,14 @@ class Selection:
     levels: List of pressure levels.
     lat_slice: Latitude range in degrees.
     lon_slice: Longitude range in degrees.
-    aux_variables: Sequence of auxiliary forecast variables required for certain
-      evaluation metrics.
   """
 
   variables: t.Sequence[str]
-  time_slice: slice
+  time_slice: t.Optional[slice] = None
+  time_start: t.Optional[str] = None
+  time_end: t.Optional[str] = None
+  init_frequency: t.Optional[np.timedelta64] = None
+  lead_times: t.Optional[np.ndarray] = None
   levels: t.Optional[t.Sequence[int]] = None
   lat_slice: t.Optional[slice] = dataclasses.field(
       default_factory=lambda: slice(None, None)
@@ -48,7 +52,7 @@ class Selection:
   lon_slice: t.Optional[slice] = dataclasses.field(
       default_factory=lambda: slice(None, None)
   )
-  aux_variables: t.Optional[t.Sequence[str]] = None
+  chunks: t.Optional[t.Mapping[str, int]] = None
 
 
 @dataclasses.dataclass
@@ -63,9 +67,12 @@ class Paths:
     climatology: Path to optional climatology file.
   """
 
-  forecast: str
-  obs: str
   output_dir: str
+  forecast: t.Optional[str] = None
+  obs: t.Optional[str] = None
+  forecast_data_loader: t.Optional[data_readers.DataReader] = None
+  # TODO(srasp): Naming mismatch, obs here, truth in evaluation.py
+  obs_data_loader: t.Optional[data_readers.DataReader] = None
   output_file_prefix: t.Optional[str] = ''
   climatology: t.Optional[str] = None
 
@@ -91,6 +98,33 @@ class Data:
   by_init: t.Optional[bool] = True
   rename_variables: t.Optional[t.Dict[str, str]] = None
   pressure_level_suffixes: t.Optional[bool] = False
+  grid2sparse: t.Optional[bool] = False
+  grid2sparse_method: t.Optional[str] = 'nearest'
+
+  def __post_init__(self):
+    if self.paths.forecast_data_loader is None:
+      self.paths.forecast_data_loader = data_readers.GriddedForecastFromZarr(
+          path=self.paths.forecast,
+          variables=self.selection.variables,
+          rename_variables=self.rename_variables,
+          levels=self.selection.levels,
+          pressure_level_suffixes=self.pressure_level_suffixes,
+      )
+    if self.paths.obs_data_loader is None:
+      self.paths.obs_data_loader = data_readers.GriddedGroundTruthFromZarr(
+          path=self.paths.obs,
+          variables=self.selection.variables,
+          rename_variables=self.rename_variables,
+          levels=self.selection.levels,
+      )
+    if self.selection.time_slice is not None:
+      # Take template from fc file
+      template = self.paths.forecast_data_loader.ds.sel(
+          init_time=self.selection.time_slice
+      )
+      self.selection.template = template
+    else:
+      self.selection.template = None
 
 
 @dataclasses.dataclass
@@ -118,9 +152,10 @@ class Eval:
   """
 
   metrics: t.Dict[str, Metric]
-  regions: t.Optional[
-      t.Dict[str, t.Union[Region, ExtraTropicalRegion, SliceRegion, LandRegion]]
-  ] = None
+  # regions: t.Optional[
+  #     t.Dict[str, t.Union[Region, ExtraTropicalRegion, SliceRegion, LandRegion]]
+  # ] = None
+  aggregations: t.Optional[t.Dict[str, Aggregation]] = None
   evaluate_persistence: t.Optional[bool] = False
   evaluate_climatology: t.Optional[bool] = False
   evaluate_probabilistic_climatology: t.Optional[bool] = False
