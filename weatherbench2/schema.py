@@ -83,6 +83,8 @@ def mock_truth_data(
   dims_3d = ('time', 'level', 'longitude', 'latitude')
   shape_3d = tuple(coords[dim].size for dim in dims_3d)
   data_vars_3d = {k: (dims_3d, np.zeros(shape_3d, dtype)) for k in variables_3d}
+  if not data_vars_3d:
+    del coords['level']
 
   dims_2d = ('time', 'longitude', 'latitude')
   shape_2d = tuple(coords[dim].size for dim in dims_2d)

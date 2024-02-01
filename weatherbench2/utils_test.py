@@ -27,7 +27,7 @@ class UtilsTest(absltest.TestCase):
         variables_2d=['2m_temperature'],
         time_start='2022-01-01',
         time_stop='2023-01-01',
-    ).drop('level')
+    )
     truth = truth + 1 * truth.time.dt.dayofyear
     explicit = utils.compute_hourly_stat(
         truth,
@@ -53,7 +53,7 @@ class UtilsTest(absltest.TestCase):
         time_stop='2005-01-01',
         time_resolution='6h',
         spatial_resolution_in_degrees=90,
-    ).drop('level')
+    )
     clim = utils.make_probabilistic_climatology(
         truth, start_year=2000, end_year=2004, hour_interval=6
     )

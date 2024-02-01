@@ -320,6 +320,48 @@ class GaussianVarianceTest(parameterized.TestCase):
     np.testing.assert_allclose(result['2m_temperature'].values, expected)
 
 
+class GaussianBrierScoreTest(parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      dict(testcase_name='good model', error=0.02, expected=0.04421),
+      dict(testcase_name='poor model', error=1e6, expected=0.70786),
+  )
+  def test_gaussian_brier_score(self, error, expected):
+    kwargs = {
+        'variables_3d': [],
+        'time_start': '2022-01-01',
+        'time_stop': '2022-01-02',
+    }
+    forecast = schema.mock_forecast_data(
+        variables_2d=['2m_temperature', '2m_temperature_std'],
+        lead_stop='1 day',
+        **kwargs
+    )
+    truth = schema.mock_truth_data(variables_2d=['2m_temperature'], **kwargs)
+    truth = truth + 1.0
+    forecast = forecast + 1.0 + error
+
+    climatology_mean = truth.isel(time=0, drop=True).expand_dims(
+        dayofyear=366,
+    )
+    climatology_std = (
+        truth.isel(time=0, drop=True)
+        .expand_dims(
+            dayofyear=366,
+        )
+        .rename({'2m_temperature': '2m_temperature_std'})
+    )
+    climatology = xr.merge([climatology_mean, climatology_std])
+    threshold = 0.8
+    result = metrics.GaussianBrierScore(climatology, threshold).compute(
+        forecast, truth
+    )
+    expected_arr = np.array([expected, expected])
+    np.testing.assert_allclose(
+        result['2m_temperature'].values, expected_arr, rtol=1e-4
+    )
+
+
 class RankHistogramTest(parameterized.TestCase):
 
   @parameterized.named_parameters(

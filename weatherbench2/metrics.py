@@ -56,6 +56,27 @@ def get_lat_weights(ds: xr.Dataset) -> xr.DataArray:
   return weights
 
 
+def _get_climatology_chunk(
+    climatology: xr.Dataset, truth: xr.Dataset
+) -> xr.Dataset:
+  """Returns the climatological mean of the observed true variables."""
+  try:
+    climatology_chunk = climatology[list(truth.keys())]
+  except KeyError as e:
+    not_found = set(truth.keys()).difference(climatology.data_vars)
+    clim_var_dict = {key + "_mean": key for key in truth.keys()}  # pytype: disable=unsupported-operands
+    not_found_means = set(clim_var_dict).difference(climatology.data_vars)
+    if not_found and not_found_means:
+      raise KeyError(
+          f"Did not find {not_found} keys in climatology. Appending "
+          "'mean' did not help."
+      ) from e
+    climatology_chunk = climatology[list(clim_var_dict.keys())].rename(
+        clim_var_dict
+    )
+  return climatology_chunk
+
+
 @dataclasses.dataclass
 class Metric:
   """Base class for metrics."""
@@ -333,22 +354,7 @@ class ACC(Metric):
       time_dim = "valid_time"
     else:
       time_dim = "time"
-    try:
-      climatology_chunk = self.climatology[list(forecast.keys())]
-    except KeyError as e:
-      not_found = set(forecast.keys()).difference(self.climatology.data_vars)
-      clim_var_dict = {key + "_mean": key for key in forecast.keys()}  # pytype: disable=unsupported-operands
-      not_found_means = set(clim_var_dict).difference(
-          self.climatology.data_vars
-      )
-      if not_found and not_found_means:
-        raise KeyError(
-            f"Did not find {not_found} forecast keys in climatology. Appending "
-            "'mean' did not help"
-        ) from e
-      climatology_chunk = self.climatology[list(clim_var_dict.keys())].rename(
-          clim_var_dict
-      )
+    climatology_chunk = _get_climatology_chunk(self.climatology, truth)
     if hasattr(forecast, "level"):
       climatology_chunk = climatology_chunk.sel(level=forecast.level)
     time_selection = dict(dayofyear=forecast[time_dim].dt.dayofyear)
@@ -794,6 +800,92 @@ class GaussianVariance(Metric):
     return _spatial_average(
         xr.Dataset(dataset, coords=forecast.coords),
         region=region,
+    )
+
+
+@dataclasses.dataclass
+class GaussianBrierScore(Metric):
+  """Brier score of a Gaussian forecast for a given binary threshold.
+
+  The Brier score is computed based on the forecast probability of exceedance of
+  a given climatological quantile. The true probability is binarized to 0 or 1.
+
+  The Brier score for the binarized event of exceedance of a given threshold is
+  equal to the Brier score for the opposite event, i.e., the forecast remaining
+  below the threshold.
+
+  References:
+  [Ferro, 2007], Comparing Probabilistic Forecasting Systems with the Brier
+  Score, DOI: https://doi.org/10.1175/WAF1034.1
+
+  Attribute:
+    climatology: Climatology for computing threshold.
+    threshold: Climatological quantile used to binarize predictions and targets.
+
+  Returns:
+    Spatially averaged Brier score for a Gaussian distribution.
+  """
+
+  climatology: xr.Dataset
+  threshold: float
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    if "init_time" in forecast.dims:
+      time_dim = "valid_time"
+    else:
+      time_dim = "time"
+    climatology_chunk = _get_climatology_chunk(self.climatology, truth)
+    clim_std_dict = {key + "_std": key for key in truth.keys()}  # pytype: disable=unsupported-operands
+    try:
+      climatology_std_chunk = self.climatology[
+          list(clim_std_dict.keys())
+      ].rename(clim_std_dict)
+    except KeyError as e:
+      not_found_stds = set(clim_std_dict).difference(self.climatology.data_vars)
+      raise KeyError(
+          f"Did not find {not_found_stds} forecast keys in climatology."
+      ) from e
+
+    if hasattr(forecast, "level"):
+      climatology_chunk = climatology_chunk.sel(level=forecast.level)
+      climatology_std_chunk = climatology_std_chunk.sel(level=forecast.level)
+
+    time_selection = dict(dayofyear=forecast[time_dim].dt.dayofyear)
+    if "hour" in set(climatology_chunk.coords):
+      time_selection["hour"] = forecast[time_dim].dt.hour
+
+    climatology_chunk = climatology_chunk.sel(time_selection).compute()
+    climatology_std_chunk = climatology_std_chunk.sel(time_selection).compute()
+    threshold = (
+        climatology_chunk
+        + stats.norm.ppf(self.threshold) * climatology_std_chunk
+    )
+    truth_probability = xr.where(truth > threshold, 1.0, 0.0)
+
+    var_list = []
+    exceedance_probability = {}
+    for var in forecast.keys():
+      if f"{var}_std" in forecast.keys():
+        var_list.append(var)
+
+    for var_name in var_list:
+      norm_threshold = (threshold[var_name] - forecast[var_name]) / forecast[
+          f"{var_name}_std"
+      ]
+      exceedance_probability[var_name] = 1 - xr.apply_ufunc(
+          stats.norm.cdf, norm_threshold.load()
+      )
+
+    forecast_probability = xr.Dataset(
+        exceedance_probability, coords=forecast.coords
+    )
+    return _spatial_average(
+        (forecast_probability - truth_probability) ** 2, region=region
     )
 
 
