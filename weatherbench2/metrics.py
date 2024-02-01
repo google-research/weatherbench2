@@ -890,6 +890,90 @@ class GaussianBrierScore(Metric):
 
 
 @dataclasses.dataclass
+class GaussianIgnoranceScore(Metric):
+  """Ignorance score of a Gaussian forecast for a given binary threshold.
+
+  The ignorance or logarithmic score is computed based on the forecast
+  probability of exceedance of a given climatological quantile. The true
+  probability is binarized to 0 or 1.
+
+  References:
+  [Benedetti, 2010], Scoring Rules for Forecast Verification,
+  DOI: https://doi.org/10.1175/2009MWR2945.1
+
+  Attribute:
+    climatology: Climatology for computing threshold.
+    threshold: Climatological quantile used to binarize predictions and targets.
+
+  Returns:
+    Spatially averaged ignorance score for a Gaussian distribution.
+  """
+
+  climatology: xr.Dataset
+  threshold: float
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    if "init_time" in forecast.dims:
+      time_dim = "valid_time"
+    else:
+      time_dim = "time"
+    climatology_chunk = _get_climatology_chunk(self.climatology, truth)
+    clim_std_dict = {key + "_std": key for key in truth.keys()}  # pytype: disable=unsupported-operands
+    try:
+      climatology_std_chunk = self.climatology[
+          list(clim_std_dict.keys())
+      ].rename(clim_std_dict)
+    except KeyError as e:
+      not_found_stds = set(clim_std_dict).difference(self.climatology.data_vars)
+      raise KeyError(
+          f"Did not find {not_found_stds} forecast keys in climatology."
+      ) from e
+
+    if hasattr(forecast, "level"):
+      climatology_chunk = climatology_chunk.sel(level=forecast.level)
+      climatology_std_chunk = climatology_std_chunk.sel(level=forecast.level)
+
+    time_selection = dict(dayofyear=forecast[time_dim].dt.dayofyear)
+    if "hour" in set(climatology_chunk.coords):
+      time_selection["hour"] = forecast[time_dim].dt.hour
+
+    climatology_chunk = climatology_chunk.sel(time_selection).compute()
+    climatology_std_chunk = climatology_std_chunk.sel(time_selection).compute()
+    threshold = (
+        climatology_chunk
+        + stats.norm.ppf(self.threshold) * climatology_std_chunk
+    )
+    truth_probability = xr.where(truth > threshold, 1.0, 0.0)
+
+    var_list = []
+    log_realized_probability = {}
+    for var in forecast.keys():
+      if f"{var}_std" in forecast.keys():
+        var_list.append(var)
+
+    for var_name in var_list:
+      norm_threshold = (threshold[var_name] - forecast[var_name]) / forecast[
+          f"{var_name}_std"
+      ]
+      cdf_value = xr.apply_ufunc(stats.norm.cdf, norm_threshold.load())
+      log_realized_probability[var_name] = -xr.where(
+          truth_probability[var_name],
+          xr.apply_ufunc(np.log, 1 - cdf_value),
+          xr.apply_ufunc(np.log, cdf_value),
+      )
+
+    ignorance_score = xr.Dataset(
+        log_realized_probability, coords=forecast.coords
+    )
+    return _spatial_average(ignorance_score, region=region)
+
+
+@dataclasses.dataclass
 class EnsembleStddevSqrtBeforeTimeAvg(EnsembleMetric):
   """The standard deviation of an ensemble of forecasts.
 
