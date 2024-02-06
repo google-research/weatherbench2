@@ -19,6 +19,7 @@ from weatherbench2 import metrics
 from weatherbench2 import regions
 from weatherbench2 import schema
 from weatherbench2 import test_utils
+from weatherbench2 import thresholds
 from weatherbench2 import utils
 import xarray as xr
 
@@ -352,10 +353,10 @@ class GaussianBrierScoreTest(parameterized.TestCase):
         .rename({'2m_temperature': '2m_temperature_std'})
     )
     climatology = xr.merge([climatology_mean, climatology_std])
-    threshold = 0.8
-    result = metrics.GaussianBrierScore(climatology, threshold).compute(
-        forecast, truth
+    threshold = thresholds.GaussianQuantileThreshold(
+        climatology=climatology, quantile=0.8
     )
+    result = metrics.GaussianBrierScore(threshold).compute(forecast, truth)
     expected_arr = np.array([expected, expected])
     np.testing.assert_allclose(
         result['2m_temperature'].values, expected_arr, rtol=1e-4
@@ -394,10 +395,10 @@ class GaussianIgnoranceScoreTest(parameterized.TestCase):
         .rename({'2m_temperature': '2m_temperature_std'})
     )
     climatology = xr.merge([climatology_mean, climatology_std])
-    threshold = 0.8
-    result = metrics.GaussianIgnoranceScore(climatology, threshold).compute(
-        forecast, truth
+    threshold = thresholds.GaussianQuantileThreshold(
+        climatology=climatology, quantile=0.8
     )
+    result = metrics.GaussianIgnoranceScore(threshold).compute(forecast, truth)
     print('Ignorance score result is', result)
     expected_arr = np.array([expected, expected])
     np.testing.assert_allclose(

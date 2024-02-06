@@ -22,6 +22,7 @@ import typing as t
 
 import numpy as np
 from scipy import stats
+from weatherbench2 import thresholds
 from weatherbench2.regions import Region
 import xarray as xr
 
@@ -826,8 +827,7 @@ class GaussianBrierScore(Metric):
     Spatially averaged Brier score for a Gaussian distribution.
   """
 
-  climatology: xr.Dataset
-  threshold: float
+  threshold: thresholds.Threshold
 
   def compute_chunk(
       self,
@@ -835,36 +835,8 @@ class GaussianBrierScore(Metric):
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
-    if "init_time" in forecast.dims:
-      time_dim = "valid_time"
-    else:
-      time_dim = "time"
-    climatology_chunk = _get_climatology_chunk(self.climatology, truth)
-    clim_std_dict = {key + "_std": key for key in truth.keys()}  # pytype: disable=unsupported-operands
-    try:
-      climatology_std_chunk = self.climatology[
-          list(clim_std_dict.keys())
-      ].rename(clim_std_dict)
-    except KeyError as e:
-      not_found_stds = set(clim_std_dict).difference(self.climatology.data_vars)
-      raise KeyError(
-          f"Did not find {not_found_stds} forecast keys in climatology."
-      ) from e
 
-    if hasattr(forecast, "level"):
-      climatology_chunk = climatology_chunk.sel(level=forecast.level)
-      climatology_std_chunk = climatology_std_chunk.sel(level=forecast.level)
-
-    time_selection = dict(dayofyear=forecast[time_dim].dt.dayofyear)
-    if "hour" in set(climatology_chunk.coords):
-      time_selection["hour"] = forecast[time_dim].dt.hour
-
-    climatology_chunk = climatology_chunk.sel(time_selection).compute()
-    climatology_std_chunk = climatology_std_chunk.sel(time_selection).compute()
-    threshold = (
-        climatology_chunk
-        + stats.norm.ppf(self.threshold) * climatology_std_chunk
-    )
+    threshold = self.threshold.compute(truth)
     truth_probability = xr.where(truth > threshold, 1.0, 0.0)
 
     var_list = []
@@ -909,8 +881,7 @@ class GaussianIgnoranceScore(Metric):
     Spatially averaged ignorance score for a Gaussian distribution.
   """
 
-  climatology: xr.Dataset
-  threshold: float
+  threshold: thresholds.Threshold
 
   def compute_chunk(
       self,
@@ -918,36 +889,8 @@ class GaussianIgnoranceScore(Metric):
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
-    if "init_time" in forecast.dims:
-      time_dim = "valid_time"
-    else:
-      time_dim = "time"
-    climatology_chunk = _get_climatology_chunk(self.climatology, truth)
-    clim_std_dict = {key + "_std": key for key in truth.keys()}  # pytype: disable=unsupported-operands
-    try:
-      climatology_std_chunk = self.climatology[
-          list(clim_std_dict.keys())
-      ].rename(clim_std_dict)
-    except KeyError as e:
-      not_found_stds = set(clim_std_dict).difference(self.climatology.data_vars)
-      raise KeyError(
-          f"Did not find {not_found_stds} forecast keys in climatology."
-      ) from e
 
-    if hasattr(forecast, "level"):
-      climatology_chunk = climatology_chunk.sel(level=forecast.level)
-      climatology_std_chunk = climatology_std_chunk.sel(level=forecast.level)
-
-    time_selection = dict(dayofyear=forecast[time_dim].dt.dayofyear)
-    if "hour" in set(climatology_chunk.coords):
-      time_selection["hour"] = forecast[time_dim].dt.hour
-
-    climatology_chunk = climatology_chunk.sel(time_selection).compute()
-    climatology_std_chunk = climatology_std_chunk.sel(time_selection).compute()
-    threshold = (
-        climatology_chunk
-        + stats.norm.ppf(self.threshold) * climatology_std_chunk
-    )
+    threshold = self.threshold.compute(truth)
     truth_probability = xr.where(truth > threshold, 1.0, 0.0)
 
     var_list = []
