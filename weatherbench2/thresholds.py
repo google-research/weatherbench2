@@ -58,6 +58,32 @@ def _get_climatology_std(
     raise KeyError(f"Did not find {not_found_stds} keys in climatology.") from e
 
 
+def _get_climatology_quantile(
+    climatology: xr.Dataset,
+    variables: abc.Sequence[str],
+    quantile: abc.Sequence[float] | float,
+    atol: float = 0.01,
+) -> xr.Dataset:
+  """Returns climatological quantiles of the given variables."""
+  clim_q_dict = {key + "_quantile": key for key in variables}
+  try:
+    climatology_q = climatology[list(clim_q_dict.keys())].rename(clim_q_dict)
+  except KeyError as e:
+    not_found_qs = set(clim_q_dict).difference(climatology.data_vars)
+    raise KeyError(f"Did not find {not_found_qs} keys in climatology.") from e
+
+  try:
+    climatology_q = climatology_q.sel(
+        quantile=quantile, tolerance=atol, method="nearest"
+    )
+  except KeyError as e:
+    raise KeyError(
+        f"Did not find quantiles {quantile}+-{atol} in climatology."
+        " Consider increasing the tolerance or recomputing the climatology."
+    ) from e
+  return typing.cast(xr.Dataset, climatology_q)
+
+
 @dataclasses.dataclass
 class Threshold:
   """Threshold for discrete probabilistic metric evaluation."""
@@ -76,12 +102,37 @@ class Threshold:
 
 @dataclasses.dataclass
 class QuantileThreshold(Threshold):
-  """Quantile threshold for discrete probabilistic metrics."""
+  """Quantile threshold for discrete probabilistic metrics.
+
+  Attributes:
+    climatology: Dataset containing quantiles of the climatological
+      distribution.
+    quantile: The climatological quantile to be evaluated.
+  """
+
+  climatology: xr.Dataset
+  quantile: float
 
   def compute(self, truth: xr.Dataset) -> xr.Dataset:
     """Computes the threshold for each label variable."""
+    if "time" in truth.dims:
+      time_dim = "time"
+    else:
+      time_dim = "valid_time"
 
-    raise NotImplementedError
+    climatology_chunk = self.climatology
+    if "level" in truth.dims:
+      climatology_chunk = climatology_chunk.sel(level=truth.level)
+
+    time_selection = dict(dayofyear=truth["time"].dt.dayofyear)
+    if "hour" in climatology_chunk.dims:
+      time_selection["hour"] = truth[time_dim].dt.hour
+    climatology_chunk = climatology_chunk.sel(time_selection).compute()
+
+    variables = [str(key) for key in truth.keys()]
+    return _get_climatology_quantile(
+        climatology_chunk, variables, self.quantile
+    )
 
 
 @dataclasses.dataclass
@@ -106,11 +157,11 @@ class GaussianQuantileThreshold(Threshold):
       time_dim = "valid_time"
 
     climatology_chunk = self.climatology
-    if hasattr(truth, "level"):
+    if "level" in truth.dims:
       climatology_chunk = climatology_chunk.sel(level=truth.level)
 
     time_selection = dict(dayofyear=truth["time"].dt.dayofyear)
-    if "hour" in set(climatology_chunk.coords):
+    if "hour" in climatology_chunk.dims:
       time_selection["hour"] = truth[time_dim].dt.hour
     climatology_chunk = climatology_chunk.sel(time_selection).compute()
 

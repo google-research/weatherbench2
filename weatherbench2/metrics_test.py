@@ -324,10 +324,20 @@ class GaussianVarianceTest(parameterized.TestCase):
 class GaussianBrierScoreTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      dict(testcase_name='good model', error=0.02, expected=0.04421),
-      dict(testcase_name='poor model', error=1e6, expected=0.70786),
+      dict(
+          testcase_name='good model',
+          error=0.02,
+          expected_1=0.04421,
+          expected_2=0.257883,
+      ),
+      dict(
+          testcase_name='poor model',
+          error=1e6,
+          expected_1=0.70786,
+          expected_2=0.707861,
+      ),
   )
-  def test_gaussian_brier_score(self, error, expected):
+  def test_gaussian_brier_score(self, error, expected_1, expected_2):
     kwargs = {
         'variables_3d': [],
         'time_start': '2022-01-01',
@@ -352,15 +362,31 @@ class GaussianBrierScoreTest(parameterized.TestCase):
         )
         .rename({'2m_temperature': '2m_temperature_std'})
     )
-    climatology = xr.merge([climatology_mean, climatology_std])
-    threshold = thresholds.GaussianQuantileThreshold(
-        climatology=climatology, quantile=0.8
-    )
-    result = metrics.GaussianBrierScore(threshold).compute(forecast, truth)
-    expected_arr = np.array([expected, expected])
-    np.testing.assert_allclose(
-        result['2m_temperature'].values, expected_arr, rtol=1e-4
-    )
+
+    with self.subTest('GaussianQuantileThreshold'):
+      climatology = xr.merge([climatology_mean, climatology_std])
+      threshold = thresholds.GaussianQuantileThreshold(
+          climatology=climatology, quantile=0.8
+      )
+      result = metrics.GaussianBrierScore(threshold).compute(forecast, truth)
+      expected_arr = np.array([expected_1, expected_1])
+      np.testing.assert_allclose(
+          result['2m_temperature'].values, expected_arr, rtol=1e-4
+      )
+    with self.subTest('QuantileThreshold'):
+      climatology = (
+          truth.isel(time=0, drop=True)
+          .expand_dims(dim={'dayofyear': 366, 'quantile': np.array([0.8])})
+          .rename({'2m_temperature': '2m_temperature_quantile'})
+      )
+      threshold = thresholds.QuantileThreshold(
+          climatology=climatology, quantile=0.8
+      )
+      result = metrics.GaussianBrierScore(threshold).compute(forecast, truth)
+      expected_arr = np.array([expected_2, expected_2])
+      np.testing.assert_allclose(
+          result['2m_temperature'].values, expected_arr, rtol=1e-4
+      )
 
 
 class GaussianIgnoranceScoreTest(parameterized.TestCase):
