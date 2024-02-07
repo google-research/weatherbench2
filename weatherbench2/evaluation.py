@@ -443,6 +443,8 @@ def _evaluate_all_metrics(
         dayofyear=forecast[time_dim].dt.dayofyear,
         hour=forecast[time_dim].dt.hour,
     )
+    if hasattr(truth, 'level'):
+      forecast = forecast.sel(level=truth.level)
   if eval_config.evaluate_probabilistic_climatology:
     probabilistic_climatology = utils.make_probabilistic_climatology(
         truth,
@@ -598,9 +600,12 @@ class _EvaluateAllMetrics(beam.PTransform):
     # Load the data, using a separate thread for each variable
     num_threads = len(variables)
     time_dim = 'valid_time' if self.data_config.by_init else 'time'
-    time_selection = dict(dayofyear=forecast_chunk[time_dim].dt.dayofyear)
+    selection = dict(dayofyear=forecast_chunk[time_dim].dt.dayofyear)
     if 'hour' in set(climatology.coords):
-      time_selection['hour'] = forecast_chunk[time_dim].dt.hour
+      selection['hour'] = forecast_chunk[time_dim].dt.hour
+    if 'level' in set(climatology.coords):
+      selection['level'] = forecast_chunk.level
+
     try:
       climatology_chunk = climatology[variables]
     except KeyError:
@@ -610,7 +615,7 @@ class _EvaluateAllMetrics(beam.PTransform):
       )
 
     climatology_chunk = (
-        climatology_chunk.sel(time_selection)
+        climatology_chunk.sel(selection)
         .chunk()
         .compute(num_workers=num_threads)
     )

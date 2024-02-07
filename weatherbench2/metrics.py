@@ -127,7 +127,9 @@ class Metric:
 
 
 def _spatial_average(
-    dataset: xr.Dataset, region: t.Optional[Region] = None, skipna: bool = False
+    dataset: xr.Dataset,
+    region: t.Optional[Region] = None,
+    skipna: bool = False,
 ) -> xr.Dataset:
   """Compute spatial average after applying region mask.
 
@@ -142,15 +144,33 @@ def _spatial_average(
   weights = get_lat_weights(dataset)
   if region is not None:
     dataset, weights = region.apply(dataset, weights)
+  # If weights is a dataset, e.g. for below-ground masks, weighting needs
+  # to be applied for each variable separately.
+  if isinstance(weights, xr.Dataset):
+    out = xr.Dataset()
+    for v in dataset:
+      # ignore NaN/Inf values in regions with zero weight
+      dataset_per_var = dataset[v].where(weights[v] > 0, 0)
+      out[v] = dataset_per_var.weighted(weights[v]).mean(
+          ["latitude", "longitude"], skipna=skipna
+      )
+    # Return DataArray if only one variable
+    if len(list(out)) == 1:
+      v = list(out)[0]
+      out = out[v]
+  else:
     # ignore NaN/Inf values in regions with zero weight
     dataset = dataset.where(weights > 0, 0)
-  return dataset.weighted(weights).mean(
-      ["latitude", "longitude"], skipna=skipna
-  )
+    out = dataset.weighted(weights).mean(
+        ["latitude", "longitude"], skipna=skipna
+    )
+  return out
 
 
 def _spatial_average_l2_norm(
-    dataset: xr.Dataset, region: t.Optional[Region] = None, skipna: bool = False
+    dataset: xr.Dataset,
+    region: t.Optional[Region] = None,
+    skipna: bool = False,
 ) -> xr.Dataset:
   """Helper function to compute sqrt(spatial_average(ds**2))."""
   return np.sqrt(_spatial_average(dataset**2, region=region, skipna=skipna))
@@ -177,6 +197,7 @@ class WindVectorMSE(Metric):
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
     diff = forecast - truth
+    # import pdb; pdb.set_trace()
     result = _spatial_average(
         diff[self.u_name] ** 2 + diff[self.v_name] ** 2,
         region=region,
@@ -955,12 +976,14 @@ class EnsembleStddevSqrtBeforeTimeAvg(EnsembleMetric):
           # Compute the average, even though we return zeros_like. Why? Because,
           # this will preserve the scalar values of lat/lon coords correctly.
           _spatial_average(forecast, region=region).mean(
-              self.ensemble_dim, skipna=False
+              self.ensemble_dim,
+              skipna=False,
           )
       )
     else:
       return _spatial_average_l2_norm(
-          forecast.std(self.ensemble_dim, ddof=1, skipna=False), region=region
+          forecast.std(self.ensemble_dim, ddof=1, skipna=False),
+          region=region,
       )
 
 
@@ -988,7 +1011,8 @@ class EnsembleVariance(EnsembleMetric):
       )
     else:
       return _spatial_average(
-          forecast.var(self.ensemble_dim, ddof=1, skipna=False), region=region
+          forecast.var(self.ensemble_dim, ddof=1, skipna=False),
+          region=region,
       )
 
 
@@ -1050,7 +1074,8 @@ class EnsembleMeanRMSESqrtBeforeTimeAvg(EnsembleMetric):
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
 
     return _spatial_average_l2_norm(
-        truth - forecast.mean(self.ensemble_dim, skipna=False), region=region
+        truth - forecast.mean(self.ensemble_dim, skipna=False),
+        region=region,
     )
 
 
@@ -1172,6 +1197,7 @@ class EnergyScoreSpread(EnsembleMetric):
       return _spatial_average_l2_norm(
           self._ensemble_slice(forecast, slice(None, -1))
           - self._ensemble_slice(forecast, slice(1, None)),
+          region=region,
       ).mean(self.ensemble_dim, skipna=False)
 
 
@@ -1187,7 +1213,7 @@ class EnergyScoreSkill(EnsembleMetric):
   ) -> xr.Dataset:
     """Energy score skill, averaged over space, for a time chunk of data."""
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
-    return _spatial_average_l2_norm(forecast - truth).mean(
+    return _spatial_average_l2_norm(forecast - truth, region=region).mean(
         self.ensemble_dim, skipna=False
     )
 

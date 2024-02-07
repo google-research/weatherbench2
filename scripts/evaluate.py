@@ -299,36 +299,71 @@ def main(argv: list[str]) -> None:
       pressure_level_suffixes=PRESSURE_LEVEL_SUFFIXES.value,
   )
 
+  # Open climatology for ACC computation
+  climatology = xr.open_zarr(CLIMATOLOGY_PATH.value)
+  climatology = evaluation.make_latitude_increasing(climatology)
+
   # Default regions
+  above_ground_climatology = climatology['above_ground'].sel(
+      level=selection.levels
+  )
+
   predefined_regions = {
-      'global': SliceRegion(),
-      'tropics': SliceRegion(lat_slice=slice(-20, 20)),
-      'extra-tropics': SliceRegion(
-          lat_slice=[slice(None, -20), slice(20, None)]
+      'global': SliceRegion(above_ground_climatology=above_ground_climatology),
+      'tropics': SliceRegion(
+          lat_slice=slice(-20, 20),
+          above_ground_climatology=above_ground_climatology,
       ),
-      'northern-hemisphere': SliceRegion(lat_slice=slice(20, None)),
-      'southern-hemisphere': SliceRegion(lat_slice=slice(None, -20)),
+      'extra-tropics': SliceRegion(
+          lat_slice=[slice(None, -20), slice(20, None)],
+          above_ground_climatology=above_ground_climatology,
+      ),
+      'northern-hemisphere': SliceRegion(
+          lat_slice=slice(20, None),
+          above_ground_climatology=above_ground_climatology,
+      ),
+      'southern-hemisphere': SliceRegion(
+          lat_slice=slice(None, -20),
+          above_ground_climatology=above_ground_climatology,
+      ),
       'europe': SliceRegion(
           lat_slice=slice(35, 75),
           lon_slice=[slice(360 - 12.5, None), slice(0, 42.5)],
+          above_ground_climatology=above_ground_climatology,
       ),
       'north-america': SliceRegion(
-          lat_slice=slice(25, 60), lon_slice=slice(360 - 120, 360 - 75)
+          lat_slice=slice(25, 60),
+          lon_slice=slice(360 - 120, 360 - 75),
+          above_ground_climatology=above_ground_climatology,
       ),
       'north-atlantic': SliceRegion(
-          lat_slice=slice(25, 65), lon_slice=slice(360 - 70, 360 - 10)
+          lat_slice=slice(25, 65),
+          lon_slice=slice(360 - 70, 360 - 10),
+          above_ground_climatology=above_ground_climatology,
       ),
       'north-pacific': SliceRegion(
-          lat_slice=slice(25, 60), lon_slice=slice(145, 360 - 130)
+          lat_slice=slice(25, 60),
+          lon_slice=slice(145, 360 - 130),
+          above_ground_climatology=above_ground_climatology,
       ),
       'east-asia': SliceRegion(
-          lat_slice=slice(25, 60), lon_slice=slice(102.5, 150)
+          lat_slice=slice(25, 60),
+          lon_slice=slice(102.5, 150),
+          above_ground_climatology=above_ground_climatology,
       ),
       'ausnz': SliceRegion(
-          lat_slice=slice(-45, -12.5), lon_slice=slice(120, 175)
+          lat_slice=slice(-45, -12.5),
+          lon_slice=slice(120, 175),
+          above_ground_climatology=above_ground_climatology,
       ),
-      'arctic': SliceRegion(lat_slice=slice(60, 90)),
-      'antarctic': SliceRegion(lat_slice=slice(-90, -60)),
+      'arctic': SliceRegion(
+          lat_slice=slice(60, 90),
+          above_ground_climatology=above_ground_climatology,
+      ),
+      'antarctic': SliceRegion(
+          lat_slice=slice(-90, -60),
+          above_ground_climatology=above_ground_climatology,
+      ),
   }
   try:
     if LSM_DATASET.value:
@@ -336,16 +371,27 @@ def main(argv: list[str]) -> None:
     else:
       land_sea_mask = xr.open_zarr(OBS_PATH.value)['land_sea_mask'].compute()
     land_regions = {
-        'global_land': LandRegion(land_sea_mask=land_sea_mask),
+        'global_land': CombinedRegion(
+            regions=[
+                SliceRegion(above_ground_climatology=above_ground_climatology),
+                LandRegion(land_sea_mask=land_sea_mask),
+            ]
+        ),
         'extra-tropics_land': CombinedRegion(
             regions=[
-                SliceRegion(lat_slice=[slice(None, -20), slice(20, None)]),
+                SliceRegion(
+                    lat_slice=[slice(None, -20), slice(20, None)],
+                    above_ground_climatology=above_ground_climatology,
+                ),
                 LandRegion(land_sea_mask=land_sea_mask),
             ]
         ),
         'tropics_land': CombinedRegion(
             regions=[
-                SliceRegion(lat_slice=slice(-20, 20)),
+                SliceRegion(
+                    lat_slice=slice(-20, 20),
+                    above_ground_climatology=above_ground_climatology,
+                ),
                 LandRegion(land_sea_mask=land_sea_mask),
             ]
         ),
@@ -361,10 +407,6 @@ def main(argv: list[str]) -> None:
     regions = {
         k: v for k, v in predefined_regions.items() if k in REGIONS.value
     }
-
-  # Open climatology for ACC computation
-  climatology = xr.open_zarr(CLIMATOLOGY_PATH.value)
-  climatology = evaluation.make_latitude_increasing(climatology)
 
   deterministic_metrics = {
       'mse': metrics.MSE(wind_vector_mse=_wind_vector_error('mse')),
