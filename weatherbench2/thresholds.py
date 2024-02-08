@@ -86,7 +86,16 @@ def _get_climatology_quantile(
 
 @dataclasses.dataclass
 class Threshold:
-  """Threshold for discrete probabilistic metric evaluation."""
+  """Threshold for discrete probabilistic metric evaluation.
+
+  Attributes:
+    climatology: Dataset containing information about the climatological
+      distribution.
+    quantile: The quantile to be evaluated.
+  """
+
+  climatology: xr.Dataset
+  quantile: float
 
   def compute(self, truth: xr.Dataset) -> xr.Dataset:
     """Computes the threshold for each true label variable.
@@ -172,3 +181,13 @@ class GaussianQuantileThreshold(Threshold):
         climatology_mean + stats.norm.ppf(self.quantile) * climatology_std
     )
     return threshold
+
+
+def get_threshold_cls(threshold_method: str) -> type[Threshold]:
+  """Returns the threshold class for the given threshold method."""
+  if threshold_method == "quantile":
+    return QuantileThreshold
+  elif threshold_method == "gaussian_quantile":
+    return GaussianQuantileThreshold
+  else:
+    raise NotImplementedError(f"Unknown threshold method: {threshold_method}")

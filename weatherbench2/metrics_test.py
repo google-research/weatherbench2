@@ -352,9 +352,7 @@ class GaussianBrierScoreTest(parameterized.TestCase):
     truth = truth + 1.0
     forecast = forecast + 1.0 + error
 
-    climatology_mean = truth.isel(time=0, drop=True).expand_dims(
-        dayofyear=366,
-    )
+    climatology_mean = truth.isel(time=0, drop=True).expand_dims(dayofyear=366)
     climatology_std = (
         truth.isel(time=0, drop=True)
         .expand_dims(
@@ -369,7 +367,7 @@ class GaussianBrierScoreTest(parameterized.TestCase):
           climatology=climatology, quantile=0.8
       )
       result = metrics.GaussianBrierScore(threshold).compute(forecast, truth)
-      expected_arr = np.array([expected_1, expected_1])
+      expected_arr = np.array([[expected_1, expected_1]])
       np.testing.assert_allclose(
           result['2m_temperature'].values, expected_arr, rtol=1e-4
       )
@@ -383,7 +381,7 @@ class GaussianBrierScoreTest(parameterized.TestCase):
           climatology=climatology, quantile=0.8
       )
       result = metrics.GaussianBrierScore(threshold).compute(forecast, truth)
-      expected_arr = np.array([expected_2, expected_2])
+      expected_arr = np.array([[expected_2, expected_2]])
       np.testing.assert_allclose(
           result['2m_temperature'].values, expected_arr, rtol=1e-4
       )
@@ -425,8 +423,7 @@ class GaussianIgnoranceScoreTest(parameterized.TestCase):
         climatology=climatology, quantile=0.8
     )
     result = metrics.GaussianIgnoranceScore(threshold).compute(forecast, truth)
-    print('Ignorance score result is', result)
-    expected_arr = np.array([expected, expected])
+    expected_arr = np.array([[expected, expected]])
     np.testing.assert_allclose(
         result['2m_temperature'].values, expected_arr, rtol=1e-4
     )

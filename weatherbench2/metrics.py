@@ -828,7 +828,7 @@ class GaussianBrierScore(Metric):
     Spatially averaged Brier score for a Gaussian distribution.
   """
 
-  threshold: thresholds.Threshold
+  threshold: thresholds.Threshold | Sequence[thresholds.Threshold]
 
   def compute_chunk(
       self,
@@ -837,28 +837,45 @@ class GaussianBrierScore(Metric):
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
 
-    threshold = self.threshold.compute(truth)
-    truth_probability = xr.where(truth > threshold, 1.0, 0.0)
+    if isinstance(self.threshold, thresholds.Threshold):
+      threshold_seq = [self.threshold]
+      threshold_method = type(self.threshold).__name__
+    else:
+      threshold_seq = self.threshold
+      threshold_method = type(self.threshold[0]).__name__
 
-    var_list = []
-    exceedance_probability = {}
-    for var in forecast.keys():
-      if f"{var}_std" in forecast.keys():
-        var_list.append(var)
+    brier_scores = []
+    for threshold in threshold_seq:
+      quantile = threshold.quantile
+      threshold = threshold.compute(truth)
+      truth_probability = xr.where(truth > threshold, 1.0, 0.0)
 
-    for var_name in var_list:
-      norm_threshold = (threshold[var_name] - forecast[var_name]) / forecast[
-          f"{var_name}_std"
-      ]
-      exceedance_probability[var_name] = 1 - xr.apply_ufunc(
-          stats.norm.cdf, norm_threshold.load()
+      var_list = []
+      exceedance_probability = {}
+      for var in forecast.keys():
+        if f"{var}_std" in forecast.keys():
+          var_list.append(var)
+
+      for var_name in var_list:
+        norm_threshold = (threshold[var_name] - forecast[var_name]) / forecast[
+            f"{var_name}_std"
+        ]
+        exceedance_probability[var_name] = 1 - xr.apply_ufunc(
+            stats.norm.cdf, norm_threshold.load()
+        )
+
+      forecast_probability = xr.Dataset(
+          exceedance_probability, coords=forecast.coords
       )
 
-    forecast_probability = xr.Dataset(
-        exceedance_probability, coords=forecast.coords
-    )
-    return _spatial_average(
-        (forecast_probability - truth_probability) ** 2, region=region
+      brier_scores.append(
+          _spatial_average(
+              (forecast_probability - truth_probability) ** 2, region=region
+          ).expand_dims(dim={"quantile": [quantile]})
+      )
+
+    return xr.merge(brier_scores).assign_attrs(
+        threshold_method=threshold_method
     )
 
 
@@ -882,7 +899,7 @@ class GaussianIgnoranceScore(Metric):
     Spatially averaged ignorance score for a Gaussian distribution.
   """
 
-  threshold: thresholds.Threshold
+  threshold: thresholds.Threshold | Sequence[thresholds.Threshold]
 
   def compute_chunk(
       self,
@@ -891,30 +908,49 @@ class GaussianIgnoranceScore(Metric):
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
 
-    threshold = self.threshold.compute(truth)
-    truth_probability = xr.where(truth > threshold, 1.0, 0.0)
+    if isinstance(self.threshold, thresholds.Threshold):
+      threshold_seq = [self.threshold]
+      threshold_method = type(self.threshold).__name__
+    else:
+      threshold_seq = self.threshold
+      threshold_method = type(self.threshold[0]).__name__
 
-    var_list = []
-    log_realized_probability = {}
-    for var in forecast.keys():
-      if f"{var}_std" in forecast.keys():
-        var_list.append(var)
+    ignorance_scores = []
+    for threshold in threshold_seq:
+      quantile = threshold.quantile
+      threshold = threshold.compute(truth)
+      truth_probability = xr.where(truth > threshold, 1.0, 0.0)
 
-    for var_name in var_list:
-      norm_threshold = (threshold[var_name] - forecast[var_name]) / forecast[
-          f"{var_name}_std"
-      ]
-      cdf_value = xr.apply_ufunc(stats.norm.cdf, norm_threshold.load())
-      log_realized_probability[var_name] = -xr.where(
-          truth_probability[var_name],
-          xr.apply_ufunc(np.log, 1 - cdf_value),
-          xr.apply_ufunc(np.log, cdf_value),
+      var_list = []
+      log_realized_probability = {}
+      for var in forecast.keys():
+        if f"{var}_std" in forecast.keys():
+          var_list.append(var)
+
+      for var_name in var_list:
+        norm_threshold = (threshold[var_name] - forecast[var_name]) / forecast[
+            f"{var_name}_std"
+        ]
+        cdf_value = xr.apply_ufunc(stats.norm.cdf, norm_threshold.load())
+        log_realized_probability[var_name] = -xr.where(
+            truth_probability[var_name],
+            xr.apply_ufunc(np.log, 1 - cdf_value),
+            xr.apply_ufunc(np.log, cdf_value),
+        )
+
+      ignorance_score = xr.Dataset(
+          log_realized_probability, coords=forecast.coords
       )
 
-    ignorance_score = xr.Dataset(
-        log_realized_probability, coords=forecast.coords
+      ignorance_scores.append(
+          _spatial_average(ignorance_score, region=region).expand_dims(
+              dim={"quantile": [quantile]}
+          )
+      )
+
+    return xr.merge(ignorance_scores).assign_attrs(
+        threshold_method=threshold_method
     )
-    return _spatial_average(ignorance_score, region=region)
 
 
 @dataclasses.dataclass

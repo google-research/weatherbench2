@@ -46,6 +46,7 @@ from weatherbench2 import config
 from weatherbench2 import evaluation
 from weatherbench2 import flag_utils
 from weatherbench2 import metrics
+from weatherbench2 import thresholds
 from weatherbench2.derived_variables import DERIVED_VARIABLE_DICT
 from weatherbench2.regions import CombinedRegion
 from weatherbench2.regions import LandRegion
@@ -185,6 +186,22 @@ DERIVED_VARIABLES = flags.DEFINE_list(
     help=(
         'Comma delimited list of derived variables to dynamically compute'
         'during evaluation.'
+    ),
+)
+THRESHOLD_METHOD = flags.DEFINE_string(
+    'threshold_method',
+    'quantile',
+    help=(
+        'Threshold method used to binarize forecasts and observations into'
+        ' dichotomous events. It can be one of "quantile", "gaussian_quantile".'
+    ),
+)
+QUANTILE_THRESHOLDS = flags.DEFINE_list(
+    'quantile_thresholds',
+    [],
+    help=(
+        'Climatological quantile thresholds used to binarize forecasts and'
+        ' observations into dichotomous events.'
     ),
 )
 TIME_START = flags.DEFINE_string(
@@ -362,9 +379,18 @@ def main(argv: list[str]) -> None:
         k: v for k, v in predefined_regions.items() if k in REGIONS.value
     }
 
-  # Open climatology for ACC computation
+  # Open climatology for ACC and quantile metrics computation
   climatology = xr.open_zarr(CLIMATOLOGY_PATH.value)
   climatology = evaluation.make_latitude_increasing(climatology)
+
+  if QUANTILE_THRESHOLDS.value:
+    threshold_cls = thresholds.get_threshold_cls(THRESHOLD_METHOD.value)
+    threshold_list = [
+        threshold_cls(climatology=climatology, quantile=float(q))
+        for q in QUANTILE_THRESHOLDS.value
+    ]
+  else:
+    threshold_list = []
 
   deterministic_metrics = {
       'mse': metrics.MSE(wind_vector_mse=_wind_vector_error('mse')),
@@ -527,10 +553,23 @@ def main(argv: list[str]) -> None:
           probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
           output_format='zarr',
       ),
-      'gaussian': config.Eval(
+      'gaussian_probabilistic': config.Eval(
           metrics={
               'crps': metrics.GaussianCRPS(),
               'ensemble_variance': metrics.GaussianVariance(),
+          },
+          against_analysis=False,
+          regions=regions,
+          derived_variables=derived_variables,
+      ),
+      'gaussian_binary': config.Eval(
+          metrics={
+              'brier_score': metrics.GaussianBrierScore(
+                  threshold=threshold_list
+              ),
+              'ignorance_score': metrics.GaussianIgnoranceScore(
+                  threshold=threshold_list
+              ),
           },
           against_analysis=False,
           regions=regions,
