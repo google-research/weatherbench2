@@ -1355,6 +1355,74 @@ class EnsembleBrierScore(EnsembleMetric):
 
 
 @dataclasses.dataclass
+class EnsembleIgnoranceScore(EnsembleMetric):
+  """Ignorance score of an ensemble forecast for a given binary threshold.
+
+  The ignorance or logarithmic score is computed based on the forecast
+  probability of exceedance of a given climatological quantile. The true
+  probability is binarized to 0 or 1. The forecast probability is equal to the
+  proportion of members that exceed the quantile.
+
+  References:
+  [Benedetti, 2010], Scoring Rules for Forecast Verification,
+  DOI: https://doi.org/10.1175/2009MWR2945.1
+  """
+
+  def __init__(
+      self,
+      threshold: thresholds.Threshold | Sequence[thresholds.Threshold],
+      ensemble_dim: str = REALIZATION,
+  ):
+    """Initializes an EnsembleIgnoranceScore.
+
+    Args:
+      threshold: Threshold used to binarize predictions and targets.
+      ensemble_dim: Dimension indexing ensemble member.
+    """
+    super().__init__(ensemble_dim=ensemble_dim)
+    self.threshold = threshold
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+
+    if isinstance(self.threshold, thresholds.Threshold):
+      threshold_seq = [self.threshold]
+      threshold_method = type(self.threshold).__name__
+    else:
+      threshold_seq = self.threshold
+      threshold_method = type(self.threshold[0]).__name__
+
+    ignorance_scores = []
+    for threshold in threshold_seq:
+      quantile = threshold.quantile
+      threshold = threshold.compute(truth)
+      truth_probability = xr.where(truth > threshold, 1.0, 0.0)
+      forecast_probability = xr.where(forecast > threshold, 1.0, 0.0)
+      ensemble_forecast_probability = forecast_probability.mean(
+          self.ensemble_dim, skipna=False
+      )
+      ignorance_score = -xr.where(
+          truth_probability,
+          xr.apply_ufunc(np.log, ensemble_forecast_probability),
+          xr.apply_ufunc(np.log, 1 - ensemble_forecast_probability),
+      )
+      ignorance_scores.append(
+          _spatial_average(
+              ignorance_score,
+              region=region,
+          ).expand_dims(dim={"quantile": [quantile]})
+      )
+
+    return xr.merge(ignorance_scores).assign_attrs(
+        threshold_method=threshold_method
+    )
+
+
+@dataclasses.dataclass
 class RankHistogram(EnsembleMetric):
   """Histogram of truth's rank with respect to forecast ensemble members.
 
