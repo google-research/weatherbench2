@@ -16,6 +16,7 @@
 
 Contains classes for all evaluation metrics used for WB2.
 """
+from collections.abc import Sequence
 import dataclasses
 import functools
 import typing as t
@@ -914,6 +915,60 @@ class GaussianIgnoranceScore(Metric):
         log_realized_probability, coords=forecast.coords
     )
     return _spatial_average(ignorance_score, region=region)
+
+
+@dataclasses.dataclass
+class GaussianRPS(Metric):
+  """Ranked probability score of a Gaussian forecast for a given quantization.
+
+  The ranked probability score (RPS) is computed based on the forecast and
+  observed cumulative distribution functions.
+
+  References:
+  [Epstein, 1969] A Scoring System for Probability Forecasts of Ranked
+  Categories,
+  DOI: https://doi.org/10.1175/1520-0450(1969)008<0985:ASSFPF>2.0.CO;2
+
+  Attribute:
+    threshold: A sequence of threshold used to divide predictions and targets
+    categorically.
+
+  Returns:
+    Spatially averaged RPS for a Gaussian distribution.
+  """
+
+  thresholds: Sequence[thresholds.Threshold]
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+
+    var_list = []
+    for var in forecast.keys():
+      if f"{var}_std" in forecast.keys():
+        var_list.append(var)
+
+    rps_per_threshold = []
+    threshold_list = [t.compute(truth) for t in self.thresholds]
+    for threshold in threshold_list:
+      truth_ecdf = xr.where(truth < threshold, 1.0, 0.0)
+
+      cdf_values = {}
+      for var_name in var_list:
+        norm_threshold = (threshold[var_name] - forecast[var_name]) / forecast[
+            f"{var_name}_std"
+        ]
+        cdf_values[var_name] = xr.apply_ufunc(
+            stats.norm.cdf, norm_threshold.load()
+        )
+
+      forecast_cdf = xr.Dataset(cdf_values, coords=forecast.coords)
+      rps_per_threshold.append((forecast_cdf - truth_ecdf) ** 2)
+
+    return _spatial_average(sum(rps_per_threshold), region=region)
 
 
 @dataclasses.dataclass
