@@ -1288,6 +1288,73 @@ class EnergyScoreSkill(EnsembleMetric):
 
 
 @dataclasses.dataclass
+class EnsembleBrierScore(EnsembleMetric):
+  """Brier score of an ensemble forecast for a given binary threshold.
+
+  The Brier score is computed based on the forecast probability of exceedance of
+  a given climatological quantile. The true probability is binarized to 0 or 1.
+  The forecast probability is equal to the proportion of members that exceed
+  the quantile.
+
+  The Brier score for the binarized event of exceedance of a given threshold is
+  equal to the Brier score for the opposite event, i.e., the forecast remaining
+  below the threshold.
+
+  References:
+  [Ferro, 2007], Comparing Probabilistic Forecasting Systems with the Brier
+  Score, DOI: https://doi.org/10.1175/WAF1034.1
+  """
+
+  def __init__(
+      self,
+      threshold: thresholds.Threshold | Sequence[thresholds.Threshold],
+      ensemble_dim: str = REALIZATION,
+  ):
+    """Initializes an EnsembleBrierScore.
+
+    Args:
+      threshold: Threshold used to binarize predictions and targets.
+      ensemble_dim: Dimension indexing ensemble member.
+    """
+    super().__init__(ensemble_dim=ensemble_dim)
+    self.threshold = threshold
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+
+    if isinstance(self.threshold, thresholds.Threshold):
+      threshold_seq = [self.threshold]
+      threshold_method = type(self.threshold).__name__
+    else:
+      threshold_seq = self.threshold
+      threshold_method = type(self.threshold[0]).__name__
+
+    brier_scores = []
+    for threshold in threshold_seq:
+      quantile = threshold.quantile
+      threshold = threshold.compute(truth)
+      truth_probability = xr.where(truth > threshold, 1.0, 0.0)
+      forecast_probability = xr.where(forecast > threshold, 1.0, 0.0)
+      ensemble_forecast_probability = forecast_probability.mean(
+          self.ensemble_dim, skipna=False
+      )
+      brier_scores.append(
+          _spatial_average(
+              (ensemble_forecast_probability - truth_probability) ** 2,
+              region=region,
+          ).expand_dims(dim={"quantile": [quantile]})
+      )
+
+    return xr.merge(brier_scores).assign_attrs(
+        threshold_method=threshold_method
+    )
+
+
+@dataclasses.dataclass
 class RankHistogram(EnsembleMetric):
   """Histogram of truth's rank with respect to forecast ensemble members.
 
