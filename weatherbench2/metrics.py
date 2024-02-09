@@ -958,7 +958,8 @@ class GaussianRPS(Metric):
   """Ranked probability score of a Gaussian forecast for a given quantization.
 
   The ranked probability score (RPS) is computed based on the forecast and
-  observed cumulative distribution functions.
+  observed cumulative distribution functions. See `EnsembleRPS` for a discussion
+  of this metric.
 
   References:
   [Epstein, 1969] A Scoring System for Probability Forecasts of Ranked
@@ -1420,6 +1421,72 @@ class EnsembleIgnoranceScore(EnsembleMetric):
     return xr.merge(ignorance_scores).assign_attrs(
         threshold_method=threshold_method
     )
+
+
+@dataclasses.dataclass
+class EnsembleRPS(EnsembleMetric):
+  """Ranked probability score of an ensemble forecast for a given quantization.
+
+  The ranked probability score (RPS) is computed based on the forecast and
+  observed cumulative distribution functions, coarsened to the level of
+  the input thresholds.
+
+  The thresholds are taken to define the limits of each considered interval,
+  except the first (resp. last) interval, which includes all values
+  lower (resp. higher) than the first (resp. last) threshold. Three thresholds
+  would define the following four intervals:
+
+                        <-- | --- | --- | -->
+
+  As an example, if the thresholds are climatological terciles [0.33, 0.66],
+  the observed event was at the climatological quantile 0.5, and the ensemble
+  forecasts were at climatological quantiles [0.1, 0.5, 0.6, 0.8], then the
+  observed CDF would be [0, 1, 1], and the forecast CDF would be
+  [0.25, 0.75, 1]. Note that the score over the last interval need not
+  be computed, since the quantized CDFs are always one for both forecasts and
+  observations there.
+
+  References:
+  [Epstein, 1969] A Scoring System for Probability Forecasts of Ranked
+  Categories,
+  DOI: https://doi.org/10.1175/1520-0450(1969)008<0985:ASSFPF>2.0.CO;2
+  """
+
+  def __init__(
+      self,
+      threshold: Sequence[thresholds.Threshold],
+      ensemble_dim: str = REALIZATION,
+  ):
+    """Initializes an EnsembleRPS.
+
+    Args:
+      threshold: A sequence of thresholds used to divide predictions and targets
+        categorically.
+      ensemble_dim: Dimension indexing ensemble member.
+    """
+    super().__init__(ensemble_dim=ensemble_dim)
+    self.thresholds = threshold
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """Spatially averaged RPS of the ensemble forecast."""
+    rps_per_threshold = []
+    threshold_list = [t.compute(truth) for t in self.thresholds]
+    for threshold in threshold_list:
+
+      truth_ecdf = xr.where(truth < threshold, 1.0, 0.0)
+      forecast_ecdf = xr.where(forecast < threshold, 1.0, 0.0)
+      ensemble_forecast_ecdf = forecast_ecdf.mean(
+          self.ensemble_dim, skipna=False
+      )
+
+      rps_per_threshold.append((ensemble_forecast_ecdf - truth_ecdf) ** 2)
+
+    return _spatial_average(sum(rps_per_threshold), region=region)
 
 
 @dataclasses.dataclass

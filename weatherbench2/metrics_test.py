@@ -916,6 +916,65 @@ class EnsembleIgnoranceScoreTest(parameterized.TestCase):
     )
 
 
+class EnsembleRPSTest(parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='good model',
+          error=0.02,
+          expected=0.0,
+      ),
+      dict(
+          testcase_name='poor model',
+          error=-2.0,
+          expected=2,
+      ),
+  )
+  def test_ensemble_rps(self, error, expected):
+    kwargs = {
+        'variables_2d': ['2m_temperature'],
+        'variables_3d': [],
+        'time_start': '2022-01-01',
+        'time_stop': '2022-01-02',
+    }
+    forecast = schema.mock_forecast_data(
+        ensemble_size=4, lead_stop='1 day', **kwargs
+    )
+    truth = schema.mock_truth_data(**kwargs)
+    q_1 = (
+        truth.isel(time=0, drop=True)
+        .expand_dims(dim={'dayofyear': 366, 'quantile': np.array([0.33])})
+        .rename({'2m_temperature': '2m_temperature_quantile'})
+    )
+    q_2 = (
+        (truth + 1.0)
+        .isel(time=0, drop=True)
+        .expand_dims(dim={'dayofyear': 366, 'quantile': np.array([0.66])})
+        .rename({'2m_temperature': '2m_temperature_quantile'})
+    )
+    q_3 = (
+        (truth + 2.0)
+        .isel(time=0, drop=True)
+        .expand_dims(dim={'dayofyear': 366, 'quantile': np.array([1.0])})
+        .rename({'2m_temperature': '2m_temperature_quantile'})
+    )
+    climatology = xr.merge([q_1, q_2, q_3])
+
+    truth = truth + 1.5
+    forecast = forecast + 1.0 + error
+
+    threshold_list = [
+        thresholds.QuantileThreshold(climatology=climatology, quantile=q)
+        for q in [0.33, 0.66, 1.0]
+    ]
+
+    result = metrics.EnsembleRPS(threshold_list).compute(forecast, truth)
+    expected_arr = np.array([expected, expected])
+    np.testing.assert_allclose(
+        result['2m_temperature'].values, expected_arr, rtol=1e-4
+    )
+
+
 class SEEPSTest(absltest.TestCase):
 
   def testExpectedValues(self):
