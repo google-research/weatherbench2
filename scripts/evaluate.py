@@ -490,6 +490,23 @@ def main(argv: list[str]) -> None:
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
           probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
       ),
+      'ensemble_binary': config.Eval(
+          metrics={
+              'brier_score': metrics.EnsembleBrierScore(
+                  ensemble_dim=ENSEMBLE_DIM.value, threshold=threshold_list
+              ),
+              'ignorance_score': metrics.EnsembleIgnoranceScore(
+                  ensemble_dim=ENSEMBLE_DIM.value, threshold=threshold_list
+              ),
+          },
+          regions=regions,
+          against_analysis=False,
+          derived_variables=derived_variables,
+          evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
+          probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
+          probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
+          probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
+      ),
       'ensemble_forecast_vs_era_experimental_metrics': config.Eval(
           metrics={
               'energy_score': metrics.EnergyScore(
