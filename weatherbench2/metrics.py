@@ -1301,6 +1301,10 @@ class EnsembleBrierScore(EnsembleMetric):
   equal to the Brier score for the opposite event, i.e., the forecast remaining
   below the threshold.
 
+  If `p` is the forecast probability, and `q` is the climatological quantile.
+  Then as ensemble size `N → ∞`, the `EnsembleBrierScore → (p - q)²`.
+  The bias from finite ensemble size is equal to `p (1 - p) / N`.
+
   References:
   [Ferro, 2007], Comparing Probabilistic Forecasting Systems with the Brier
   Score, DOI: https://doi.org/10.1175/WAF1034.1
