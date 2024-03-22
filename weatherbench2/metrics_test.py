@@ -843,10 +843,11 @@ class EnergyScoreTest(parameterized.TestCase):
 class EnsembleBrierScoreTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      dict(testcase_name='perfect model', error=0.0, expected=0.0),
-      dict(testcase_name='useless model', error=-10.0, expected=1.0),
+      dict(testcase_name='perfect', error=0.0, ens_delta=0.1, expected=0.0),
+      dict(testcase_name='ok', error=0.0, ens_delta=1.0, expected=0.25),
+      dict(testcase_name='useless', error=-10.0, ens_delta=0.1, expected=1.0),
   )
-  def test_ensemble_brier_score(self, error, expected):
+  def test_ensemble_brier_score(self, error, ens_delta, expected):
     kwargs = {
         'variables_2d': ['2m_temperature'],
         'variables_3d': [],
@@ -858,7 +859,13 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
     )
     truth = schema.mock_truth_data(**kwargs)
     truth = truth + 1.0
-    forecast = forecast + 1.0 + error
+    forecast = (
+        forecast
+        + 1.0
+        + error
+        + ens_delta * np.arange(-2, 2).reshape((4, 1, 1, 1, 1))
+    )
+
     climatology_mean = truth.isel(time=0, drop=True).expand_dims(dayofyear=366)
     climatology_std = (
         truth.isel(time=0, drop=True)
