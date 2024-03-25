@@ -485,6 +485,39 @@ class SEEPS(SpatialSEEPS):
 ################################################################################
 
 
+def _debiased_ensemble_mean_mse(
+    forecast: xr.Dataset,
+    truth: xr.Dataset,
+    ensemble_dim: str,
+) -> xr.Dataset:
+  """Debiased estimate of E(forecast.mean() - truth)².
+
+  Suppose we have n iid {Xₖ}, each with mean μ and variance σ², and ground
+  truth Y. We wish to estimate M = (Y - μ)² in an unbiased fashion.
+  Define
+    μ(n)  = (1/n) Sum(Xₖ)
+    σ²(n) = (1/(n-1)) Sum((Xₖ - μ(n))²)
+    M(n)  = (μ(n) - Y)²
+    M̃(n)  = M(n) - (1/n) σ²(n)
+  One can check that
+    E[M̃(n)] = E[M(n)] - σ²/n
+            = E[M] + σ²/n - σ²/n
+            = E[M].
+
+  Args:
+    forecast: A forecast dataset.
+    truth: A ground truth dataset.
+    ensemble_dim: Dimension indexing ensembles in the forecast.
+
+  Returns:
+    Dataset with debiased (forecast - truth)².
+  """
+  forecast_mean = forecast.mean(ensemble_dim, skipna=False)
+  forecast_var = forecast.var(ensemble_dim, skipna=False, ddof=1)
+  biased_mse = (truth - forecast_mean) ** 2
+  return biased_mse - forecast_var / _get_n_ensemble(forecast, ensemble_dim)
+
+
 def _get_n_ensemble(
     ds: xr.Dataset,
     ensemble_dim: str,
@@ -1148,7 +1181,12 @@ class EnsembleMeanRMSESqrtBeforeTimeAvg(EnsembleMetric):
 
 @dataclasses.dataclass
 class EnsembleMeanMSE(EnsembleMetric):
-  """Mean square error between the ensemble mean and ground truth."""
+  """Mean square error between the ensemble mean and ground truth.
+
+  Suppose we have a size n ensemble, {Xₖ}, each an iid copy of X having with
+  mean μ and variance σ². Let Y be the ground truth.
+  This class estimates E(X - Y)² with a bias equal to σ² / n.
+  """
 
   def compute_chunk(
       self,
@@ -1161,6 +1199,32 @@ class EnsembleMeanMSE(EnsembleMetric):
 
     return _spatial_average(
         (truth - forecast.mean(self.ensemble_dim, skipna=False)) ** 2,
+        region=region,
+    )
+
+
+@dataclasses.dataclass
+class DebiasedEnsembleMeanMSE(EnsembleMetric):
+  """Debiased mean square error between the ensemble mean and ground truth.
+
+  Suppose we have a size n ensemble, {Xₖ}, each an iid copy of X having with
+  mean μ and variance σ². Let Y be the ground truth.
+  This class estimates E(X - Y)² with no bias. This is done by subtracting the
+  sample variance divided by n. As such, you must have n > 1 or the result will
+  be NaN.
+  """
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """DebiasedEnsembleMeanMSE, averaged over space, for one time chunk."""
+    _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
+
+    return _spatial_average(
+        _debiased_ensemble_mean_mse(forecast, truth, self.ensemble_dim),
         region=region,
     )
 
@@ -1179,6 +1243,22 @@ class SpatialEnsembleMeanMSE(EnsembleMetric):
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
 
     return (truth - forecast.mean(self.ensemble_dim, skipna=False)) ** 2
+
+
+@dataclasses.dataclass
+class DebiasedSpatialEnsembleMeanMSE(EnsembleMetric):
+  """DebiasedEnsembleMeanMSE (MSE, not RMSE), without spatial averaging."""
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """Squared error in the ensemble mean, for a time chunk of data."""
+    _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
+
+    return _debiased_ensemble_mean_mse(forecast, truth, self.ensemble_dim)
 
 
 @dataclasses.dataclass
@@ -1289,7 +1369,71 @@ class EnergyScoreSkill(EnsembleMetric):
 
 
 @dataclasses.dataclass
-class EnsembleBrierScore(EnsembleMetric):
+class _BaseEnsembleBrierScore(EnsembleMetric):
+  """Base class for [Debiased]EnsembleBrierScore."""
+
+  def __init__(
+      self,
+      threshold: thresholds.Threshold | Sequence[thresholds.Threshold],
+      ensemble_dim: str = REALIZATION,
+  ):
+    """Initializes a _BaseEnsembleBrierScore.
+
+    Args:
+      threshold: Threshold used to binarize predictions and targets.
+      ensemble_dim: Dimension indexing ensemble member.
+    """
+    super().__init__(ensemble_dim=ensemble_dim)
+    self.threshold = threshold
+
+  def _compute_chunk_impl(
+      self,
+      debias: bool,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    """Common implementation of compute_chunk."""
+
+    if isinstance(self.threshold, thresholds.Threshold):
+      threshold_seq = [self.threshold]
+      threshold_method = type(self.threshold).__name__
+    else:
+      threshold_seq = self.threshold
+      threshold_method = type(self.threshold[0]).__name__
+
+    brier_scores = []
+    for threshold in threshold_seq:
+      quantile = threshold.quantile
+      threshold = threshold.compute(truth)
+      truth_probability = xr.where(truth > threshold, 1.0, 0.0)
+      forecast_probability = xr.where(forecast > threshold, 1.0, 0.0)
+      if debias:
+        mse_of_probabilities = _debiased_ensemble_mean_mse(
+            forecast_probability,
+            truth_probability,
+            self.ensemble_dim,
+        )
+      else:
+        mse_of_probabilities = (
+            forecast_probability.mean(self.ensemble_dim, skipna=False)
+            - truth_probability
+        ) ** 2
+
+      brier_scores.append(
+          _spatial_average(
+              mse_of_probabilities,
+              region=region,
+          ).expand_dims(dim={"quantile": [quantile]})
+      )
+
+    return xr.merge(brier_scores).assign_attrs(
+        threshold_method=threshold_method
+    )
+
+
+@dataclasses.dataclass
+class EnsembleBrierScore(_BaseEnsembleBrierScore):
   """Brier score of an ensemble forecast for a given binary threshold.
 
   The Brier score is computed based on the forecast probability of exceedance of
@@ -1300,6 +1444,15 @@ class EnsembleBrierScore(EnsembleMetric):
   The Brier score for the binarized event of exceedance of a given threshold is
   equal to the Brier score for the opposite event, i.e., the forecast remaining
   below the threshold.
+
+  Given ensemble size n, let Q and Pn be the observation and forecast
+  frequency of exceeding `threshold`. As n → ∞,
+    Pn → P  (the forecast probability of exceeding `threshold`)
+    EnsembleBrierScore → (P - Q)².
+
+  For finite ensemble size, the bias is
+    Bn := E(Pn - Q)² - (P - Q)² = P (1 - P) / n.
+  An unbiased estimate of Bn is Pn (1 - Pn) / (n - 1).
 
   References:
   [Ferro, 2007], Comparing Probabilistic Forecasting Systems with the Brier
@@ -1317,8 +1470,7 @@ class EnsembleBrierScore(EnsembleMetric):
       threshold: Threshold used to binarize predictions and targets.
       ensemble_dim: Dimension indexing ensemble member.
     """
-    super().__init__(ensemble_dim=ensemble_dim)
-    self.threshold = threshold
+    super().__init__(threshold=threshold, ensemble_dim=ensemble_dim)
 
   def compute_chunk(
       self,
@@ -1326,32 +1478,58 @@ class EnsembleBrierScore(EnsembleMetric):
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
+    return self._compute_chunk_impl(
+        debias=False, forecast=forecast, truth=truth, region=region
+    )
 
-    if isinstance(self.threshold, thresholds.Threshold):
-      threshold_seq = [self.threshold]
-      threshold_method = type(self.threshold).__name__
-    else:
-      threshold_seq = self.threshold
-      threshold_method = type(self.threshold[0]).__name__
 
-    brier_scores = []
-    for threshold in threshold_seq:
-      quantile = threshold.quantile
-      threshold = threshold.compute(truth)
-      truth_probability = xr.where(truth > threshold, 1.0, 0.0)
-      forecast_probability = xr.where(forecast > threshold, 1.0, 0.0)
-      ensemble_forecast_probability = forecast_probability.mean(
-          self.ensemble_dim, skipna=False
-      )
-      brier_scores.append(
-          _spatial_average(
-              (ensemble_forecast_probability - truth_probability) ** 2,
-              region=region,
-          ).expand_dims(dim={"quantile": [quantile]})
-      )
+@dataclasses.dataclass
+class DebiasedEnsembleBrierScore(_BaseEnsembleBrierScore):
+  """Debiased Brier score of an ensemble forecast for a given binary threshold.
 
-    return xr.merge(brier_scores).assign_attrs(
-        threshold_method=threshold_method
+  The Brier score is computed based on the forecast probability of exceedance of
+  a given climatological quantile. The true probability is binarized to 0 or 1.
+  The forecast probability is equal to the proportion of members that exceed
+  the quantile.
+
+  The Brier score for the binarized event of exceedance of a given threshold is
+  equal to the Brier score for the opposite event, i.e., the forecast remaining
+  below the threshold.
+
+  Given ensemble size n, let Q and Pn be the observation and forecast
+  frequency of exceeding `threshold`. As n → ∞,
+    Pn → P  (the forecast probability of exceeding `threshold`)
+    EnsembleBrierScore → (P - Q)².
+
+  For finite ensemble size, we debias the result by subtracting the sample
+  variance divided by n. As such, you must have n > 1 or the result will be NaN.
+
+  References:
+  [Ferro, 2007], Comparing Probabilistic Forecasting Systems with the Brier
+  Score, DOI: https://doi.org/10.1175/WAF1034.1
+  """
+
+  def __init__(
+      self,
+      threshold: thresholds.Threshold | Sequence[thresholds.Threshold],
+      ensemble_dim: str = REALIZATION,
+  ):
+    """Initializes a DebiasedEnsembleBrierScore.
+
+    Args:
+      threshold: Threshold used to binarize predictions and targets.
+      ensemble_dim: Dimension indexing ensemble member.
+    """
+    super().__init__(threshold=threshold, ensemble_dim=ensemble_dim)
+
+  def compute_chunk(
+      self,
+      forecast: xr.Dataset,
+      truth: xr.Dataset,
+      region: t.Optional[Region] = None,
+  ) -> xr.Dataset:
+    return self._compute_chunk_impl(
+        debias=True, forecast=forecast, truth=truth, region=region
     )
 
 

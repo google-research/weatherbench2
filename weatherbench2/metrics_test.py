@@ -751,6 +751,48 @@ class EnsembleMeanRMSEAndStddevTest(parameterized.TestCase):
     xr.testing.assert_allclose(xr.zeros_like(mean_rmse), mean_rmse)
 
 
+class DebiasedEnsembleMeanMSETest(parameterized.TestCase):
+
+  def test_versus_large_ensemble(self):
+    large_ensemble_size = 1000
+    truth, forecast = get_random_truth_and_forecast(
+        ensemble_size=large_ensemble_size,
+        spatial_resolution_in_degrees=20,
+    )
+    small_ensemble_forecast = forecast.isel({metrics.REALIZATION: slice(2)})
+
+    mse_large_ensemble = metrics.EnsembleMeanMSE().compute_chunk(
+        forecast, truth
+    )
+    mse_small_ensemble = metrics.EnsembleMeanMSE().compute_chunk(
+        small_ensemble_forecast, truth
+    )
+    mse_debiased_small_ensemble = (
+        metrics.DebiasedEnsembleMeanMSE().compute_chunk(
+            small_ensemble_forecast, truth
+        )
+    )
+
+    var_large_ensemble = metrics.EnsembleVariance().compute_chunk(
+        forecast, truth
+    )
+
+    # Demonstrate the test is not trivial by showing that the small ensemble has
+    # the anticipated bias.
+    anticipated_bias = var_large_ensemble.max() / 2
+    observed_bias = (mse_small_ensemble - mse_large_ensemble).mean()
+    xr.testing.assert_allclose(observed_bias, anticipated_bias, rtol=0.05)
+
+    total_points = np.prod(list(truth.dims.values()))
+    stderr = np.sqrt(var_large_ensemble.geopotential.max() / total_points)
+
+    xr.testing.assert_allclose(
+        mse_large_ensemble.mean(),
+        mse_debiased_small_ensemble.mean(),
+        atol=4 * stderr,
+    )
+
+
 def _crps_brute_force(forecast: xr.Dataset, truth: xr.Dataset) -> xr.Dataset:
   """The eFAIR version of CRPS from Zamo & Naveau over a chunk of data."""
 
@@ -882,6 +924,59 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
     expected_arr = np.array([[expected, expected]])
     np.testing.assert_allclose(
         result['2m_temperature'].values, expected_arr, rtol=1e-4
+    )
+
+
+class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
+
+  def test_versus_large_ensemble(self):
+    large_ensemble_size = 1000
+    threshold = 1.0
+    truth, forecast = get_random_truth_and_forecast(
+        ensemble_size=large_ensemble_size,
+        spatial_resolution_in_degrees=20,
+    )
+    small_ensemble_forecast = forecast.isel({metrics.REALIZATION: slice(2)})
+
+    climatology_mean = truth.isel(time=0, drop=True).expand_dims(dayofyear=366)
+    climatology_std = (
+        truth.isel(time=0, drop=True)
+        .expand_dims(
+            dayofyear=366,
+        )
+        .rename({'geopotential': 'geopotential_std'})
+    )
+    climatology = xr.merge([climatology_mean, climatology_std])
+    threshold = thresholds.GaussianQuantileThreshold(
+        climatology=climatology, quantile=0.2
+    )
+
+    bs_large_ensemble = metrics.EnsembleBrierScore(threshold).compute(
+        forecast, truth
+    )
+    bs_debiased_small_ensemble = metrics.DebiasedEnsembleBrierScore(
+        threshold
+    ).compute(small_ensemble_forecast, truth)
+
+    # Make sure the test is not trivial by showing that without debiasing we get
+    # a huge (positive) bias.
+    bs_small_ensemble = metrics.EnsembleBrierScore(threshold).compute(
+        small_ensemble_forecast, truth
+    )
+    self.assertGreater(
+        (bs_small_ensemble - bs_large_ensemble).geopotential.mean().data,
+        bs_large_ensemble.mean().geopotential.data / 4,
+    )
+
+    # The variance in a Brier score estimate is p * (1 - p) / N, where p is the
+    # probability of being above threshold. For simplicity, just assume p=0.5.
+    total_points = np.prod(list(truth.dims.values()))
+    stderr = np.sqrt((0.5 * (1 - 0.5)) / total_points)
+
+    xr.testing.assert_allclose(
+        bs_large_ensemble.mean(),
+        bs_debiased_small_ensemble.mean(),
+        atol=4 * stderr,
     )
 
 

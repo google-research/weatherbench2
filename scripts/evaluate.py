@@ -478,6 +478,9 @@ def main(argv: list[str]) -> None:
               'ensemble_mean_mse': metrics.EnsembleMeanMSE(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
+              'debiased_ensemble_mean_mse': metrics.DebiasedEnsembleMeanMSE(
+                  ensemble_dim=ENSEMBLE_DIM.value
+              ),
               'ensemble_variance': metrics.EnsembleVariance(
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
@@ -493,6 +496,9 @@ def main(argv: list[str]) -> None:
       'ensemble_binary': config.Eval(
           metrics={
               'brier_score': metrics.EnsembleBrierScore(
+                  ensemble_dim=ENSEMBLE_DIM.value, threshold=threshold_list
+              ),
+              'debiased_brier_score': metrics.DebiasedEnsembleBrierScore(
                   ensemble_dim=ENSEMBLE_DIM.value, threshold=threshold_list
               ),
               'ignorance_score': metrics.EnsembleIgnoranceScore(
@@ -543,6 +549,11 @@ def main(argv: list[str]) -> None:
               ),
               'ensemble_mean_mse': metrics.SpatialEnsembleMeanMSE(
                   ensemble_dim=ENSEMBLE_DIM.value
+              ),
+              'debiased_ensemble_mean_mse': (
+                  metrics.DebiasedSpatialEnsembleMeanMSE(
+                      ensemble_dim=ENSEMBLE_DIM.value
+                  )
               ),
               'ensemble_variance': metrics.SpatialEnsembleVariance(
                   ensemble_dim=ENSEMBLE_DIM.value
