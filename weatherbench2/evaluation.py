@@ -24,7 +24,7 @@ import copy
 import dataclasses
 import logging
 import os.path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import apache_beam as beam
 import fsspec
@@ -294,7 +294,7 @@ def open_forecast_and_truth_datasets(
     data_config: config.Data,
     eval_config: config.Eval,
     use_dask: bool = False,
-) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset | None]:
+) -> tuple[xr.Dataset, xr.Dataset, Union[xr.Dataset, None]]:
   """Open datasets and select desired slices.
 
   Args:

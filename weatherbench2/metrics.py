@@ -861,7 +861,7 @@ class GaussianBrierScore(Metric):
     Spatially averaged Brier score for a Gaussian distribution.
   """
 
-  threshold: thresholds.Threshold | Sequence[thresholds.Threshold]
+  threshold: t.Union[thresholds.Threshold, Sequence[thresholds.Threshold]]
 
   def compute_chunk(
       self,
@@ -932,7 +932,7 @@ class GaussianIgnoranceScore(Metric):
     Spatially averaged ignorance score for a Gaussian distribution.
   """
 
-  threshold: thresholds.Threshold | Sequence[thresholds.Threshold]
+  threshold: t.Union[thresholds.Threshold, Sequence[thresholds.Threshold]]
 
   def compute_chunk(
       self,
@@ -1374,7 +1374,7 @@ class _BaseEnsembleBrierScore(EnsembleMetric):
 
   def __init__(
       self,
-      threshold: thresholds.Threshold | Sequence[thresholds.Threshold],
+      threshold: t.Union[thresholds.Threshold, Sequence[thresholds.Threshold]],
       ensemble_dim: str = REALIZATION,
   ):
     """Initializes a _BaseEnsembleBrierScore.
@@ -1461,7 +1461,7 @@ class EnsembleBrierScore(_BaseEnsembleBrierScore):
 
   def __init__(
       self,
-      threshold: thresholds.Threshold | Sequence[thresholds.Threshold],
+      threshold: t.Union[thresholds.Threshold, Sequence[thresholds.Threshold]],
       ensemble_dim: str = REALIZATION,
   ):
     """Initializes an EnsembleBrierScore.
@@ -1511,7 +1511,7 @@ class DebiasedEnsembleBrierScore(_BaseEnsembleBrierScore):
 
   def __init__(
       self,
-      threshold: thresholds.Threshold | Sequence[thresholds.Threshold],
+      threshold: t.Union[thresholds.Threshold, Sequence[thresholds.Threshold]],
       ensemble_dim: str = REALIZATION,
   ):
     """Initializes a DebiasedEnsembleBrierScore.
@@ -1549,7 +1549,7 @@ class EnsembleIgnoranceScore(EnsembleMetric):
 
   def __init__(
       self,
-      threshold: thresholds.Threshold | Sequence[thresholds.Threshold],
+      threshold: t.Union[thresholds.Threshold, Sequence[thresholds.Threshold]],
       ensemble_dim: str = REALIZATION,
   ):
     """Initializes an EnsembleIgnoranceScore.

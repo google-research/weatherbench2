@@ -61,7 +61,7 @@ def _get_climatology_std(
 def _get_climatology_quantile(
     climatology: xr.Dataset,
     variables: abc.Sequence[str],
-    quantile: abc.Sequence[float] | float,
+    quantile: typing.Union[abc.Sequence[float], float],
     atol: float = 0.01,
 ) -> xr.Dataset:
   """Returns climatological quantiles of the given variables."""
