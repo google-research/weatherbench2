@@ -932,14 +932,20 @@ class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
   def test_versus_large_ensemble(self):
     large_ensemble_size = 1000
     threshold = 1.0
+
+    # truth, forecast are both Normal(0, 1)
     truth, forecast = get_random_truth_and_forecast(
         ensemble_size=large_ensemble_size,
         spatial_resolution_in_degrees=20,
     )
     small_ensemble_forecast = forecast.isel({metrics.REALIZATION: slice(2)})
 
-    climatology_mean = truth.isel(time=0, drop=True).expand_dims(dayofyear=366)
-    climatology_std = (
+    # climatology has the same stats as Normal(0, 1). So truth/forecast should
+    # be "perfect".
+    climatology_mean = xr.zeros_like(
+        truth.isel(time=0, drop=True).expand_dims(dayofyear=366)
+    )
+    climatology_std = xr.ones_like(
         truth.isel(time=0, drop=True)
         .expand_dims(
             dayofyear=366,
@@ -947,31 +953,36 @@ class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
         .rename({'geopotential': 'geopotential_std'})
     )
     climatology = xr.merge([climatology_mean, climatology_std])
+    quantile = 0.2
     threshold = thresholds.GaussianQuantileThreshold(
-        climatology=climatology, quantile=0.2
+        climatology=climatology,
+        quantile=quantile,
     )
 
     bs_large_ensemble = metrics.EnsembleBrierScore(threshold).compute(
         forecast, truth
+    )
+    bs_small_ensemble = metrics.EnsembleBrierScore(threshold).compute(
+        small_ensemble_forecast, truth
     )
     bs_debiased_small_ensemble = metrics.DebiasedEnsembleBrierScore(
         threshold
     ).compute(small_ensemble_forecast, truth)
 
     # Make sure the test is not trivial by showing that without debiasing we get
-    # a huge (positive) bias.
-    bs_small_ensemble = metrics.EnsembleBrierScore(threshold).compute(
-        small_ensemble_forecast, truth
-    )
-    self.assertGreater(
-        (bs_small_ensemble - bs_large_ensemble).geopotential.mean().data,
-        bs_large_ensemble.mean().geopotential.data / 4,
+    # the expected bias. Since truth/forecast are drawn from the correct
+    # distribution, we know the variance, and then
+    #   bias = variance / ensemble_size
+    #        = p * (1 - p) / 2
+    variance = (1 - quantile) * quantile
+    anticipated_bias = variance / 2
+    observed_bias = (bs_small_ensemble - bs_large_ensemble).mean()
+    np.testing.assert_allclose(
+        observed_bias.geopotential.data, anticipated_bias, rtol=0.05
     )
 
-    # The variance in a Brier score estimate is p * (1 - p) / N, where p is the
-    # probability of being above threshold. For simplicity, just assume p=0.5.
     total_points = np.prod(list(truth.dims.values()))
-    stderr = np.sqrt((0.5 * (1 - 0.5)) / total_points)
+    stderr = np.sqrt(variance / total_points)
 
     xr.testing.assert_allclose(
         bs_large_ensemble.mean(),
