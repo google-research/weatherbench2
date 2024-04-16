@@ -73,10 +73,12 @@ def create_window_weights(window_size: int) -> xr.DataArray:
   """Create linearly decaying window weights."""
   assert window_size % 2 == 1, 'Window size must be odd.'
   half_window_size = window_size // 2
-  window_weights = np.concatenate([
-      np.linspace(0, 1, half_window_size + 1),
-      np.linspace(1, 0, half_window_size + 1)[1:],
-  ])
+  window_weights = np.concatenate(
+      [
+          np.linspace(0, 1, half_window_size + 1),
+          np.linspace(1, 0, half_window_size + 1)[1:],
+      ]
+  )
   window_weights = window_weights / window_weights.mean()
   window_weights = xr.DataArray(window_weights, dims=['window'])
   return window_weights

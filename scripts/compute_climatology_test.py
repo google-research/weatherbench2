@@ -21,19 +21,23 @@ from . import compute_climatology as cc
 class SEEPSThresholdTest(absltest.TestCase):
 
   def testSEEPSThreshold(self):
-    dataset = xr.Dataset({
-        'total_precipitation_6hr': xr.DataArray([0, 0.25, 2, 4, 6]) / 1000,
-    })
+    dataset = xr.Dataset(
+        {
+            'total_precipitation_6hr': xr.DataArray([0, 0.25, 2, 4, 6]) / 1000,
+        }
+    )
 
     result = cc.SEEPSThreshold(0.25, 'total_precipitation_6hr').compute(
         dataset,
         dim=...,
     )
 
-    expected = xr.Dataset({
-        'total_precipitation_6hr_seeps_dry_fraction': xr.DataArray(1 / 5),
-        'total_precipitation_6hr_seeps_threshold': xr.DataArray(4 / 1000),
-    })
+    expected = xr.Dataset(
+        {
+            'total_precipitation_6hr_seeps_dry_fraction': xr.DataArray(1 / 5),
+            'total_precipitation_6hr_seeps_threshold': xr.DataArray(4 / 1000),
+        }
+    )
     xr.testing.assert_allclose(result, expected)
 
 

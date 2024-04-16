@@ -59,14 +59,16 @@ class MetricsTest(parameterized.TestCase):
     # integral of cos(x) from 0*pi/6 to 1*pi/6 -> 0.5
     # integral of cos(x) from 1*pi/6 to 2*pi/6 -> (sqrt(3) - 1) / 2
     # integral of cos(x) from 2*pi/6 to 3*pi/6 -> 1 - sqrt(3) / 2
-    expected_data = 3 * np.array([
-        1 - np.sqrt(3) / 2,
-        (np.sqrt(3) - 1) / 2,
-        1 / 2,
-        1 / 2,
-        (np.sqrt(3) - 1) / 2,
-        1 - np.sqrt(3) / 2,
-    ])
+    expected_data = 3 * np.array(
+        [
+            1 - np.sqrt(3) / 2,
+            (np.sqrt(3) - 1) / 2,
+            1 / 2,
+            1 / 2,
+            (np.sqrt(3) - 1) / 2,
+            1 - np.sqrt(3) / 2,
+        ]
+    )
     expected = xr.DataArray(expected_data, coords=ds.coords, dims=['latitude'])
     xr.testing.assert_allclose(expected, weights)
 
@@ -90,22 +92,26 @@ class MetricsTest(parameterized.TestCase):
         time_stop='2022-01-02',
     )
 
-    forecast_modifier = xr.Dataset({
-        'u_component_of_wind': xr.DataArray(
-            [0, 3, np.NaN], coords={'level': forecast.level}
-        ),
-        'v_component_of_wind': xr.DataArray(
-            [0, -4, 1], coords={'level': forecast.level}
-        ),
-    })
-    truth_modifier = xr.Dataset({
-        'u_component_of_wind': xr.DataArray(
-            [0, -3, np.NaN], coords={'level': forecast.level}
-        ),
-        'v_component_of_wind': xr.DataArray(
-            [0, 4, 1], coords={'level': forecast.level}
-        ),
-    })
+    forecast_modifier = xr.Dataset(
+        {
+            'u_component_of_wind': xr.DataArray(
+                [0, 3, np.NaN], coords={'level': forecast.level}
+            ),
+            'v_component_of_wind': xr.DataArray(
+                [0, -4, 1], coords={'level': forecast.level}
+            ),
+        }
+    )
+    truth_modifier = xr.Dataset(
+        {
+            'u_component_of_wind': xr.DataArray(
+                [0, -3, np.NaN], coords={'level': forecast.level}
+            ),
+            'v_component_of_wind': xr.DataArray(
+                [0, 4, 1], coords={'level': forecast.level}
+            ),
+        }
+    )
 
     forecast = forecast + forecast_modifier
     truth = truth + truth_modifier

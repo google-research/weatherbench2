@@ -161,10 +161,12 @@ class SEEPSThreshold:
     if weights is not None:
       heavy_threshold = heavy_threshold.weighted(weights)  # pytype: disable=wrong-arg-types
     heavy_threshold = heavy_threshold.quantile(2 / 3, dim=dim)
-    out = xr.Dataset({
-        f'{self.var}_seeps_threshold': heavy_threshold.drop('quantile'),
-        f'{self.var}_seeps_dry_fraction': dry_fraction,
-    })
+    out = xr.Dataset(
+        {
+            f'{self.var}_seeps_threshold': heavy_threshold.drop('quantile'),
+            f'{self.var}_seeps_dry_fraction': dry_fraction,
+        }
+    )
     return out
 
 
@@ -311,10 +313,12 @@ def main(argv: list[str]) -> None:
   seeps_dry_threshold_mm = ast.literal_eval(SEEPS_DRY_THRESHOLD_MM.value)
   if 'seeps' in STATISTICS.value:
     for v in seeps_dry_threshold_mm.keys():
-      clim_template = clim_template.assign({
-          f'{v}_seeps_threshold': clim_template[v],
-          f'{v}_seeps_dry_fraction': clim_template[v],
-      })
+      clim_template = clim_template.assign(
+          {
+              f'{v}_seeps_threshold': clim_template[v],
+              f'{v}_seeps_dry_fraction': clim_template[v],
+          }
+      )
 
   def _compute_seeps(kv):
     k, _ = kv

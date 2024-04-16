@@ -83,10 +83,12 @@ def make_multispectral_dataset(
 class DerivedVariablesTest(absltest.TestCase):
 
   def testWindSpeed(self):
-    dataset = xr.Dataset({
-        'u_component_of_wind': xr.DataArray([0, 3, np.NaN]),
-        'v_component_of_wind': xr.DataArray([0, -4, 1]),
-    })
+    dataset = xr.Dataset(
+        {
+            'u_component_of_wind': xr.DataArray([0, 3, np.NaN]),
+            'v_component_of_wind': xr.DataArray([0, -4, 1]),
+        }
+    )
 
     derived_variable = dvs.WindSpeed(
         u_name='u_component_of_wind',

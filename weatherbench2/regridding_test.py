@@ -26,10 +26,12 @@ class RegriddingTest(parameterized.TestCase):
     # integral of cos(x) from 0*pi/6 to 1*pi/6 -> 0.5
     # integral of cos(x) from 1*pi/6 to 2*pi/6 -> (sqrt(3) - 1) / 2
     # integral of cos(x) from 2*pi/6 to 3*pi/6 -> 1 - sqrt(3) / 2
-    expected = np.array([
-        [1 - np.sqrt(3) / 2, (np.sqrt(3) - 1) / 2, 1 / 2, 0, 0, 0],
-        [0, 0, 0, 1 / 2, (np.sqrt(3) - 1) / 2, 1 - np.sqrt(3) / 2],
-    ])
+    expected = np.array(
+        [
+            [1 - np.sqrt(3) / 2, (np.sqrt(3) - 1) / 2, 1 / 2, 0, 0, 0],
+            [0, 0, 0, 1 / 2, (np.sqrt(3) - 1) / 2, 1 - np.sqrt(3) / 2],
+        ]
+    )
     actual = regridding._conservative_latitude_weights(source_lat, target_lat)
     np.testing.assert_almost_equal(expected, actual)
 
@@ -49,12 +51,14 @@ class RegriddingTest(parameterized.TestCase):
     source_lon = np.pi / 180 * np.array([0, 60, 120, 180, 240, 300])
     target_lon = np.pi / 180 * np.array([0, 90, 180, 270])
     expected = (
-        np.array([
-            [4, 1, 0, 0, 0, 1],
-            [0, 3, 3, 0, 0, 0],
-            [0, 0, 1, 4, 1, 0],
-            [0, 0, 0, 0, 3, 3],
-        ])
+        np.array(
+            [
+                [4, 1, 0, 0, 0, 1],
+                [0, 3, 3, 0, 0, 0],
+                [0, 0, 1, 4, 1, 0],
+                [0, 0, 0, 0, 3, 3],
+            ]
+        )
         / 6
     )
     actual = regridding._conservative_longitude_weights(source_lon, target_lon)

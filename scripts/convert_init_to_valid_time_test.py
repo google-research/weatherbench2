@@ -39,12 +39,14 @@ class InitToValidTimeTest(parameterized.TestCase):
         {
             'foo': (
                 ('time', 'prediction_timedelta'),
-                np.array([
-                    [1, 2, 3, 4, 5],
-                    [6, 7, 8, 9, 10],
-                    [11, 12, 13, 14, 15],
-                    [16, 17, 18, 19, 20],
-                ]),
+                np.array(
+                    [
+                        [1, 2, 3, 4, 5],
+                        [6, 7, 8, 9, 10],
+                        [11, 12, 13, 14, 15],
+                        [16, 17, 18, 19, 20],
+                    ]
+                ),
             ),
         },
         coords={
@@ -58,14 +60,16 @@ class InitToValidTimeTest(parameterized.TestCase):
         {
             'foo': (
                 ('time', 'prediction_timedelta'),
-                np.array([
-                    [1, np.nan, np.nan],
-                    [6, 3, np.nan],
-                    [11, 8, 5],
-                    [16, 13, 10],
-                    [np.nan, 18, 15],
-                    [np.nan, np.nan, 20],
-                ]),
+                np.array(
+                    [
+                        [1, np.nan, np.nan],
+                        [6, 3, np.nan],
+                        [11, 8, 5],
+                        [16, 13, 10],
+                        [np.nan, 18, 15],
+                        [np.nan, np.nan, 20],
+                    ]
+                ),
             ),
         },
         coords={
@@ -98,12 +102,14 @@ class InitToValidTimeTest(parameterized.TestCase):
         {
             'foo': (
                 ('time', 'prediction_timedelta'),
-                np.array([
-                    [2, 3, 4, 5],
-                    [7, 8, 9, 10],
-                    [12, 13, 14, 15],
-                    [17, 18, 19, 20],
-                ]),
+                np.array(
+                    [
+                        [2, 3, 4, 5],
+                        [7, 8, 9, 10],
+                        [12, 13, 14, 15],
+                        [17, 18, 19, 20],
+                    ]
+                ),
             ),
         },
         coords={
@@ -117,13 +123,15 @@ class InitToValidTimeTest(parameterized.TestCase):
         {
             'foo': (
                 ('time', 'prediction_timedelta'),
-                np.array([
-                    [3, np.nan],
-                    [8, 5],
-                    [13, 10],
-                    [18, 15],
-                    [np.nan, 20],
-                ]),
+                np.array(
+                    [
+                        [3, np.nan],
+                        [8, 5],
+                        [13, 10],
+                        [18, 15],
+                        [np.nan, 20],
+                    ]
+                ),
             ),
         },
         coords={
