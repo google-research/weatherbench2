@@ -170,7 +170,7 @@ def main(argv: abc.Sequence[str]) -> None:
           orig_times.min() - np.timedelta64(rolling_window - 1, 'D'),
           orig_times.max() - np.timedelta64(rolling_window - 2, 'D'),
           dtype='datetime64[D]',
-      )
+      ).astype('datetime64[ns]')
   elif METHOD.value == 'resample':
     if PERIOD.value[-1] == 'w':
       raise NotImplementedError(
@@ -181,7 +181,7 @@ def main(argv: abc.Sequence[str]) -> None:
           orig_times.min(),
           orig_times.max() + np.timedelta64(1, 'D'),
           dtype='datetime64[D]',
-      )
+      ).astype('datetime64[ns]')
   else:
     raise ValueError(f'Method {METHOD.value} not supported.')
 
