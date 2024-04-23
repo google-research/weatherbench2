@@ -86,6 +86,11 @@ FANOUT = flags.DEFINE_integer(
     None,
     help='Beam CombineFn fanout. Might be required for large dataset.',
 )
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
+)
 
 
 # pylint: disable=expression-not-assigned
@@ -120,7 +125,10 @@ def main(argv: list[str]):
 
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     chunked = root | xbeam.DatasetToChunks(
-        source_dataset, source_chunks, split_vars=True
+        source_dataset,
+        source_chunks,
+        split_vars=True,
+        num_threads=NUM_THREADS.value,
     )
 
     if weights is not None:
@@ -131,7 +139,12 @@ def main(argv: list[str]):
     (
         chunked
         | xbeam.Mean(AVERAGING_DIMS.value, skipna=False, fanout=FANOUT.value)
-        | xbeam.ChunksToZarr(OUTPUT_PATH.value, template, target_chunks)
+        | xbeam.ChunksToZarr(
+            OUTPUT_PATH.value,
+            template,
+            target_chunks,
+            num_threads=NUM_THREADS.value,
+        )
     )
 
 

@@ -14,9 +14,11 @@
 # ==============================================================================
 """WeatherBench2 utilities for working with command line flags."""
 import re
-from typing import Any
+from typing import Any, Union
 
 from absl import flags
+
+DimValueType = Union[int, float, str]
 
 
 def _chunks_string_is_valid(chunks_string: str) -> bool:
@@ -52,8 +54,8 @@ class _ChunksParser(flags.ArgumentParser):
     return 'dict[str, int]'
 
 
-class _ChunksSerializer(flags.ArgumentSerializer):
-  """Serializer for Xarray-Beam chunks flags."""
+class _DimValuePairSerializer(flags.ArgumentSerializer):
+  """Serializer for dim=value pairs."""
 
   def serialize(self, value: dict[str, int]) -> str:
     return ','.join(f'{k}={v}' for k, v in value.items())
@@ -67,7 +69,67 @@ def DEFINE_chunks(  # pylint: disable=invalid-name
 ):
   """Define a flag for defining Xarray-Beam chunks."""
   parser = _ChunksParser()
-  serializer = _ChunksSerializer()
+  serializer = _DimValuePairSerializer()
+  return flags.DEFINE(
+      parser, name, default, help, serializer=serializer, **kwargs
+  )
+
+
+# Key/value pairs of the form dimension=integer have the same requirements as
+# chunks.
+DEFINE_dim_integer_pairs = DEFINE_chunks
+
+
+class _DimValuePairParser(flags.ArgumentParser):
+  """Parser for dim=value pairs."""
+
+  syntactic_help: str = (
+      'comma separate list of dim=value pairs, e.g.,'
+      '"time=0 days,longitude=100"'
+  )
+
+  def parse(self, argument: str) -> dict[str, DimValueType]:
+    return _parse_dim_value_pairs(argument)
+
+  def flag_type(self) -> str:
+    """Returns a string representing the type of the flag."""
+    return 'dict[str, int | float | str]'
+
+
+def _get_dim_value(value_string: str) -> DimValueType:
+  """Tries returning int then float, fallback to string."""
+  try:
+    return int(value_string)
+  except ValueError:
+    pass
+  try:
+    return float(value_string)
+  except ValueError:
+    pass
+  return value_string
+
+
+def _parse_dim_value_pairs(
+    dim_value_string: str,
+) -> dict[str, DimValueType]:
+  """Parse a chunks string into a dict."""
+  pairs = {}
+  if dim_value_string:
+    for entry in dim_value_string.split(','):
+      key, value = entry.split('=')
+      pairs[key] = _get_dim_value(value)
+  return pairs
+
+
+def DEFINE_dim_value_pairs(  # pylint: disable=invalid-name
+    name: str,
+    default: str,
+    help: str,  # pylint: disable=redefined-builtin
+    **kwargs: Any,
+):
+  """Flag for defining key=value pairs, string key, value a str/int/float."""
+  parser = _DimValuePairParser()
+  serializer = _DimValuePairSerializer()
   return flags.DEFINE(
       parser, name, default, help, serializer=serializer, **kwargs
   )
