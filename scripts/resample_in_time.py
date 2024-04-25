@@ -221,7 +221,7 @@ def resample_in_time_chunk(
 
 
 def resample_in_time_core(
-    chunk: xr.Dataset,
+    chunk: t.Union[xr.Dataset, xr.DataArray],
     method: str,
     period: pd.Timedelta,
     statistic: str,
@@ -272,13 +272,13 @@ def main(argv: abc.Sequence[str]) -> None:
   if METHOD.value == 'resample':
     rsmp_times = resample_in_time_core(
         # All stats will give the same times, so use 'mean' arbitrarily.
-        ds.time,
+        ds[TIME_DIM.value],
         METHOD.value,
         period,
         statistic='mean',
-    ).time
+    )[TIME_DIM.value]
   else:
-    rsmp_times = ds.time
+    rsmp_times = ds[TIME_DIM.value]
   assert isinstance(ds, xr.Dataset)  # To satisfy pytype.
   rsmp_template = (
       xbeam.make_template(ds)
@@ -306,7 +306,7 @@ def main(argv: abc.Sequence[str]) -> None:
   working_chunks.update(WORKING_CHUNKS.value)
   if TIME_DIM.value in working_chunks:
     raise ValueError('cannot include time working chunks')
-  working_chunks[TIME_DIM.value] = len(ds.time)
+  working_chunks[TIME_DIM.value] = len(ds[TIME_DIM.value])
   output_chunks = input_chunks.copy()
   output_chunks[TIME_DIM.value] = min(
       len(rsmp_times), output_chunks[TIME_DIM.value]
