@@ -102,6 +102,11 @@ import xarray_beam
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='zarr inputs')
 OUTPUT_PATH = flags.DEFINE_string('output_path', None, help='zarr outputs')
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
+)
 
 TIME = 'time'
 DELTA = 'prediction_timedelta'
@@ -254,7 +259,9 @@ def main(argv: list[str]) -> None:
             source_ds.indexes[INIT],
         )
     )
-    p |= xarray_beam.DatasetToChunks(source_ds, input_chunks, split_vars=True)
+    p |= xarray_beam.DatasetToChunks(
+        source_ds, input_chunks, split_vars=True, num_threads=NUM_THREADS.value
+    )
     if input_chunks != split_chunks:
       p |= xarray_beam.SplitChunks(split_chunks)
     p |= beam.FlatMapTuple(
@@ -266,7 +273,12 @@ def main(argv: list[str]) -> None:
     p = (p, padding) | beam.Flatten()
     if input_chunks != split_chunks:
       p |= xarray_beam.ConsolidateChunks(output_chunks)
-    p |= xarray_beam.ChunksToZarr(OUTPUT_PATH.value, template, output_chunks)
+    p |= xarray_beam.ChunksToZarr(
+        OUTPUT_PATH.value,
+        template,
+        output_chunks,
+        num_threads=NUM_THREADS.value,
+    )
 
 
 if __name__ == '__main__':

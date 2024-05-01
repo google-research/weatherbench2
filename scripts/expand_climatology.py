@@ -72,6 +72,11 @@ TIME_CHUNK_SIZE = flags.DEFINE_integer(
     None,
     help='Desired integer chunk size. If not set, inferred from input chunks.',
 )
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
+)
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 
@@ -149,7 +154,10 @@ def main(argv: list[str]) -> None:
         | beam.Reshuffle()
         | beam.FlatMap(select_climatology, climatology, times, base_chunks)
         | xbeam.ChunksToZarr(
-            OUTPUT_PATH.value, template=template, zarr_chunks=output_chunks
+            OUTPUT_PATH.value,
+            template=template,
+            zarr_chunks=output_chunks,
+            num_threads=NUM_THREADS.value,
         )
     )
 
