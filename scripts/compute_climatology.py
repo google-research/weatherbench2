@@ -120,6 +120,11 @@ SEEPS_DRY_THRESHOLD_MM = flags.DEFINE_string(
         'precipitation variable. In mm.'
     ),
 )
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
+)
 
 
 class Quantile:
@@ -353,7 +358,10 @@ def main(argv: list[str]) -> None:
     pcoll = (
         root
         | xbeam.DatasetToChunks(
-            obs, input_chunks, split_vars=True, num_threads=16
+            obs,
+            input_chunks,
+            split_vars=True,
+            num_threads=NUM_THREADS.value,
         )
         | 'RechunkIn'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
@@ -416,7 +424,7 @@ def main(argv: list[str]) -> None:
             OUTPUT_PATH.value,
             template=clim_template,
             zarr_chunks=output_chunks,
-            num_threads=16,
+            num_threads=NUM_THREADS.value,
         )
     )
 

@@ -509,6 +509,7 @@ class _SaveOutputs(beam.PTransform):
   eval_name: str
   data_config: config.Data
   output_format: str
+  num_threads: Optional[int] = None
 
   def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:
     combined = xr.combine_by_coords(datasets)
@@ -529,7 +530,9 @@ class _SaveOutputs(beam.PTransform):
       output_path = _get_output_path(
           self.data_config, self.eval_name, self.output_format
       )
-      return pcoll | xbeam.ChunksToZarr(output_path)
+      return pcoll | xbeam.ChunksToZarr(
+          output_path, num_threads=self.num_threads
+      )
     else:
       raise ValueError(f'unrecogonized data format: {self.output_format}')
 
@@ -551,6 +554,7 @@ class _EvaluateAllMetrics(beam.PTransform):
   data_config: config.Data
   input_chunks: abc.Mapping[str, int]
   fanout: Optional[int] = None
+  num_threads: Optional[int] = None
 
   def _evaluate_chunk(
       self,
@@ -662,12 +666,14 @@ class _EvaluateAllMetrics(beam.PTransform):
           forecast,
           self.input_chunks,
           split_vars=False,
+          num_threads=self.num_threads,
       ) | beam.MapTuple(self._sel_corresponding_truth_chunk, truth=truth)
     else:
       forecast_pipeline = xbeam.DatasetToChunks(
           [forecast, truth],
           self.input_chunks,
           split_vars=False,
+          num_threads=self.num_threads,
       )
 
     if self.eval_config.evaluate_climatology:
@@ -723,6 +729,7 @@ def evaluate_with_beam(
     input_chunks: abc.Mapping[str, int],
     runner: str,
     fanout: Optional[int] = None,
+    num_threads: Optional[int] = None,
     argv: Optional[list[str]] = None,
 ) -> None:
   """Run evaluation with a Beam pipeline.
@@ -750,6 +757,7 @@ def evaluate_with_beam(
     input_chunks: Chunking of input datasets.
     runner: Beam runner.
     fanout: Beam CombineFn fanout.
+    num_threads: Number of threads to use for reading/writing data.
     argv: Other arguments to pass into the Beam pipeline.
   """
 
@@ -760,8 +768,18 @@ def evaluate_with_beam(
           root
           | f'evaluate_{eval_name}'
           >> _EvaluateAllMetrics(
-              eval_name, eval_config, data_config, input_chunks, fanout=fanout
+              eval_name,
+              eval_config,
+              data_config,
+              input_chunks,
+              fanout=fanout,
+              num_threads=num_threads,
           )
           | f'save_{eval_name}'
-          >> _SaveOutputs(eval_name, data_config, eval_config.output_format)
+          >> _SaveOutputs(
+              eval_name,
+              data_config,
+              eval_config.output_format,
+              num_threads=num_threads,
+          )
       )
