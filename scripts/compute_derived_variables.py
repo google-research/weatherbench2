@@ -116,6 +116,11 @@ RECHUNK_ITEMSIZE = flags.DEFINE_integer(
 MAX_MEM_GB = flags.DEFINE_integer(
     'max_mem_gb', 1, help='Max memory for rechunking in GB.'
 )
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
+)
 
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
@@ -226,7 +231,12 @@ def main(argv: list[str]) -> None:
     # so that with and without rechunking can be computed in parallel
     pcoll = (
         root
-        | xbeam.DatasetToChunks(source_dataset, source_chunks, split_vars=False)
+        | xbeam.DatasetToChunks(
+            source_dataset,
+            source_chunks,
+            split_vars=False,
+            num_threads=NUM_THREADS.value,
+        )
         | beam.MapTuple(
             lambda k, v: (  # pylint: disable=g-long-lambda
                 k,
@@ -274,7 +284,10 @@ def main(argv: list[str]) -> None:
 
     # Combined
     _ = pcoll | xbeam.ChunksToZarr(
-        OUTPUT_PATH.value, template, source_chunks, num_threads=16
+        OUTPUT_PATH.value,
+        template,
+        source_chunks,
+        num_threads=NUM_THREADS.value,
     )
 
 

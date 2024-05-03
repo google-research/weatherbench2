@@ -27,7 +27,7 @@ from . import resample_in_time
 
 class ResampleInTimeTest(parameterized.TestCase):
 
-  def test_demonstrating_returned_times_for_resample(self):
+  def test_demonstrating_resample_and_rolling_are_aligned(self):
     # times = 10 days, starting at Jan 1
     times = pd.DatetimeIndex(
         [
@@ -43,7 +43,13 @@ class ResampleInTimeTest(parameterized.TestCase):
             '2023-01-10',
         ]
     )
-    temperatures = np.arange(len(times))
+    temperatures = np.arange(len(times)).astype(float)
+
+    # NaN inserted to (i) verify skipna=False, and (ii) verify correct setting
+    # for min_periods. If e.g. min_periods=1, then NaN values get skipped so
+    # long as there is at least one non-NaN value!
+    temperatures[0] = np.nan
+
     input_ds = xr.Dataset(
         {
             'temperature': xr.DataArray(
@@ -53,37 +59,128 @@ class ResampleInTimeTest(parameterized.TestCase):
     )
 
     input_path = self.create_tempdir('source').full_path
-    output_path = self.create_tempdir('destination').full_path
-
     input_ds.to_zarr(input_path)
 
+    # Get resampled output
+    resample_output_path = self.create_tempdir('resample').full_path
     with flagsaver.as_parsed(
         input_path=input_path,
-        output_path=output_path,
+        output_path=resample_output_path,
         method='resample',
-        period='1w',
+        period='3d',
         mean_vars='ALL',
         runner='DirectRunner',
     ):
       resample_in_time.main([])
+    resample, unused_output_chunks = xarray_beam.open_zarr(resample_output_path)
 
-    output_ds, unused_output_chunks = xarray_beam.open_zarr(output_path)
+    # Show that the output at time T uses data from the window [T, T + period]
     np.testing.assert_array_equal(
-        output_ds.time,
-        # The first output time is the first input time
-        # The second output time is the first + 1w
-        np.array(
-            ['2023-01-01T00:00:00.000000000', '2023-01-08T00:00:00.000000000'],
-            dtype='datetime64[ns]',
+        pd.to_datetime(resample.time),
+        pd.DatetimeIndex(
+            ['2023-01-01', '2023-01-04', '2023-01-07', '2023-01-10']
         ),
     )
 
     np.testing.assert_array_equal(
-        output_ds.temperature.data,
-        # The first temperature is the average of the first 7 times
-        # The second temperature is the average of the remaining times (of which
-        # there are only 3).
-        [np.mean(temperatures[:7]), np.mean(temperatures[7:14])],
+        resample.temperature.data,
+        [
+            np.mean(temperatures[:3]),  # Will be NaN
+            np.mean(temperatures[3:6]),
+            np.mean(temperatures[6:9]),
+            np.mean(temperatures[9:12]),
+        ],
+    )
+
+    # Get rolled output
+    rolling_output_path = self.create_tempdir('rolling').full_path
+    with flagsaver.as_parsed(
+        input_path=input_path,
+        output_path=rolling_output_path,
+        method='rolling',
+        period='3d',
+        mean_vars='ALL',
+        runner='DirectRunner',
+    ):
+      resample_in_time.main([])
+    rolling, unused_output_chunks = xarray_beam.open_zarr(rolling_output_path)
+
+    common_times = pd.DatetimeIndex(['2023-01-01', '2023-01-04', '2023-01-07'])
+    xr.testing.assert_equal(
+        resample.sel(time=common_times),
+        rolling.sel(time=common_times),
+    )
+
+  @parameterized.parameters(
+      (20, '3d', None),
+      (21, '3d', None),
+      (21, '8d', None),
+      (5, '1d', None),
+      (20, '3d', [0, 4, 8]),
+      (21, '3d', [20]),
+      (21, '8d', [15]),
+  )
+  def test_demonstrating_resample_and_rolling_are_aligned_many_combinations(
+      self,
+      n_times,
+      period,
+      nan_locations,
+  ):
+    # Less readable than test_demonstrating_resample_and_rolling_are_aligned,
+    # but these sorts of automated checks ensure we didn't miss an edge case
+    # (there are many!!!!)
+    times = pd.date_range('2010', periods=n_times)
+    temperatures = np.random.RandomState(802701).rand(n_times)
+
+    for i in nan_locations or []:
+      temperatures[i] = np.nan
+
+    input_ds = xr.Dataset(
+        {
+            'temperature': xr.DataArray(
+                temperatures, coords=[times], dims=['time']
+            )
+        }
+    )
+
+    input_path = self.create_tempdir('source').full_path
+    input_ds.to_zarr(input_path)
+
+    # Get resampled output
+    resample_output_path = self.create_tempdir('resample').full_path
+    with flagsaver.as_parsed(
+        input_path=input_path,
+        output_path=resample_output_path,
+        method='resample',
+        period=period,
+        mean_vars='ALL',
+        runner='DirectRunner',
+    ):
+      resample_in_time.main([])
+    resample, unused_output_chunks = xarray_beam.open_zarr(resample_output_path)
+
+    # Get rolled output
+    rolling_output_path = self.create_tempdir('rolling').full_path
+    with flagsaver.as_parsed(
+        input_path=input_path,
+        output_path=rolling_output_path,
+        method='rolling',
+        period=period,
+        mean_vars='ALL',
+        runner='DirectRunner',
+    ):
+      resample_in_time.main([])
+    rolling, unused_output_chunks = xarray_beam.open_zarr(rolling_output_path)
+
+    common_times = pd.to_datetime(resample.time.data).intersection(
+        rolling.time.data
+    )
+
+    # At most, one time is lost if the period doesn't evenly divide n_times.
+    self.assertGreaterEqual(len(common_times), len(resample.time) - 1)
+    xr.testing.assert_equal(
+        resample.sel(time=common_times),
+        rolling.sel(time=common_times),
     )
 
   @parameterized.named_parameters(
@@ -189,6 +286,12 @@ class ResampleInTimeTest(parameterized.TestCase):
               time=pd.to_timedelta(period)
               // pd.to_timedelta(input_time_resolution)
           ).mean()
+      )
+      # Enact the time offsetting needed to align resample and rolling.
+      expected_mean = expected_mean.assign_coords(
+          time=expected_mean.time
+          - pd.to_timedelta(period)
+          + pd.to_timedelta(input_time_resolution)
       )
     else:
       raise ValueError(f'Unhandled {method=}')
@@ -336,6 +439,12 @@ class ResampleInTimeTest(parameterized.TestCase):
               prediction_timedelta=pd.to_timedelta(period)
               // pd.to_timedelta(input_time_resolution)
           ).mean()
+      )
+      # Enact the time offsetting needed to align resample and rolling.
+      expected_mean = expected_mean.assign_coords(
+          prediction_timedelta=expected_mean.prediction_timedelta
+          - pd.to_timedelta(period)
+          + pd.to_timedelta(input_time_resolution)
       )
     else:
       raise ValueError(f'Unhandled {method=}')

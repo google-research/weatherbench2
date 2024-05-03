@@ -61,6 +61,11 @@ TIME_STOP = flags.DEFINE_string(
     '2020-12-31',
     help='ISO 8601 timestamp (inclusive) at which to stop evaluation',
 )
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
+)
 
 
 # pylint: disable=expression-not-assigned
@@ -88,9 +93,19 @@ def main(argv: list[str]):
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     (
         root
-        | xbeam.DatasetToChunks(source_dataset, source_chunks, split_vars=True)
+        | xbeam.DatasetToChunks(
+            source_dataset,
+            source_chunks,
+            split_vars=True,
+            num_threads=NUM_THREADS.value,
+        )
         | xbeam.Mean(REALIZATION_NAME.value, skipna=False)
-        | xbeam.ChunksToZarr(OUTPUT_PATH.value, template, target_chunks)
+        | xbeam.ChunksToZarr(
+            OUTPUT_PATH.value,
+            template,
+            target_chunks,
+            num_threads=NUM_THREADS.value,
+        )
     )
 
 

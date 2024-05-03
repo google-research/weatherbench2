@@ -429,6 +429,48 @@ _Command options_:
 * `--working_chunks`: Spatial chunk sizes to use during time downsampling, e.g., "longitude=10,latitude=10". They may not include "time".
 * `--beam_runner`: Beam runner. Use `DirectRunner` for local execution.
 
+## Slice dataset
+Slices a Zarr file containing an xarray Dataset, using `.sel` and `.isel`.
+
+```
+usage: slice_dataset.py [-h]
+                 [--input_path INPUT_PATH]
+                 [--output_path OUTPUT_PATH]
+                 [--sel SEL]
+                 [--isel ISEL]
+                 [--drop_variables DROP_VARIABLES]
+                 [--keep_variables KEEP_VARIABLES]
+                 [--output_chunks OUTPUT_CHUNKS]
+                 [--runner RUNNER]
+
+```
+
+_Command options_:
+
+* `--input_path`: (required) Input Zarr path
+* `--output_path`: (required) Output Zarr path
+* `--sel`: Selection criteria, to pass to `xarray.Dataset.sel`. Passed as
+           key=value pairs, with key = `VARNAME_{start,stop,step}`
+* `--isel`: Selection criteria, to pass to `xarray.Dataset.isel`. Passed as
+            key=value pairs, with key = `VARNAME_{start,stop,step}`
+* `--drop_variables`: Comma delimited list of variables to drop. If empty, drop
+                      no variables.
+* `--keep_variables`: Comma delimited list of variables to keep. If empty, use
+                      `--drop_variables` to determine which variables to keep.
+* `--output_chunks`: Chunk sizes overriding input chunks.
+* `--runner`: Beam runner. Use `DirectRunner` for local execution.
+
+*Example*
+
+```bash
+python slice_dataset.py -- \
+  --input_path=gs://weatherbench2/datasets/ens/2018-64x32_equiangular_with_poles_conservative.zarr \
+  --output_path=PATH \
+  --sel="prediction_timedelta_stop=15 days,latitude_start=-33.33,latitude_stop=33.33" \
+  --isel="longitude_start=0,longitude_stop=180,longitude_step=40" \
+  --keep_variables=geopotential,temperature
+```
+
 ## Expand climatology
 
 `expand_climatology.py` takes a climatology dataset and expands it into a forecast-like format (`init_time` + `lead_time`). This is not currently used as `evaluation.py` is able to do this on-the-fly, reducing the number of intermediate steps. We still included the script here in case others find it useful. 

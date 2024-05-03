@@ -96,6 +96,11 @@ FANOUT = flags.DEFINE_integer(
     None,
     help='Beam CombineFn fanout. Might be required for large dataset.',
 )
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
+)
 
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
@@ -196,7 +201,12 @@ def main(argv: list[str]) -> None:
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     _ = (
         root
-        | xbeam.DatasetToChunks(source_dataset, source_chunks, split_vars=False)
+        | xbeam.DatasetToChunks(
+            source_dataset,
+            source_chunks,
+            split_vars=False,
+            num_threads=NUM_THREADS.value,
+        )
         | beam.MapTuple(
             lambda k, v: (  # pylint: disable=g-long-lambda
                 k,
@@ -207,7 +217,10 @@ def main(argv: list[str]) -> None:
         | beam.MapTuple(_strip_offsets)
         | xbeam.Mean(AVERAGING_DIMS.value, fanout=FANOUT.value)
         | xbeam.ChunksToZarr(
-            OUTPUT_PATH.value, template, output_chunks, num_threads=16
+            OUTPUT_PATH.value,
+            template,
+            output_chunks,
+            num_threads=NUM_THREADS.value,
         )
     )
 

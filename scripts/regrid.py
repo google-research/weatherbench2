@@ -78,6 +78,11 @@ LATITUDE_NAME = flags.DEFINE_string(
 LONGITUDE_NAME = flags.DEFINE_string(
     'longitude_name', 'longitude', help='Name of longitude dimension in dataset'
 )
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
+)
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 
@@ -135,11 +140,21 @@ def main(argv):
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     _ = (
         root
-        | xarray_beam.DatasetToChunks(source_ds, input_chunks, split_vars=True)
+        | xarray_beam.DatasetToChunks(
+            source_ds,
+            input_chunks,
+            split_vars=True,
+            num_threads=NUM_THREADS.value,
+        )
         | 'Regrid'
         >> beam.MapTuple(lambda k, v: (k, regridder.regrid_dataset(v)))
         | xarray_beam.ConsolidateChunks(output_chunks)
-        | xarray_beam.ChunksToZarr(OUTPUT_PATH.value, template, output_chunks)
+        | xarray_beam.ChunksToZarr(
+            OUTPUT_PATH.value,
+            template,
+            output_chunks,
+            num_threads=NUM_THREADS.value,
+        )
     )
 
 

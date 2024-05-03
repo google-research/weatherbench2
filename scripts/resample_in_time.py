@@ -70,7 +70,12 @@ METHOD = flags.DEFINE_enum(
     'method',
     'resample',
     ['resample', 'rolling'],
-    help='Whether to resample to new times, or use a rolling window.',
+    help=(
+        'Whether to resample to new times (spaced by --period), or use a'
+        ' rolling window. In either case, output at time index T uses the'
+        ' window [T, T + period]. In particular, whether using resample or'
+        ' rolling, output at matching times will be the same.'
+    ),
 )
 PERIOD = flags.DEFINE_string(
     'period',
@@ -114,7 +119,9 @@ ADD_MEAN_SUFFIX = flags.DEFINE_bool(
     help='Add suffix "_mean" to variable name when computing the mean.',
 )
 NUM_THREADS = flags.DEFINE_integer(
-    'num_threads', None, help='Number of chunks to load in parallel per worker.'
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
 )
 TIME_DIM = flags.DEFINE_string(
     'time_dim', 'time', help='Name for the time dimension to slice data on.'
@@ -234,14 +241,16 @@ def resample_in_time_core(
           f'{delta_t=} between chunk times did not evenly divide {period=}'
       )
     return getattr(
-        chunk.rolling({TIME_DIM.value: period // delta_t}),
+        chunk.rolling(
+            {TIME_DIM.value: period // delta_t}, center=False, min_periods=None
+        ),
         statistic,
-    )()
+    )(skipna=False)
   elif method == 'resample':
     return getattr(
-        chunk.resample({TIME_DIM.value: period}),
+        chunk.resample({TIME_DIM.value: period}, label='left'),
         statistic,
-    )()
+    )(skipna=False)
   else:
     raise ValueError(f'Unhandled {method=}')
 
@@ -249,6 +258,8 @@ def resample_in_time_core(
 def main(argv: abc.Sequence[str]) -> None:
 
   ds, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
+  period = pd.to_timedelta(PERIOD.value)
+
   if TIME_START.value is not None or TIME_STOP.value is not None:
     ds = ds.sel({TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value)})
 
@@ -267,8 +278,22 @@ def main(argv: abc.Sequence[str]) -> None:
     )
   ds = ds[keep_vars]
 
+  # To ensure results at time T use data from [T, T + period], an offset needs
+  # to be added if the method is rolling.
+  # It would be wonderful if this was the default, or possible with appropriate
+  # kwargs in rolling, but alas...
+  if METHOD.value == 'rolling':
+    delta_ts = pd.to_timedelta(np.unique(np.diff(ds[TIME_DIM.value].data)))
+    if len(delta_ts) != 1:
+      raise ValueError(
+          f'Input data must have constant spacing. Found {delta_ts}'
+      )
+    delta_t = delta_ts[0]
+    ds = ds.assign_coords(
+        {TIME_DIM.value: ds[TIME_DIM.value] - period + delta_t}
+    )
+
   # Make the template
-  period = pd.to_timedelta(PERIOD.value)
   if METHOD.value == 'resample':
     rsmp_times = resample_in_time_core(
         # All stats will give the same times, so use 'mean' arbitrarily.

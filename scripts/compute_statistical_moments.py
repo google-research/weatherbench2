@@ -37,6 +37,11 @@ RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 RECHUNK_ITEMSIZE = flags.DEFINE_integer(
     'rechunk_itemsize', 4, help='Itemsize for rechunking.'
 )
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
+)
 
 
 def moment_reduce(
@@ -143,7 +148,9 @@ def main(argv: list[str]) -> None:
 
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
     # Read
-    pcoll = root | xbeam.DatasetToChunks(obs, input_chunks, split_vars=True)
+    pcoll = root | xbeam.DatasetToChunks(
+        obs, input_chunks, split_vars=True, num_threads=NUM_THREADS.value
+    )
 
     # Branches to compute statistical moments
     pcolls = []
@@ -174,6 +181,7 @@ def main(argv: list[str]) -> None:
             OUTPUT_PATH.value,
             template=output_template,
             zarr_chunks=output_chunks,
+            num_threads=NUM_THREADS.value,
         )
     )
 
