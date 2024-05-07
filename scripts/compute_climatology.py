@@ -330,6 +330,10 @@ def main(argv: list[str]) -> None:
     if stat not in ['seeps', 'mean']:
       for var in raw_vars:
         if stat == 'quantile':
+          if not quantiles:
+            raise ValueError(
+                'Cannot compute stat `quantile` without specifying --quantiles.'
+            )
           quantile_dim = xr.DataArray(
               quantiles, name='quantile', dims=['quantile']
           )
