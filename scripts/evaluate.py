@@ -249,6 +249,11 @@ FANOUT = flags.DEFINE_integer(
     None,
     help='Beam CombineFn fanout. Might be required for large dataset.',
 )
+NUM_THREADS = flags.DEFINE_integer(
+    'num_threads',
+    None,
+    help='Number of chunks to read/write Zarr in parallel per worker.',
+)
 
 
 def _wind_vector_error(err_type: str):
@@ -623,6 +628,7 @@ def main(argv: list[str]) -> None:
         runner=RUNNER.value,
         input_chunks=INPUT_CHUNKS.value,
         fanout=FANOUT.value,
+        num_threads=NUM_THREADS.value,
         argv=argv,
     )
   else:

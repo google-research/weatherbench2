@@ -119,7 +119,9 @@ ADD_MEAN_SUFFIX = flags.DEFINE_bool(
     help='Add suffix "_mean" to variable name when computing the mean.',
 )
 NUM_THREADS = flags.DEFINE_integer(
-    'num_threads', None, help='Number of chunks to load in parallel per worker.'
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
 )
 TIME_DIM = flags.DEFINE_string(
     'time_dim', 'time', help='Name for the time dimension to slice data on.'

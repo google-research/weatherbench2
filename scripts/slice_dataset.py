@@ -96,7 +96,9 @@ RUNNER = flags.DEFINE_string(
     'runner', None, help='Beam runner. Use DirectRunner for local execution.'
 )
 NUM_THREADS = flags.DEFINE_integer(
-    'num_threads', None, help='Number of chunks to load in parallel per worker.'
+    'num_threads',
+    None,
+    help='Number of chunks to read/write in parallel per worker.',
 )
 
 
