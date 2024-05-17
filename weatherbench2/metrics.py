@@ -1445,14 +1445,18 @@ class EnsembleBrierScore(_BaseEnsembleBrierScore):
   equal to the Brier score for the opposite event, i.e., the forecast remaining
   below the threshold.
 
-  Given ensemble size n, let Q and Pn be the observation and forecast
-  frequency of exceeding `threshold`. As n → ∞,
-    Pn → P  (the forecast probability of exceeding `threshold`)
-    EnsembleBrierScore → (P - Q)².
+  Given threshold σ, consider the Brier score of forecasts at fixed time and
+  space. Let Xₖ be the kth ensemble member (out of n total). Let 1{Y > σ} and
+  1{Xₖ > σ} be the indicators equal to 1 just when Y > σ and Xₖ > σ. Then,
+    EnsembleBrierScore = Bn = ( 1{Y > σ} - (1/n)Σₖ 1{Xₖ > σ} )²
+
+  As the ensemble size n → ∞
+    (1/n)Σₖ 1{Xₖ > σ} → Prob[X > σ]
+    Bn → B := ( 1{Y > σ} - Prob[X > σ] )²
 
   For finite ensemble size, the bias is
-    Bn := E(Pn - Q)² - (P - Q)² = P (1 - P) / n.
-  An unbiased estimate of Bn is Pn (1 - Pn) / (n - 1).
+    E[Bn - B] = Prob[X > σ] (1 - Prob[X > σ]) / n,
+  which is just the sample variance divided by n.
 
   References:
   [Ferro, 2007], Comparing Probabilistic Forecasting Systems with the Brier
@@ -1496,10 +1500,18 @@ class DebiasedEnsembleBrierScore(_BaseEnsembleBrierScore):
   equal to the Brier score for the opposite event, i.e., the forecast remaining
   below the threshold.
 
-  Given ensemble size n, let Q and Pn be the observation and forecast
-  frequency of exceeding `threshold`. As n → ∞,
-    Pn → P  (the forecast probability of exceeding `threshold`)
-    EnsembleBrierScore → (P - Q)².
+  Given threshold σ, consider the Brier score of forecasts at fixed time and
+  space. Let Xₖ be the kth ensemble member (out of n total). Let 1{Y > σ} and
+  1{Xₖ > σ} be the indicators equal to 1 just when Y > σ and Xₖ > σ. Then,
+    EnsembleBrierScore = Bn = ( 1{Y > σ} - (1/n)Σₖ 1{Xₖ > σ} )²
+
+  As the ensemble size n → ∞
+    (1/n)Σₖ 1{Xₖ > σ} → Prob[X > σ]
+    Bn → B := ( 1{Y > σ} - Prob[X > σ] )²
+
+  For finite ensemble size, the bias is
+    E[Bn - B] = Prob[X > σ] (1 - Prob[X > σ]) / n,
+  which is just the sample variance divided by n.
 
   For finite ensemble size, we debias the result by subtracting the sample
   variance divided by n. As such, you must have n > 1 or the result will be NaN.
