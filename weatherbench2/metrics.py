@@ -114,6 +114,7 @@ class Metric:
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Evaluate this metric on datasets with full temporal coverages."""
     if "time" in forecast.dims:
@@ -124,7 +125,10 @@ class Metric:
       raise ValueError(
           f"Forecast has neither valid_time or init_time dimension {forecast}"
       )
-    return self.compute_chunk(forecast, truth, region=region).mean(avg_dim)
+    return self.compute_chunk(forecast, truth, region=region).mean(
+        avg_dim,
+        skipna=skipna,
+    )
 
 
 def _spatial_average(
@@ -553,9 +557,10 @@ class EnsembleMetric(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Evaluate this metric on datasets with full temporal coverages."""
-    result = super().compute(forecast, truth, region=region)
+    result = super().compute(forecast, truth, region=region, skipna=skipna)
     return result.assign_attrs(ensemble_size=forecast[self.ensemble_dim].size)
 
 
@@ -1406,8 +1411,14 @@ class _BaseEnsembleBrierScore(EnsembleMetric):
     for threshold in threshold_seq:
       quantile = threshold.quantile
       threshold = threshold.compute(truth)
-      truth_probability = xr.where(truth > threshold, 1.0, 0.0)
-      forecast_probability = xr.where(forecast > threshold, 1.0, 0.0)
+      truth_probability = xr.where(
+          truth.isnull(),
+          np.nan,
+          xr.where(truth > threshold, 1.0, 0.0),
+      )
+      forecast_probability = xr.where(
+          forecast.isnull(), np.nan, xr.where(forecast > threshold, 1.0, 0.0)
+      )
       if debias:
         mse_of_probabilities = _debiased_ensemble_mean_mse(
             forecast_probability,
