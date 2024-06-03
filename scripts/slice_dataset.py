@@ -75,7 +75,7 @@ DROP_VARIABLES = flags.DEFINE_list(
     None,
     help=(
         'Comma delimited list of variables to drop. If empty, drop no'
-        ' variables.'
+        ' variables. List may include data variables or coords.'
     ),
 )
 
@@ -83,7 +83,7 @@ KEEP_VARIABLES = flags.DEFINE_list(
     'keep_variables',
     None,
     help=(
-        'Comma delimited list of variables to keep. If empty, use'
+        'Comma delimited list of data variables to keep. If empty, use'
         ' --drop_variables to determine which variables to keep'
     ),
 )
@@ -143,7 +143,7 @@ def main(argv: abc.Sequence[str]) -> None:
   ds, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
 
   if DROP_VARIABLES.value:
-    ds = ds[[v for v in ds if v not in DROP_VARIABLES.value]]
+    ds = ds.drop_vars(DROP_VARIABLES.value)
   elif KEEP_VARIABLES.value:
     ds = ds[KEEP_VARIABLES.value]
 

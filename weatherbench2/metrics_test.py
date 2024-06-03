@@ -932,6 +932,69 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
         result['2m_temperature'].values, expected_arr, rtol=1e-4
     )
 
+  def test_nan_propagates_to_output(self):
+    kwargs = {
+        'variables_2d': ['2m_temperature'],
+        'variables_3d': [],
+        'time_start': '2022-01-01',
+        'time_stop': '2022-01-03',
+    }
+    forecast = schema.mock_forecast_data(
+        ensemble_size=4, lead_stop='1 day', **kwargs
+    )
+    forecast = (
+        # Use settings from test_ensemble_brier_score that result in score=0.
+        forecast
+        + 1.0
+        + 0.1 * np.arange(-2, 2).reshape((4, 1, 1, 1, 1))
+    )
+    truth = schema.mock_truth_data(**kwargs)
+    truth = truth + 1.0
+
+    forecast_with_nan = xr.where(
+        forecast.prediction_timedelta < forecast.prediction_timedelta[-1],
+        np.nan,
+        forecast,
+    )
+    truth_with_nan = xr.where(truth.time < truth.time[-1], np.nan, truth)
+
+    climatology_mean = truth.isel(time=0, drop=True).expand_dims(dayofyear=366)
+    climatology_std = (
+        truth.isel(time=0, drop=True)
+        .expand_dims(
+            dayofyear=366,
+        )
+        .rename({'2m_temperature': '2m_temperature_std'})
+    )
+    climatology = xr.merge([climatology_mean, climatology_std])
+    threshold = thresholds.GaussianQuantileThreshold(
+        climatology=climatology, quantile=0.2
+    )
+
+    with self.subTest('forecast has nan'):
+      # When forecast has nan in prediction_timedelta, only that timedelta will
+      # be NaN.
+      result = metrics.EnsembleBrierScore(threshold).compute(
+          forecast_with_nan, truth
+      )
+      expected_arr = np.array([[np.nan, 0.0]])
+      np.testing.assert_allclose(
+          result['2m_temperature'].values,
+          expected_arr,
+      )
+
+    with self.subTest('truth has nan'):
+      # When truth has nan, the final average over times means the entire
+      # score is NaN.
+      result = metrics.EnsembleBrierScore(threshold).compute(
+          forecast, truth_with_nan
+      )
+      expected_arr = np.array([[np.nan, np.nan]])
+      np.testing.assert_allclose(
+          result['2m_temperature'].values,
+          expected_arr,
+      )
+
 
 class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
 

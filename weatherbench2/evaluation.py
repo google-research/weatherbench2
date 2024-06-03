@@ -708,6 +708,7 @@ class _EvaluateAllMetrics(beam.PTransform):
       forecast_pipeline |= 'TemporalMean' >> xbeam.Mean(
           dim='init_time' if self.data_config.by_init else 'time',
           fanout=self.fanout,
+          skipna=False,
       )
 
     return forecast_pipeline
