@@ -24,6 +24,7 @@ import typing as t
 import numpy as np
 from scipy import stats
 from weatherbench2 import thresholds
+from weatherbench2 import utils
 from weatherbench2.regions import Region
 import xarray as xr
 
@@ -564,6 +565,10 @@ class EnsembleMetric(Metric):
     return result.assign_attrs(ensemble_size=forecast[self.ensemble_dim].size)
 
 
+# Maxmimum ensemble size where we compute CRPS spread by brute force O(M²) algo.
+_CRPS_MAX_BRUTE_FORCE_ENSEMBLE_SIZE = 5
+
+
 @dataclasses.dataclass
 class CRPS(EnsembleMetric):
   """Continuous Ranked Probability Score, averaged over space and time.
@@ -705,6 +710,7 @@ class SpatialCRPSSkill(EnsembleMetric):
     return _pointwise_crps_skill(forecast, truth, self.ensemble_dim)
 
 
+@utils.id_lru_cache(maxsize=1)
 def _pointwise_crps_spread(
     forecast: xr.Dataset, truth: xr.Dataset, ensemble_dim: str
 ) -> xr.Dataset:
@@ -713,6 +719,17 @@ def _pointwise_crps_spread(
   n_ensemble = _get_n_ensemble(forecast, ensemble_dim)
   if n_ensemble < 2:
     return xr.zeros_like(forecast.isel({ensemble_dim: 0}))
+
+  # For smaller ensembles, avoid the sort by looping over all combinations.
+  # This is O(M) memory and O(M²) compute.
+  if n_ensemble <= _CRPS_MAX_BRUTE_FORCE_ENSEMBLE_SIZE:
+    sum_of_abs = xr.zeros_like(forecast.isel({ensemble_dim: 0}))
+    for i in range(n_ensemble):
+      x_i = forecast.isel({ensemble_dim: i})
+      for j in range(i + 1, n_ensemble):
+        x_j = forecast.isel({ensemble_dim: j})
+        sum_of_abs += np.abs(x_i - x_j)
+    return sum_of_abs / (n_ensemble * (n_ensemble - 1) / 2)
 
   # one_half_spread is ̂̂λ₂ from Zamo. That is, with n_ensemble = M,
   #   λ₂ = 1 / (2 M (M - 1)) Σ_{i,j=1}^M |Xi - Xj|

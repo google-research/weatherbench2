@@ -167,6 +167,14 @@ class CRPSTest(parameterized.TestCase):
       dict(testcase_name='EnsembleSize2', ensemble_size=2),
       dict(testcase_name='EnsembleSize3', ensemble_size=3),
       dict(testcase_name='EnsembleSize5', ensemble_size=5),
+      dict(
+          testcase_name='MaxBrutePlus1',
+          ensemble_size=metrics._CRPS_MAX_BRUTE_FORCE_ENSEMBLE_SIZE + 1,
+      ),
+      dict(
+          testcase_name='MaxBrutePlus2',
+          ensemble_size=metrics._CRPS_MAX_BRUTE_FORCE_ENSEMBLE_SIZE + 2,
+      ),
   )
   def test_vs_brute_force(self, ensemble_size):
     truth, forecast = get_random_truth_and_forecast(ensemble_size=ensemble_size)
