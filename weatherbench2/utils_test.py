@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 from absl.testing import absltest
+import numpy as np
 from weatherbench2 import schema
 from weatherbench2 import utils
 import xarray
@@ -65,6 +66,40 @@ class UtilsTest(absltest.TestCase):
         'number': 5,
     }
     self.assertEqual(clim['2m_temperature'].sizes, expected_sizes)
+
+
+class IdLRUCacheTest(absltest.TestCase):
+
+  def test_handles_non_hashable_args_and_kwargs(self):
+
+    @utils.id_lru_cache(maxsize=2)
+    def func(x: np.ndarray, y: np.ndarray, b: float = 1):
+      return np.sum(x + y * b)
+
+    # Use 3 sets of arrays so we are sure to cycle through the size 2 cache.
+    with self.subTest('First set of arrays'):
+      x = np.array([1.0, 2.0, 3.0])
+      y = x + 2
+      b = 1.3
+      expected = np.sum(x + y * b)
+      for _ in range(4):
+        self.assertEqual(expected, func(x, y, b=b))
+
+    with self.subTest('Second set of arrays'):
+      x = np.array([0.0, -2.0, 0.123])
+      y = np.array([10.0, -1.0, 3])
+      b = 10.3
+      expected = np.sum(x + y * b)
+      for _ in range(4):
+        self.assertEqual(expected, func(x, y, b=b))
+
+    with self.subTest('Third set of arrays'):
+      x = np.array([0.0, -20.0])
+      y = np.array([10.0, -11.0])
+      b = -1234
+      expected = np.sum(x + y * b)
+      for _ in range(4):
+        self.assertEqual(expected, func(x, y, b=b))
 
 
 if __name__ == '__main__':

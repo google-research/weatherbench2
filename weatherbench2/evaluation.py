@@ -390,6 +390,7 @@ def _metric_and_region_loop(
 ) -> xr.Dataset:
   """Compute metric results looping over metrics and regions in eval config."""
   # Compute derived variables
+  logging.info('Starting _metric_and_region_loop')
   for name, dv in eval_config.derived_variables.items():
     logging.info(f'Logging: derived_variable {name!r}: {dv}')
     forecast[name] = dv.compute(forecast)
