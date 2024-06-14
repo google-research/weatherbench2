@@ -751,9 +751,22 @@ def _rank_ds(ds: xr.Dataset, dim: str) -> xr.Dataset:
   """The ranking of `ds` along `dim`, with 1 being the smallest entry."""
 
   def _rank_da(da: xr.DataArray) -> np.ndarray:
-    return stats.rankdata(da.values, method="ordinal", axis=da.dims.index(dim))
+    return _rankdata(da.values, axis=da.dims.index(dim))
 
   return ds.copy(data={k: _rank_da(v) for k, v in ds.items()})
+
+
+def _rankdata(x: np.ndarray, axis: int) -> np.ndarray:
+  """Version of (ordinal) scipy.rankdata from V13."""
+  x = np.asarray(x)
+  x = np.swapaxes(x, axis, -1)
+  j = np.argsort(x, axis=-1)
+  ordinal_ranks = np.broadcast_to(
+      np.arange(1, x.shape[-1] + 1, dtype=int), x.shape
+  )
+  ordered_ranks = np.empty(j.shape, dtype=ordinal_ranks.dtype)
+  np.put_along_axis(ordered_ranks, j, ordinal_ranks, axis=-1)
+  return np.swapaxes(ordered_ranks, axis, -1)
 
 
 @dataclasses.dataclass

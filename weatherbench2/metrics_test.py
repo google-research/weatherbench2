@@ -15,6 +15,7 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
+from scipy import stats
 from weatherbench2 import metrics
 from weatherbench2 import regions
 from weatherbench2 import schema
@@ -159,6 +160,23 @@ class MetricsTest(parameterized.TestCase):
     acc1 = metrics.ACC(climatology).compute_chunk(forecast, truth)
     acc2 = metrics.ACC(climatology_mean).compute_chunk(forecast, truth)
     xr.testing.assert_allclose(acc1, acc2)
+
+
+class RankDataTest(parameterized.TestCase):
+
+  @parameterized.parameters(
+      ((4, 5, 6), 0),
+      ((4, 8, 6), 1),
+      ((4, 2, 6), 2),
+      ((4, 5, 7), -1),
+      ((1, 5), 0),
+      ((1, 5), 1),
+  )
+  def test_vs_scipy(self, shape, axis):
+    x = np.random.RandomState(1729 + axis + np.prod(shape)).rand(*shape)
+    ranks = metrics._rankdata(x, axis)
+    sp_ranks = stats.rankdata(x, method='ordinal', axis=axis)
+    np.testing.assert_array_equal(ranks, sp_ranks)
 
 
 class CRPSTest(parameterized.TestCase):
