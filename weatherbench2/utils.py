@@ -13,7 +13,8 @@
 # limitations under the License.
 # ==============================================================================
 """Utility function for WeatherBench2."""
-from typing import Callable, Union
+import functools
+from typing import Callable, Hashable, Union
 
 import fsspec
 import numpy as np
@@ -292,3 +293,48 @@ def random_like(dataset: xr.Dataset, seed: int = 0) -> xr.Dataset:
   return dataset.copy(
       data={k: rs.normal(size=v.shape) for k, v in dataset.items()}
   )
+
+
+def id_lru_cache(maxsize: int = 5):
+  """Like functools.lru_cache but uses argument id for non-hashables.
+
+  Warning: This is not threadsafe. Multiple threads reading/writing to the cache
+  results in inconsistent behavior.
+
+  Args:
+    maxsize: Maximum size of cache.
+
+  Returns:
+    Decorator to make a function into a caching function.
+  """
+
+  def hashid(x):
+    if isinstance(x, Hashable):
+      return hash(x)
+    return id(x)
+
+  def decorating_function(func):
+    cache = {}
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+      key = tuple(hashid(a) for a in args) + tuple(
+          (k, hashid(v)) for k, v in kwargs.items()
+      )
+      # Python dicts are ordered in the sense that if keys = list(my_dict.key())
+      # then keys[0] is the first key added, and keys[-1] is the most recently
+      # added.
+      if key in cache:
+        # Move cache[key] to position -1 since it is most recently used.
+        value = cache[key]
+        del cache[key]
+        cache[key] = value
+      else:
+        if len(cache) >= maxsize:
+          cache.pop(list(cache)[0])  # Pop first item added to dictionary.
+        cache[key] = func(*args, **kwargs)
+      return cache[key]
+
+    return wrapper
+
+  return decorating_function

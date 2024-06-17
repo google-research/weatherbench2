@@ -24,6 +24,7 @@ import typing as t
 import numpy as np
 from scipy import stats
 from weatherbench2 import thresholds
+from weatherbench2 import utils
 from weatherbench2.regions import Region
 import xarray as xr
 
@@ -705,6 +706,7 @@ class SpatialCRPSSkill(EnsembleMetric):
     return _pointwise_crps_skill(forecast, truth, self.ensemble_dim)
 
 
+@utils.id_lru_cache(maxsize=1)
 def _pointwise_crps_spread(
     forecast: xr.Dataset, truth: xr.Dataset, ensemble_dim: str
 ) -> xr.Dataset:
