@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Utility function for WeatherBench2."""
+import functools
 from typing import Callable, Union
 
 import fsspec
@@ -292,3 +293,58 @@ def random_like(dataset: xr.Dataset, seed: int = 0) -> xr.Dataset:
   return dataset.copy(
       data={k: rs.normal(size=v.shape) for k, v in dataset.items()}
   )
+
+
+class _WrappedDataset:
+  """Hashable wrapper for xarray.Datasets."""
+
+  def __init__(self, value):
+    if not isinstance(value, xr.Dataset):
+      raise ValueError(f'_WrappedDataset cannot wrap type {type(value)}')
+    self.value = value
+
+  def __eq__(self, other):
+    if not isinstance(other, _WrappedDataset):
+      return False
+    return self.value.equals(other.value)
+
+  def __hash__(self):
+    # Something that can be calculated quickly -- we won't have many collisions.
+    # Hash collisions just mean that that __eq__ needs to be checked.
+    # https://stackoverflow.com/questions/16589791/most-efficient-property-to-hash-for-numpy-array
+    return hash(
+        tuple(
+            (k, repr(v.data.ravel())) for k, v in self.value.data_vars.items()
+        )
+    )
+
+
+def dataset_safe_lru_cache(maxsize=128):
+  """An xarray.Dataset compatible version of functools.lru_cache."""
+
+  def decorator(func):  # pylint: disable=missing-docstring
+    @functools.lru_cache(maxsize)
+    def cached_func(*args, **kwargs):
+      args = tuple(
+          a.value if isinstance(a, _WrappedDataset) else a for a in args
+      )
+      kwargs = {
+          k: v.value if isinstance(v, _WrappedDataset) else v
+          for k, v in kwargs.items()
+      }
+      return func(*args, **kwargs)
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):  # pylint: disable=missing-docstring
+      args = tuple(
+          _WrappedDataset(a) if isinstance(a, xr.Dataset) else a for a in args
+      )
+      kwargs = {
+          k: _WrappedDataset(v) if isinstance(v, xr.Dataset) else v
+          for k, v in kwargs.items()
+      }
+      return cached_func(*args, **kwargs)
+
+    return wrapper
+
+  return decorator

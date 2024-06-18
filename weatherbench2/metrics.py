@@ -24,6 +24,7 @@ import typing as t
 import numpy as np
 from scipy import stats
 from weatherbench2 import thresholds
+from weatherbench2 import utils
 from weatherbench2.regions import Region
 import xarray as xr
 
@@ -637,7 +638,7 @@ class CRPSSpread(EnsembleMetric):
   ) -> xr.Dataset:
     """CRPSSpread, averaged over space, for a time chunk of data."""
     return _spatial_average(
-        _pointwise_crps_spread(forecast, truth, self.ensemble_dim),
+        _pointwise_crps_spread(forecast, self.ensemble_dim),
         region=region,
     )
 
@@ -688,7 +689,7 @@ class SpatialCRPSSpread(EnsembleMetric):
       region: t.Optional[Region] = None,
   ) -> xr.Dataset:
     """CRPSSpread, averaged over space, for a time chunk of data."""
-    return _pointwise_crps_spread(forecast, truth, self.ensemble_dim)
+    return _pointwise_crps_spread(forecast, self.ensemble_dim)
 
 
 @dataclasses.dataclass
@@ -705,11 +706,16 @@ class SpatialCRPSSkill(EnsembleMetric):
     return _pointwise_crps_skill(forecast, truth, self.ensemble_dim)
 
 
+@utils.dataset_safe_lru_cache(
+    # This is used in _metric_and_region_loop. The same dataset is used
+    # repeatedly for different metrics/regions, then the loop returns.
+    # Therefore, maxsize=1 is sufficient.
+    maxsize=1,
+)
 def _pointwise_crps_spread(
-    forecast: xr.Dataset, truth: xr.Dataset, ensemble_dim: str
+    forecast: xr.Dataset, ensemble_dim: str
 ) -> xr.Dataset:
   """CRPS spread at each point in truth, averaged over ensemble only."""
-  del truth  # unused
   n_ensemble = _get_n_ensemble(forecast, ensemble_dim)
   if n_ensemble < 2:
     return xr.zeros_like(forecast.isel({ensemble_dim: 0}))

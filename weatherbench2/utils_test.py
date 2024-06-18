@@ -13,9 +13,10 @@
 # limitations under the License.
 # ==============================================================================
 from absl.testing import absltest
+import numpy as np
 from weatherbench2 import schema
 from weatherbench2 import utils
-import xarray
+import xarray as xr
 
 
 class UtilsTest(absltest.TestCase):
@@ -43,7 +44,7 @@ class UtilsTest(absltest.TestCase):
         hour_interval=24,
         stat_fn='mean',
     )
-    xarray.testing.assert_allclose(explicit, fast)
+    xr.testing.assert_allclose(explicit, fast)
 
   def testProbabilisticClimatology(self):
     truth = schema.mock_truth_data(
@@ -65,6 +66,48 @@ class UtilsTest(absltest.TestCase):
         'number': 5,
     }
     self.assertEqual(clim['2m_temperature'].sizes, expected_sizes)
+
+
+class DatasetSafeLRUCacheTest(absltest.TestCase):
+
+  def test_handles_non_hashable_args_and_kwargs(self):
+
+    def dataset(z) -> xr.Dataset:
+      z = np.asarray(z)
+      assert z.ndim == 1
+      return xr.Dataset(
+          data_vars={'temperature': (('level',), z)},
+          coords={'level': np.arange(len(z))},
+      )
+
+    @utils.dataset_safe_lru_cache(maxsize=2)
+    def func(x: xr.Dataset, y: xr.Dataset, b: float = 1):
+      return (x + y * b).sum()
+
+    # Use 3 sets of arrays so we are sure to cycle through the size 2 cache.
+    with self.subTest('First set of Datasets'):
+      x = dataset([1.0, 2.0, 3.0])
+      y = x + 2
+      b = 1.3
+      expected = np.sum(x + y * b)
+      for _ in range(4):
+        self.assertEqual(expected, func(x, y, b=b))
+
+    with self.subTest('Second set of Datasets'):
+      x = dataset([0.0, -2.0, 0.123])
+      y = dataset([10.0, -1.0, 3])
+      b = 10.3
+      expected = np.sum(x + y * b)
+      for _ in range(4):
+        self.assertEqual(expected, func(x, y, b=b))
+
+    with self.subTest('Third set of Datasets'):
+      x = dataset([0.0, -20.0])
+      y = dataset([10.0, -11.0])
+      b = -1234
+      expected = np.sum(x + y * b)
+      for _ in range(4):
+        self.assertEqual(expected, func(x, y, b=b))
 
 
 if __name__ == '__main__':
