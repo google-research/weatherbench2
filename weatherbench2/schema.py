@@ -29,19 +29,19 @@ def apply_time_conventions(
   forecast = forecast.copy()
   if 'prediction_timedelta' in forecast.coords:
     forecast = forecast.rename({'prediction_timedelta': 'lead_time'})
-    if by_init:
-      # Need to rename time dimension because different from time dimension in
-      # truth dataset
-      forecast = forecast.rename({'time': 'init_time'})
-      valid_time = forecast.init_time + forecast.lead_time
-      forecast.coords['valid_time'] = valid_time
-      assert not hasattr(
-          forecast, 'time'
-      ), f'Forecast should not have time dimension at this point: {forecast}'
-    else:
-      init_time = forecast.time - forecast.lead_time
-      forecast.coords['init_time'] = init_time
-  return forecast
+  if by_init:
+    # Need to rename time dimension because different from time dimension in
+    # truth dataset
+    forecast = forecast.rename({'time': 'init_time'})
+    valid_time = forecast.init_time + forecast.lead_time
+    forecast.coords['valid_time'] = valid_time
+    assert not hasattr(
+        forecast, 'time'
+    ), f'Forecast should not have time dimension at this point: {forecast}'
+  else:
+    init_time = forecast.time - forecast.lead_time
+    forecast.coords['init_time'] = init_time
+  return forec  ast
 
 
 ALL_3D_VARIABLES = (
