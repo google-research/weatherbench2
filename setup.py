@@ -19,10 +19,10 @@ base_requires = [
     'apache_beam>=2.31.0',
     'jax[cpu]',
     'numpy',
-    'pandas==2.0.3',
+    'pandas~=2.0.3',
     'scipy',
     'scikit-learn',
-    'xarray==2023.7.0',
+    'xarray~=2023.7.0',
     'xarray-beam',
     'zarr',
 ]
