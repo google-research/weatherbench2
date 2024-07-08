@@ -139,6 +139,19 @@ class DerivedVariablesTest(absltest.TestCase):
         accumulation_hours=6,
     )
     result = derived_variable.compute(dataset)
+
+    # Test a few specific times for example's sake.
+    sel = lambda ds, hr: ds.sel(prediction_timedelta=f'{hr}hr')
+    np.testing.assert_array_equal(
+        (sel(dataset, 24) - sel(dataset, 24 - 6)).total_precipitation.data,
+        sel(result, 24),
+    )
+    np.testing.assert_array_equal(
+        (sel(dataset, 18) - sel(dataset, 18 - 6)).total_precipitation.data,
+        sel(result, 18),
+    )
+
+    # Test every timedelta.
     expected = xr.DataArray(
         [np.nan, 5, 10, 0, 6, 10, 0],
         dims=['prediction_timedelta'],

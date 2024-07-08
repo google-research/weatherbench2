@@ -151,6 +151,14 @@ def main(argv: list[str]) -> None:
 
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
 
+  for var_name in PREEXISTING_VARIABLES_TO_REMOVE.value:
+    if var_name in source_dataset:
+      del source_dataset[var_name]
+  source_chunks = {
+      # Removing variables may remove some dims.
+      k: v for k, v in source_chunks.items() if k in source_dataset.dims
+  }
+
   # Validate and clean-up the source datset.
   if RENAME_RAW_TP_NAME.value:
     source_dataset = source_dataset.rename(
@@ -167,10 +175,6 @@ def main(argv: list[str]) -> None:
     source_chunks = {
         rename_variables.get(k, k): v for k, v in source_chunks.items()
     }
-
-  for var_name in PREEXISTING_VARIABLES_TO_REMOVE.value:
-    if var_name in source_dataset:
-      del source_dataset[var_name]
 
   for var_name, dv in derived_variables.items():
     if var_name in source_dataset:
