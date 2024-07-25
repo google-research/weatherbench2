@@ -465,8 +465,8 @@ class SpatialSEEPS(Metric):
     result = xr.dot(out, scoring_matrix, dims=("forecast_cat", "truth_cat"))
 
     # Mask out p1 thresholds
-    result = result.where(self.p1 < self.max_p1, np.NaN)
-    result = result.where(self.p1 > self.min_p1, np.NaN)
+    result = result.where(self.p1 < self.max_p1, np.nan)
+    result = result.where(self.p1 > self.min_p1, np.nan)
     return xr.Dataset({f"{self.precip_name}": result})
 
 

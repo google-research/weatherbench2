@@ -85,7 +85,7 @@ class DerivedVariablesTest(absltest.TestCase):
   def testWindSpeed(self):
     dataset = xr.Dataset(
         {
-            'u_component_of_wind': xr.DataArray([0, 3, np.NaN]),
+            'u_component_of_wind': xr.DataArray([0, 3, np.nan]),
             'v_component_of_wind': xr.DataArray([0, -4, 1]),
         }
     )
@@ -97,7 +97,7 @@ class DerivedVariablesTest(absltest.TestCase):
 
     result = derived_variable.compute(dataset)
 
-    expected = xr.DataArray([0, 5, np.NaN])
+    expected = xr.DataArray([0, 5, np.nan])
     xr.testing.assert_allclose(result, expected)
 
   def testRelativeHumidity(self):
@@ -140,7 +140,7 @@ class DerivedVariablesTest(absltest.TestCase):
     )
     result = derived_variable.compute(dataset)
     expected = xr.DataArray(
-        [np.NaN, 5, 10, 0, 6, 10, 0],
+        [np.nan, 5, 10, 0, 6, 10, 0],
         dims=['prediction_timedelta'],
         coords={'prediction_timedelta': dataset.prediction_timedelta},
     )
@@ -155,7 +155,7 @@ class DerivedVariablesTest(absltest.TestCase):
     )
     result = derived_variable.compute(dataset)
     expected = xr.DataArray(
-        [np.NaN, np.NaN, np.NaN, np.NaN, 20, 25, 15],
+        [np.nan, np.nan, np.nan, np.nan, 20, 25, 15],
         dims=['prediction_timedelta'],
         coords={'prediction_timedelta': dataset.prediction_timedelta},
     )
@@ -178,7 +178,7 @@ class DerivedVariablesTest(absltest.TestCase):
     )
     result = derived_variable.compute(dataset)
     expected = xr.DataArray(
-        [np.NaN, np.NaN, np.NaN, 8, 3, 13],
+        [np.nan, np.nan, np.nan, 8, 3, 13],
         dims=['prediction_timedelta'],
         coords={'prediction_timedelta': dataset.prediction_timedelta},
     )

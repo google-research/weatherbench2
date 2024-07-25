@@ -519,7 +519,7 @@ class PrecipitationAccumulation(DerivedVariable):
       )
     # Add 0th time step with NaNs
     accumulation = xr.concat(
-        [tp.isel({self.lead_time_name: [0]}) * np.NaN, accumulation],
+        [tp.isel({self.lead_time_name: [0]}) * np.nan, accumulation],
         self.lead_time_name,
     )
     return accumulation

@@ -96,7 +96,7 @@ class MetricsTest(parameterized.TestCase):
     forecast_modifier = xr.Dataset(
         {
             'u_component_of_wind': xr.DataArray(
-                [0, 3, np.NaN], coords={'level': forecast.level}
+                [0, 3, np.nan], coords={'level': forecast.level}
             ),
             'v_component_of_wind': xr.DataArray(
                 [0, -4, 1], coords={'level': forecast.level}
@@ -106,7 +106,7 @@ class MetricsTest(parameterized.TestCase):
     truth_modifier = xr.Dataset(
         {
             'u_component_of_wind': xr.DataArray(
-                [0, -3, np.NaN], coords={'level': forecast.level}
+                [0, -3, np.nan], coords={'level': forecast.level}
             ),
             'v_component_of_wind': xr.DataArray(
                 [0, 4, 1], coords={'level': forecast.level}
@@ -119,7 +119,7 @@ class MetricsTest(parameterized.TestCase):
 
     result = wv.compute(forecast, truth).values.squeeze()
 
-    expected = np.array([0, 10, np.NaN])
+    expected = np.array([0, 10, np.nan])
     np.testing.assert_allclose(result, expected)
 
   @parameterized.named_parameters(
