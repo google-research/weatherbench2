@@ -149,7 +149,10 @@ def _make_template(
   )
 
 
-def _output_dims(source: xr.Dataset, include_averaging_dims: bool) -> list[str]:
+def _output_dims(
+    source: xr.Dataset,
+    include_averaging_dims: bool,
+) -> list[str]:
   """Dimensions in the output, in canonical order."""
   dims = []
   for d in source.dims:
@@ -161,12 +164,25 @@ def _output_dims(source: xr.Dataset, include_averaging_dims: bool) -> list[str]:
   return dims
 
 
-def _impose_data_selection(ds: xr.Dataset) -> xr.Dataset:
+def _impose_data_selection(
+    source: xr.Dataset,
+    source_chunks: t.Mapping[str, int],
+) -> tuple[xr.Dataset, t.Mapping[str, int]]:
+  """Select subset of source data for this script."""
   selection = {
       TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value),
       'level': [int(level) for level in LEVELS.value],
   }
-  return ds.sel({k: v for k, v in selection.items() if k in ds.dims})
+  source = source[BASE_VARIABLES.value].sel(
+      {k: v for k, v in selection.items() if k in source.dims}
+  )
+  source_chunks = {  # Remove dims that disappeared after data selection
+      k: v for k, v in source_chunks.items() if k in source.dims
+  }
+  source_chunks = {  # Truncate chunks that are shorter after data selection
+      k: min(source.dims[k], source_chunks[k]) for k in source_chunks
+  }
+  return source, source_chunks
 
 
 def _strip_offsets(
@@ -185,10 +201,9 @@ def main(argv: list[str]) -> None:
   ]
 
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
-  source_dataset = _impose_data_selection(source_dataset)
-  source_chunks = {
-      k: min(source_dataset.dims[k], source_chunks[k]) for k in source_chunks
-  }
+  source_dataset, source_chunks = _impose_data_selection(
+      source_dataset, source_chunks
+  )
   output_chunks = {}
   for d in _output_dims(source_dataset, include_averaging_dims=False):
     if d == 'zonal_wavenumber':
