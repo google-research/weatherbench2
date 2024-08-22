@@ -316,23 +316,28 @@ def main(argv: abc.Sequence[str]) -> None:
   rsmp_template = rsmp_template[[]]  # Drop all variables...will add in below
   for var in mean_vars:
     rsmp_template = rsmp_template.assign(
-        {var + '_mean' if ADD_MEAN_SUFFIX.value else var: template_copy[var]}
+        {f'{var}_mean' if ADD_MEAN_SUFFIX.value else var: template_copy[var]}
     )
   for var in min_vars:
-    rsmp_template = rsmp_template.assign({var + '_min': template_copy[var]})
+    rsmp_template = rsmp_template.assign({f'{var}_min': template_copy[var]})
   for var in max_vars:
-    rsmp_template = rsmp_template.assign({var + '_max': template_copy[var]})
+    rsmp_template = rsmp_template.assign({f'{var}_max': template_copy[var]})
+
+  # We've changed ds (e.g. dropped vars), so the dims may have changed.
+  # Therefore, input_chunks may no longer be valid.
+  ds_chunks = {k: v for k, v in input_chunks.items() if k in ds.dims}
 
   # Get the working and output chunks
-  input_chunks_without_time = {
-      k: v for k, v in input_chunks.items() if k != TIME_DIM.value
+  ds_chunks_without_time = {
+      k: v for k, v in ds_chunks.items() if k != TIME_DIM.value
   }
-  working_chunks = input_chunks_without_time.copy()
+  working_chunks = ds_chunks_without_time.copy()
   working_chunks.update(WORKING_CHUNKS.value)
   if TIME_DIM.value in working_chunks:
     raise ValueError('cannot include time working chunks')
   working_chunks[TIME_DIM.value] = len(ds[TIME_DIM.value])
-  output_chunks = input_chunks.copy()
+
+  output_chunks = ds_chunks.copy()
   output_chunks[TIME_DIM.value] = min(
       len(rsmp_times), output_chunks[TIME_DIM.value]
   )
@@ -344,12 +349,12 @@ def main(argv: abc.Sequence[str]) -> None:
     unused_pcoll = (
         root
         | xbeam.DatasetToChunks(
-            ds, input_chunks, split_vars=True, num_threads=NUM_THREADS.value
+            ds, ds_chunks, split_vars=True, num_threads=NUM_THREADS.value
         )
         | 'RechunkToWorkingChunks'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
             ds.sizes,
-            input_chunks,
+            ds_chunks,
             working_chunks,
             itemsize=itemsize,
         )

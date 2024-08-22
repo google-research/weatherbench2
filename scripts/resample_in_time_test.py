@@ -253,10 +253,21 @@ class ResampleInTimeTest(parameterized.TestCase):
     # individually.
     input_ds = input_ds.assign({'geopotential': input_ds.geopotential + 10})
 
+    # Add a variable that uses some new dimension. We expect this dimension to
+    # be dropped from the output (since we won't put this variable in the
+    # output).
+    input_ds['var_to_drop'] = xr.DataArray(np.ones((5,)), dims=['dim_to_drop'])
+
     input_path = self.create_tempdir('source').full_path
     output_path = self.create_tempdir('destination').full_path
 
-    input_chunks = {'time': 40, 'longitude': 6, 'latitude': 5, 'level': 3}
+    input_chunks = {
+        'time': 40,
+        'longitude': 6,
+        'latitude': 5,
+        'level': 3,
+        'dim_to_drop': 5,
+    }
     input_ds.chunk(input_chunks).to_zarr(input_path)
 
     with flagsaver.as_parsed(
@@ -302,6 +313,7 @@ class ResampleInTimeTest(parameterized.TestCase):
       raise ValueError(f'Unhandled {method=}')
 
     expected_chunks = input_chunks.copy()
+    del expected_chunks['dim_to_drop']
     if method == 'resample':
       expected_chunks['time'] = min(
           len(expected_mean.time), expected_chunks['time']
@@ -395,6 +407,11 @@ class ResampleInTimeTest(parameterized.TestCase):
     # individually.
     input_ds = input_ds.assign({'geopotential': input_ds.geopotential + 10})
 
+    # Add a variable that uses some new dimension. We expect this dimension to
+    # be dropped from the output (since we won't put this variable in the
+    # output).
+    input_ds['var_to_drop'] = xr.DataArray(np.ones((5,)), dims=['dim_to_drop'])
+
     input_path = self.create_tempdir('source').full_path
     output_path = self.create_tempdir('destination').full_path
 
@@ -404,6 +421,7 @@ class ResampleInTimeTest(parameterized.TestCase):
         'longitude': 6,
         'latitude': 5,
         'level': 3,
+        'dim_to_drop': 5,
     }
     input_ds.chunk(input_chunks).to_zarr(input_path)
 
@@ -455,6 +473,7 @@ class ResampleInTimeTest(parameterized.TestCase):
       raise ValueError(f'Unhandled {method=}')
 
     expected_chunks = input_chunks.copy()
+    del expected_chunks['dim_to_drop']
     if method == 'resample':
       expected_chunks['prediction_timedelta'] = min(
           len(expected_mean.prediction_timedelta),
