@@ -26,11 +26,13 @@ from . import compute_ensemble_mean
 
 class EnsembleMeanTest(test_util.TestCase):
 
-  def test(self):
+  def test_keeping_all_variables(self):
+    # By default, all variables are kept.
     input_path = self.create_tempdir('source').full_path
     output_path = self.create_tempdir('destination').full_path
 
     input_ds = utils.random_like(schema.mock_forecast_data(ensemble_size=3))
+
     input_ds.chunk({'time': 31}).to_zarr(input_path)
 
     with flagsaver.flagsaver(
@@ -43,6 +45,34 @@ class EnsembleMeanTest(test_util.TestCase):
 
     xarray.testing.assert_allclose(
         output_ds, input_ds.mean(compute_ensemble_mean.REALIZATION)
+    )
+
+  def test_keep_some_variables(self):
+    input_path = self.create_tempdir('source').full_path
+    output_path = self.create_tempdir('destination').full_path
+
+    input_ds = utils.random_like(schema.mock_forecast_data(ensemble_size=3))
+
+    all_vars = list(input_ds.data_vars)
+    self.assertGreaterEqual(len(all_vars), 2)  # Else test is trivial
+    variables_to_get_mean_of = all_vars[:-1]
+
+    input_ds.chunk({'time': 31}).to_zarr(input_path)
+
+    with flagsaver.flagsaver(
+        input_path=input_path,
+        output_path=output_path,
+        variables=variables_to_get_mean_of,
+    ):
+      compute_ensemble_mean.main([])
+
+    output_ds = xarray.open_zarr(output_path)
+
+    xarray.testing.assert_allclose(
+        output_ds,
+        input_ds[variables_to_get_mean_of].mean(
+            compute_ensemble_mean.REALIZATION
+        ),
     )
 
 

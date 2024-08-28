@@ -80,7 +80,8 @@ LEVELS = flags.DEFINE_list(
     _DEFAULT_LEVELS,
     help=(
         'Comma delimited list of pressure levels to compute spectra on. If'
-        ' empty, compute on all levels of --input_path'
+        ' empty, compute on all levels of --input_path. Ignored if "level" is'
+        ' not a dimension.'
     ),
 )
 AVERAGING_DIMS = flags.DEFINE_list(
@@ -169,13 +170,13 @@ def _impose_data_selection(
     source_chunks: t.Mapping[str, int],
 ) -> tuple[xr.Dataset, t.Mapping[str, int]]:
   """Select subset of source data for this script."""
+  source = source[BASE_VARIABLES.value]
   selection = {
       TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value),
-      'level': [int(level) for level in LEVELS.value],
   }
-  source = source[BASE_VARIABLES.value].sel(
-      {k: v for k, v in selection.items() if k in source.dims}
-  )
+  if 'level' in source.dims:
+    selection['level'] = [int(level) for level in LEVELS.value]
+  source = source.sel({k: v for k, v in selection.items() if k in source.dims})
   source_chunks = {  # Remove dims that disappeared after data selection
       k: v for k, v in source_chunks.items() if k in source.dims
   }

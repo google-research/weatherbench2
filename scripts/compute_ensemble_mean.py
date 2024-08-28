@@ -32,6 +32,8 @@ Example Usage:
     --job_name=compute-ensemble-mean-$USER
   ```
 """
+import typing as t
+
 from absl import app
 from absl import flags
 import apache_beam as beam
@@ -66,21 +68,43 @@ NUM_THREADS = flags.DEFINE_integer(
     None,
     help='Number of chunks to read/write in parallel per worker.',
 )
+VARIABLES = flags.DEFINE_list(
+    'variables',
+    None,
+    help=(
+        'Comma delimited list of variables to select from weather. By default,'
+        ' all variables are selected.'
+    ),
+)
 
 
 # pylint: disable=expression-not-assigned
 
 
-def _impose_data_selection(ds: xr.Dataset) -> xr.Dataset:
+def _impose_data_selection(
+    ds: xr.Dataset, source_chunks: t.Mapping[str, int]
+) -> tuple[xr.Dataset, t.Mapping[str, int]]:
+  """Select a subset of ds and keep remaining chunk sizes."""
   selection = {
       TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value),
   }
-  return ds.sel({k: v for k, v in selection.items() if k in ds.dims})
+  if VARIABLES.value is not None:
+    ds = ds[VARIABLES.value]
+  ds = ds.sel({k: v for k, v in selection.items() if k in ds.dims})
+  source_chunks = {
+      # Some dimensions may be removed when we remove variables.
+      k: v
+      for k, v in source_chunks.items()
+      if k in ds.dims
+  }
+  return ds, source_chunks
 
 
 def main(argv: list[str]):
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
-  source_dataset = _impose_data_selection(source_dataset)
+  source_dataset, source_chunks = _impose_data_selection(
+      source_dataset, source_chunks
+  )
   template = xbeam.make_template(
       source_dataset.isel({REALIZATION_NAME.value: 0}, drop=True),
       # coordinates should not be lazy

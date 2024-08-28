@@ -168,7 +168,10 @@ PRESSURE_LEVEL_SUFFIXES = flags.DEFINE_bool(
 LEVELS = flags.DEFINE_list(
     'levels',
     _DEFAULT_LEVELS,
-    help='Comma delimited list of pressure levels to select for evaluation',
+    help=(
+        'Comma delimited list of pressure levels to select for evaluation.'
+        ' Ignored if level is not a dimension.'
+    ),
 )
 VARIABLES = flags.DEFINE_list(
     'variables',
