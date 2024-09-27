@@ -472,8 +472,11 @@ class RelativeHumidity(DerivedVariable):
 class PrecipitationAccumulation(DerivedVariable):
   """Compute precipitation accumulation from hourly accumulations.
 
-  Accumulation is computed for the time period leading up to the lead_time.
-  E.g. 24h accumulation at lead_time=24h indicates 0-24h accumulation.
+  Accumulation is computed for the time period leading up to and including the
+  lead_time.  E.g. 24h accumulation at lead_time=24h indicates accumulation
+  from lead_time=0 to lead_time=24. This is equal to the values of
+  `total_precipitation_name` at 24, minus the value at 0.
+
   Caution: Small negative values sometimes appear in model output.
   Here, we set them to zero.
 
