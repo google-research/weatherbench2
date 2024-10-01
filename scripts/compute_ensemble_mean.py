@@ -76,6 +76,14 @@ VARIABLES = flags.DEFINE_list(
         ' all variables are selected.'
     ),
 )
+SKIPNA = flags.DEFINE_boolean(
+    'skipna',
+    False,
+    help=(
+        'Whether to skip NaN data points (in forecasts and observations) when'
+        ' evaluating.'
+    ),
+)
 
 
 # pylint: disable=expression-not-assigned
@@ -123,7 +131,7 @@ def main(argv: list[str]):
             split_vars=True,
             num_threads=NUM_THREADS.value,
         )
-        | xbeam.Mean(REALIZATION_NAME.value, skipna=False)
+        | xbeam.Mean(REALIZATION_NAME.value, skipna=SKIPNA.value)
         | xbeam.ChunksToZarr(
             OUTPUT_PATH.value,
             template,
