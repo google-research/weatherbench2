@@ -157,6 +157,14 @@ RENAME_VARIABLES = flags.DEFINE_string(
         ' "2m_temperature"}'
     ),
 )
+SKIPNA = flags.DEFINE_boolean(
+    'skipna',
+    False,
+    help=(
+        'Whether to skip NaN data points (in forecasts and observations) when'
+        ' evaluating.'
+    ),
+)
 PRESSURE_LEVEL_SUFFIXES = flags.DEFINE_bool(
     'pressure_level_suffixes',
     False,
@@ -630,14 +638,17 @@ def main(argv: list[str]) -> None:
         eval_configs,
         runner=RUNNER.value,
         input_chunks=INPUT_CHUNKS.value,
+        skipna=SKIPNA.value,
         fanout=FANOUT.value,
         num_threads=NUM_THREADS.value,
         argv=argv,
     )
   else:
-    evaluation.evaluate_in_memory(data_config, eval_configs)
+    evaluation.evaluate_in_memory(
+        data_config, eval_configs, skipna=SKIPNA.value
+    )
 
 
 if __name__ == '__main__':
   app.run(main)
-  flags.mark_flag_as_required('output_path')
+  flags.mark_flags_as_required(['output_path', 'obs_path'])
