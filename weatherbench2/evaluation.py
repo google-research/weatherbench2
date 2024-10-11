@@ -386,6 +386,7 @@ def _metric_and_region_loop(
     forecast: xr.Dataset,
     truth: xr.Dataset,
     eval_config: config.Eval,
+    skipna: bool,
     compute_chunk: bool = False,
 ) -> xr.Dataset:
   """Compute metric results looping over metrics and regions in eval config."""
@@ -412,16 +413,18 @@ def _metric_and_region_loop(
         region_dim = xr.DataArray(
             [region_name], coords={'region': [region_name]}
         )
-        tmp_result = eval_fn(forecast=forecast, truth=truth, region=region)
+        tmp_result = eval_fn(
+            forecast=forecast, truth=truth, region=region, skipna=skipna
+        )
         tmp_results.append(
             tmp_result.expand_dims({'metric': metric_dim, 'region': region_dim})
         )
         logging.info(f'Logging region done: {region_name}')
       result = xr.concat(tmp_results, 'region')
     else:
-      result = eval_fn(forecast=forecast, truth=truth).expand_dims(
-          {'metric': metric_dim}
-      )
+      result = eval_fn(
+          forecast=forecast, truth=truth, skipna=skipna
+      ).expand_dims({'metric': metric_dim})
     results.append(result)
     logging.info(f'Logging metric done: {name}')
   results = xr.merge(results)
@@ -432,6 +435,7 @@ def _evaluate_all_metrics(
     eval_name: str,
     eval_config: config.Eval,
     data_config: config.Data,
+    skipna: bool,
 ) -> None:
   """Evaluate a set of eval metrics in memory."""
   forecast, truth, climatology = open_forecast_and_truth_datasets(
@@ -463,7 +467,7 @@ def _evaluate_all_metrics(
   if data_config.by_init:
     truth = truth.sel(time=forecast.valid_time)
 
-  results = _metric_and_region_loop(forecast, truth, eval_config)
+  results = _metric_and_region_loop(forecast, truth, eval_config, skipna=skipna)
 
   logging.info(f'Logging Evaluation complete:\n{results}')
 
@@ -475,6 +479,7 @@ def _evaluate_all_metrics(
 def evaluate_in_memory(
     data_config: config.Data,
     eval_configs: dict[str, config.Eval],
+    skipna: bool = False,
 ) -> None:
   """Run evaluation in memory.
 
@@ -498,9 +503,11 @@ def evaluate_in_memory(
   Args:
     data_config: config.Data instance.
     eval_configs: Dictionary of config.Eval instances.
+    skipna: Whether to skip NaN values in both forecasts and observations during
+      evaluation.
   """
   for eval_name, eval_config in eval_configs.items():
-    _evaluate_all_metrics(eval_name, eval_config, data_config)
+    _evaluate_all_metrics(eval_name, eval_config, data_config, skipna=skipna)
 
 
 @dataclasses.dataclass
@@ -547,13 +554,17 @@ class _EvaluateAllMetrics(beam.PTransform):
     eval_config: config.Eval instance.
     data_config: config.Data instance.
     input_chunks: Chunks to use for input files.
+    skipna: Whether to skip NaN values in both forecasts and observations during
+      evaluation.
     fanout: Fanout parameter for Beam combiners.
+    num_threads: Number of threads for reading/writing files.
   """
 
   eval_name: str
   eval_config: config.Eval
   data_config: config.Data
   input_chunks: abc.Mapping[str, int]
+  skipna: bool
   fanout: Optional[int] = None
   num_threads: Optional[int] = None
 
@@ -565,7 +576,11 @@ class _EvaluateAllMetrics(beam.PTransform):
     forecast, truth = forecast_and_truth
     logging.info(f'Logging _evaluate_chunk Key: {key}')
     results = _metric_and_region_loop(
-        forecast, truth, self.eval_config, compute_chunk=True
+        forecast,
+        truth,
+        self.eval_config,
+        compute_chunk=True,
+        skipna=self.skipna,
     )
     dropped_dims = [dim for dim in key.offsets if dim not in results.dims]
     result_key = key.with_offsets(**{dim: None for dim in dropped_dims})
@@ -709,7 +724,7 @@ class _EvaluateAllMetrics(beam.PTransform):
       forecast_pipeline |= 'TemporalMean' >> xbeam.Mean(
           dim='init_time' if self.data_config.by_init else 'time',
           fanout=self.fanout,
-          skipna=False,
+          skipna=self.skipna,
       )
 
     return forecast_pipeline
@@ -733,6 +748,7 @@ def evaluate_with_beam(
     fanout: Optional[int] = None,
     num_threads: Optional[int] = None,
     argv: Optional[list[str]] = None,
+    skipna: bool = False,
 ) -> None:
   """Run evaluation with a Beam pipeline.
 
@@ -761,6 +777,8 @@ def evaluate_with_beam(
     fanout: Beam CombineFn fanout.
     num_threads: Number of threads to use for reading/writing data.
     argv: Other arguments to pass into the Beam pipeline.
+    skipna: Whether to skip NaN values in both forecasts and observations during
+      evaluation.
   """
 
   with beam.Pipeline(runner=runner, argv=argv) as root:
@@ -776,6 +794,7 @@ def evaluate_with_beam(
               input_chunks,
               fanout=fanout,
               num_threads=num_threads,
+              skipna=skipna,
           )
           | f'save_{eval_name}'
           >> _SaveOutputs(
