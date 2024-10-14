@@ -69,7 +69,7 @@ class MetricsTest(parameterized.TestCase):
             (np.sqrt(3) - 1) / 2,
             1 - np.sqrt(3) / 2,
         ]
-    )
+    )  # fmt: skip
     expected = xr.DataArray(expected_data, coords=ds.coords, dims=['latitude'])
     xr.testing.assert_allclose(expected, weights)
 
@@ -102,7 +102,7 @@ class MetricsTest(parameterized.TestCase):
                 [0, -4, 1], coords={'level': forecast.level}
             ),
         }
-    )
+    )  # fmt: skip
     truth_modifier = xr.Dataset(
         {
             'u_component_of_wind': xr.DataArray(
@@ -112,7 +112,7 @@ class MetricsTest(parameterized.TestCase):
                 [0, 4, 1], coords={'level': forecast.level}
             ),
         }
-    )
+    )  # fmt: skip
 
     forecast = forecast + forecast_modifier
     truth = truth + truth_modifier
@@ -188,7 +188,7 @@ class CRPSTest(parameterized.TestCase):
   )
   def test_vs_brute_force(self, ensemble_size):
     truth, forecast = get_random_truth_and_forecast(ensemble_size=ensemble_size)
-    expected_crps = _crps_brute_force(forecast, truth)
+    expected_crps = _crps_brute_force(forecast, truth, skipna=False)
 
     xr.testing.assert_allclose(
         expected_crps['score'],
@@ -203,7 +203,9 @@ class CRPSTest(parameterized.TestCase):
     truth, forecast = get_random_truth_and_forecast(ensemble_size=1)
 
     expected_skill = metrics._spatial_average(
-        abs(truth - forecast.isel({metrics.REALIZATION: 0}))
+        abs(truth - forecast.isel({metrics.REALIZATION: 0})),
+        region=None,
+        skipna=False,
     )
 
     xr.testing.assert_allclose(
@@ -219,7 +221,11 @@ class CRPSTest(parameterized.TestCase):
         expected_skill,  # Spread = 0
     )
 
-  def test_nan_forecasts_result_in_nan_crps(self):
+  @parameterized.parameters(
+      (True,),
+      (False,),
+  )
+  def test_nan_forecasts_result_in_nan_crps(self, skipna):
     truth, forecast = get_random_truth_and_forecast(
         variables=['geopotential', 'temperature'], ensemble_size=7
     )
@@ -231,11 +237,14 @@ class CRPSTest(parameterized.TestCase):
         data={'geopotential': new_values, 'temperature': forecast.temperature}
     )
 
-    crps = metrics.CRPS().compute_chunk(forecast, truth)
+    crps = metrics.CRPS().compute_chunk(forecast, truth, skipna=skipna)
 
-    # The only NaN geopotential is in the very first place.
+    # The only possible NaN geopotential is in the very first place.
     score_values = crps.geopotential.values.copy()
-    self.assertTrue(np.isnan(score_values[0, 0, 0]))
+    if skipna:
+      self.assertFalse(np.isnan(score_values[0, 0, 0]))
+    else:
+      self.assertTrue(np.isnan(score_values[0, 0, 0]))
     score_values[0, 0, 0] = 0  # Replace the NaN
     self.assertTrue(np.all(np.isfinite(score_values)))
 
@@ -243,7 +252,10 @@ class CRPSTest(parameterized.TestCase):
     self.assertTrue(np.all(np.isfinite(crps.temperature.values)))
 
     xr.testing.assert_allclose(
-        crps, _crps_brute_force(forecast, truth)['score']
+        crps,
+        _crps_brute_force(forecast, truth, skipna=skipna)['score'],
+        rtol=1e-4,
+        atol=1e-4,
     )
 
   def test_repeated_forecasts_are_okay(self):
@@ -257,7 +269,7 @@ class CRPSTest(parameterized.TestCase):
 
     crps = metrics.CRPS().compute_chunk(forecast, truth)
     xr.testing.assert_allclose(
-        crps, _crps_brute_force(forecast, truth)['score']
+        crps, _crps_brute_force(forecast, truth, skipna=False)['score']
     )
 
 
@@ -370,7 +382,7 @@ class GaussianBrierScoreTest(parameterized.TestCase):
     forecast = schema.mock_forecast_data(
         variables_2d=['2m_temperature', '2m_temperature_std'],
         lead_stop='1 day',
-        **kwargs
+        **kwargs,
     )
     truth = schema.mock_truth_data(variables_2d=['2m_temperature'], **kwargs)
     truth = truth + 1.0
@@ -426,7 +438,7 @@ class GaussianIgnoranceScoreTest(parameterized.TestCase):
     forecast = schema.mock_forecast_data(
         variables_2d=['2m_temperature', '2m_temperature_std'],
         lead_stop='1 day',
-        **kwargs
+        **kwargs,
     )
     truth = schema.mock_truth_data(variables_2d=['2m_temperature'], **kwargs)
     truth = truth + 1.0
@@ -476,7 +488,7 @@ class GaussianRPSTest(parameterized.TestCase):
     forecast = schema.mock_forecast_data(
         variables_2d=['2m_temperature', '2m_temperature_std'],
         lead_stop='1 day',
-        **kwargs
+        **kwargs,
     )
     truth = schema.mock_truth_data(variables_2d=['2m_temperature'], **kwargs)
     q_1 = (
@@ -521,7 +533,9 @@ class RankHistogramTest(parameterized.TestCase):
       dict(testcase_name='EnsembleSize2', ensemble_size=2),
       dict(testcase_name='EnsembleSize9_NumBins5', ensemble_size=9, num_bins=5),
   )
-  def test_well_and_mis_calibrated(self, ensemble_size, num_bins=None):
+  def test_well_and_mis_calibrated(
+      self, ensemble_size, num_bins=None, frac_nan=None
+  ):
     num_bins = ensemble_size + 1 if num_bins is None else num_bins
     # Forecast and truth come from same distribution
     truth, forecast = get_random_truth_and_forecast(
@@ -531,6 +545,9 @@ class RankHistogramTest(parameterized.TestCase):
         time_stop='2019-12-10',
         levels=(0, 1, 2, 3, 4),
     )
+    if frac_nan:
+      truth = test_utils.insert_nan(truth, frac_nan=frac_nan, seed=0)
+      forecast = test_utils.insert_nan(forecast, frac_nan=frac_nan, seed=1)
 
     # level=0 is well calibrated
     # level=1,2 are under/over dispersed
@@ -817,21 +834,23 @@ class DebiasedEnsembleMeanMSETest(parameterized.TestCase):
     )
 
 
-def _crps_brute_force(forecast: xr.Dataset, truth: xr.Dataset) -> xr.Dataset:
+def _crps_brute_force(
+    forecast: xr.Dataset, truth: xr.Dataset, skipna: bool
+) -> xr.Dataset:
   """The eFAIR version of CRPS from Zamo & Naveau over a chunk of data."""
 
   # This version is simple enough that we can use it as a reference.
   def _l1_norm(x):
-    return metrics._spatial_average(abs(x))
+    return metrics._spatial_average(abs(x), region=None, skipna=skipna)
 
   n_ensemble = forecast.dims[metrics.REALIZATION]
-  skill = _l1_norm(truth - forecast).mean(metrics.REALIZATION, skipna=False)
+  skill = _l1_norm(truth - forecast).mean(metrics.REALIZATION, skipna=skipna)
   if n_ensemble == 1:
     spread = xr.zeros_like(skill)
   else:
     spread = _l1_norm(
         forecast - forecast.rename({metrics.REALIZATION: 'dummy'})
-    ).mean(dim=(metrics.REALIZATION, 'dummy'), skipna=False) * (
+    ).mean(dim=(metrics.REALIZATION, 'dummy'), skipna=skipna) * (
         n_ensemble / (n_ensemble - 1)
     )
 
@@ -950,7 +969,11 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
         result['2m_temperature'].values, expected_arr, rtol=1e-4
     )
 
-  def test_nan_propagates_to_output(self):
+  @parameterized.parameters(
+      (True,),
+      (False,),
+  )
+  def test_nan_propagates_to_output_unless_skipna(self, skipna):
     kwargs = {
         'variables_2d': ['2m_temperature'],
         'variables_3d': [],
@@ -970,11 +993,13 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
     truth = truth + 1.0
 
     forecast_with_nan = xr.where(
-        forecast.prediction_timedelta < forecast.prediction_timedelta[-1],
+        forecast.latitude == forecast.latitude[0],
         np.nan,
         forecast,
     )
-    truth_with_nan = xr.where(truth.time < truth.time[-1], np.nan, truth)
+    truth_with_nan = xr.where(
+        truth.longitude == truth.longitude[0], np.nan, truth
+    )
 
     climatology_mean = truth.isel(time=0, drop=True).expand_dims(dayofyear=366)
     climatology_std = (
@@ -993,9 +1018,14 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
       # When forecast has nan in prediction_timedelta, only that timedelta will
       # be NaN.
       result = metrics.EnsembleBrierScore(threshold).compute(
-          forecast_with_nan, truth
+          forecast_with_nan,
+          truth,
+          skipna=skipna,
       )
-      expected_arr = np.array([[np.nan, 0.0]])
+      if skipna:
+        expected_arr = np.array([[0.0, 0.0]])
+      else:
+        expected_arr = np.array([[np.nan, np.nan]])
       np.testing.assert_allclose(
           result['2m_temperature'].values,
           expected_arr,
@@ -1005,9 +1035,14 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
       # When truth has nan, the final average over times means the entire
       # score is NaN.
       result = metrics.EnsembleBrierScore(threshold).compute(
-          forecast, truth_with_nan
+          forecast,
+          truth_with_nan,
+          skipna=skipna,
       )
-      expected_arr = np.array([[np.nan, np.nan]])
+      if skipna:
+        expected_arr = np.array([[0.0, 0.0]])
+      else:
+        expected_arr = np.array([[np.nan, np.nan]])
       np.testing.assert_allclose(
           result['2m_temperature'].values,
           expected_arr,
@@ -1016,9 +1051,8 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
 
 class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
 
-  def test_versus_large_ensemble(self):
+  def test_versus_large_ensemble_and_ensure_skipna_works(self):
     large_ensemble_size = 1000
-    threshold = 1.0
 
     # truth, forecast are both Normal(0, 1)
     truth, forecast = get_random_truth_and_forecast(
@@ -1056,6 +1090,27 @@ class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
         threshold
     ).compute(small_ensemble_forecast, truth)
 
+    # Get some variants using a bit of NaN values
+    data_size = np.prod(list(small_ensemble_forecast.sizes.values()))
+    frac_nan = 0.0005
+    self.assertGreater(
+        data_size * frac_nan,
+        40,
+        msg=f'{frac_nan=} was so small this test is trivial',
+    )
+    small_ensemble_forecast_w_nan = test_utils.insert_nan(
+        small_ensemble_forecast, frac_nan=frac_nan, seed=0
+    )
+    truth_w_nan = test_utils.insert_nan(truth, frac_nan=frac_nan, seed=1)
+    bs_small_ensemble_w_nan = metrics.EnsembleBrierScore(threshold).compute(
+        small_ensemble_forecast_w_nan,
+        truth_w_nan,
+        skipna=True,
+    )
+    bs_debiased_small_ensemble_w_nan = metrics.DebiasedEnsembleBrierScore(
+        threshold
+    ).compute(small_ensemble_forecast_w_nan, truth_w_nan, skipna=True)
+
     # Make sure the test is not trivial by showing that without debiasing we get
     # the expected bias. Since truth/forecast are drawn from the correct
     # distribution, we know the variance, and then
@@ -1071,8 +1126,21 @@ class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
     total_points = np.prod(list(truth.dims.values()))
     stderr = np.sqrt(variance / total_points)
 
+    # Large ensemble gives the same result as small ensemble, since we debias.
     xr.testing.assert_allclose(
         bs_large_ensemble.mean(),
+        bs_debiased_small_ensemble.mean(),
+        atol=4 * stderr,
+    )
+
+    # The small fraction of NaN values barely changes the results.
+    xr.testing.assert_allclose(
+        bs_small_ensemble_w_nan.mean(),
+        bs_small_ensemble.mean(),
+        atol=4 * stderr,
+    )
+    xr.testing.assert_allclose(
+        bs_debiased_small_ensemble_w_nan.mean(),
         bs_debiased_small_ensemble.mean(),
         atol=4 * stderr,
     )
