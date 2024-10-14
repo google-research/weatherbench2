@@ -16,6 +16,7 @@
 from typing import Any
 
 import numpy as np
+import xarray as xr
 
 
 def assert_strictly_decreasing(x: Any, axis=-1, err_msg: str = '') -> None:
@@ -46,3 +47,17 @@ def assert_negative(x: Any, err_msg: str = '') -> None:
       0,
       err_msg=f'Was not negative. {err_msg}',
   )
+
+
+def insert_nan(
+    ds: xr.Dataset, frac_nan: float = 0.1, seed=802701
+) -> xr.Dataset:
+  """Copy ds with NaN inserted in every variable."""
+  ds = ds.copy()
+  rng = np.random.RandomState(seed)
+  for name in ds:
+    data = ds[name].data
+    mask = rng.rand(*data.shape) < frac_nan
+    data = np.where(mask, np.nan, data)
+    ds[name] = ds[name].copy(data=data)
+  return ds
