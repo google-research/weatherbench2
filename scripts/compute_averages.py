@@ -81,6 +81,14 @@ VARIABLES = flags.DEFINE_list(
         'If empty, compute on all data_vars of --input_path'
     ),
 )
+SKIPNA = flags.DEFINE_boolean(
+    'skipna',
+    False,
+    help=(
+        'Whether to skip NaN data points (in forecasts and observations) when'
+        ' evaluating.'
+    ),
+)
 FANOUT = flags.DEFINE_integer(
     'fanout',
     None,
@@ -138,7 +146,9 @@ def main(argv: list[str]):
 
     (
         chunked
-        | xbeam.Mean(AVERAGING_DIMS.value, skipna=False, fanout=FANOUT.value)
+        | xbeam.Mean(
+            AVERAGING_DIMS.value, skipna=SKIPNA.value, fanout=FANOUT.value
+        )
         | xbeam.ChunksToZarr(
             OUTPUT_PATH.value,
             template,
