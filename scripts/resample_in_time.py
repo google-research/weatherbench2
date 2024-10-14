@@ -142,6 +142,14 @@ TIME_STOP = flags.DEFINE_string(
         ' use the last time in --input_path.'
     ),
 )
+SKIPNA = flags.DEFINE_boolean(
+    'skipna',
+    False,
+    help=(
+        'Whether to skip NaN data points (in forecasts and observations) when'
+        ' evaluating.'
+    ),
+)
 WORKING_CHUNKS = flag_utils.DEFINE_chunks(
     'working_chunks',
     '',
@@ -182,6 +190,7 @@ def resample_in_time_chunk(
     min_vars: list[str],
     max_vars: list[str],
     add_mean_suffix: bool,
+    skipna: bool = False,
 ) -> tuple[xbeam.Key, xr.Dataset]:
   """Resample a data chunk in time and return a requested time statistic.
 
@@ -196,6 +205,8 @@ def resample_in_time_chunk(
     max_vars: Variables to compute the max of.
     add_mean_suffix: Whether to add a "_mean" suffix to variables after
       computing the mean.
+    skipna: Whether to skip NaN values in both forecasts and observations during
+      evaluation.
 
   Returns:
     The resampled data chunk and its key.
@@ -207,21 +218,23 @@ def resample_in_time_chunk(
   for chunk_var in chunk.data_vars:
     if chunk_var in mean_vars:
       rsmp_chunks.append(
-          resample_in_time_core(chunk, method, period, 'mean').rename(
+          resample_in_time_core(
+              chunk, method, period, 'mean', skipna=skipna
+          ).rename(
               {chunk_var: f'{chunk_var}_mean' if add_mean_suffix else chunk_var}
           )
       )
     if chunk_var in min_vars:
       rsmp_chunks.append(
-          resample_in_time_core(chunk, method, period, 'min').rename(
-              {chunk_var: f'{chunk_var}_min'}
-          )
+          resample_in_time_core(
+              chunk, method, period, 'min', skipna=skipna
+          ).rename({chunk_var: f'{chunk_var}_min'})
       )
     if chunk_var in max_vars:
       rsmp_chunks.append(
-          resample_in_time_core(chunk, method, period, 'max').rename(
-              {chunk_var: f'{chunk_var}_max'}
-          )
+          resample_in_time_core(
+              chunk, method, period, 'max', skipna=skipna
+          ).rename({chunk_var: f'{chunk_var}_max'})
       )
 
   return rsmp_key, xr.merge(rsmp_chunks)
@@ -232,6 +245,7 @@ def resample_in_time_core(
     method: str,
     period: pd.Timedelta,
     statistic: str,
+    skipna: bool,
 ) -> t.Union[xr.Dataset, xr.DataArray]:
   """Core call to xarray resample or rolling."""
   if method == 'rolling':
@@ -245,12 +259,12 @@ def resample_in_time_core(
             {TIME_DIM.value: period // delta_t}, center=False, min_periods=None
         ),
         statistic,
-    )(skipna=False)
+    )(skipna=skipna)
   elif method == 'resample':
     return getattr(
         chunk.resample({TIME_DIM.value: period}, label='left'),
         statistic,
-    )(skipna=False)
+    )(skipna=skipna)
   else:
     raise ValueError(f'Unhandled {method=}')
 
@@ -301,6 +315,7 @@ def main(argv: abc.Sequence[str]) -> None:
         METHOD.value,
         period,
         statistic='mean',
+        skipna=SKIPNA.value,
     )[TIME_DIM.value]
   else:
     rsmp_times = ds[TIME_DIM.value]
@@ -369,6 +384,7 @@ def main(argv: abc.Sequence[str]) -> None:
                 min_vars=min_vars,
                 max_vars=max_vars,
                 add_mean_suffix=ADD_MEAN_SUFFIX.value,
+                skipna=SKIPNA.value,
             )
         )
         | 'RechunkToOutputChunks'
