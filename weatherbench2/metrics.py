@@ -19,6 +19,7 @@ Contains classes for all evaluation metrics used for WB2.
 from collections.abc import Sequence
 import dataclasses
 import functools
+import logging
 import typing as t
 
 import numpy as np
@@ -89,6 +90,7 @@ class Metric:
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Evaluate this metric on a temporal chunk of data.
 
@@ -103,6 +105,8 @@ class Metric:
         forecast.
       region: Region class. .apply() method is called inside before spatial
         averaging.
+      skipna: Whether to skip NaN values in both forecasts and observations
+        during evaluation.
 
     Returns:
       Dataset with metric results for each variable in forecasts/truth, without
@@ -126,14 +130,18 @@ class Metric:
       raise ValueError(
           f"Forecast has neither valid_time or init_time dimension {forecast}"
       )
-    return self.compute_chunk(forecast, truth, region=region).mean(
+    return self.compute_chunk(
+        forecast, truth, region=region, skipna=skipna
+    ).mean(
         avg_dim,
         skipna=skipna,
     )
 
 
 def _spatial_average(
-    dataset: xr.Dataset, region: t.Optional[Region] = None, skipna: bool = False
+    dataset: xr.Dataset,
+    region: t.Optional[Region],
+    skipna: bool,
 ) -> xr.Dataset:
   """Compute spatial average after applying region mask.
 
@@ -156,7 +164,9 @@ def _spatial_average(
 
 
 def _spatial_average_l2_norm(
-    dataset: xr.Dataset, region: t.Optional[Region] = None, skipna: bool = False
+    dataset: xr.Dataset,
+    region: t.Optional[Region],
+    skipna: bool,
 ) -> xr.Dataset:
   """Helper function to compute sqrt(spatial_average(ds**2))."""
   return np.sqrt(_spatial_average(dataset**2, region=region, skipna=skipna))
@@ -181,11 +191,13 @@ class WindVectorMSE(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     diff = forecast - truth
     result = _spatial_average(
         diff[self.u_name] ** 2 + diff[self.v_name] ** 2,
         region=region,
+        skipna=skipna,
     )
     return result
 
@@ -213,10 +225,11 @@ class WindVectorRMSESqrtBeforeTimeAvg(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     mse = WindVectorMSE(
         u_name=self.u_name, v_name=self.v_name, vector_name=self.vector_name
-    ).compute_chunk(forecast, truth, region=region)
+    ).compute_chunk(forecast, truth, region=region, skipna=skipna)
     return np.sqrt(mse)
 
 
@@ -240,12 +253,18 @@ class RMSESqrtBeforeTimeAvg(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
-    results = _spatial_average_l2_norm(forecast - truth, region=region)
+    results = _spatial_average_l2_norm(
+        forecast - truth, region=region, skipna=skipna
+    )
     if self.wind_vector_rmse is not None:
       for wv in self.wind_vector_rmse:
         results[wv.vector_name] = wv.compute_chunk(
-            forecast, truth, region=region
+            forecast,
+            truth,
+            region=region,
+            skipna=skipna,
         )
     return results
 
@@ -266,12 +285,18 @@ class MSE(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
-    results = _spatial_average((forecast - truth) ** 2, region=region)
+    results = _spatial_average(
+        (forecast - truth) ** 2, region=region, skipna=skipna
+    )
     if self.wind_vector_mse is not None:
       for wv in self.wind_vector_mse:
         results[wv.vector_name] = wv.compute_chunk(
-            forecast, truth, region=region
+            forecast,
+            truth,
+            region=region,
+            skipna=skipna,
         )
     return results
 
@@ -285,7 +310,9 @@ class SpatialMSE(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
+    del skipna  # Ignored
     return (forecast - truth) ** 2
 
 
@@ -298,8 +325,9 @@ class MAE(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
-    return _spatial_average(abs(forecast - truth), region=region)
+    return _spatial_average(abs(forecast - truth), region=region, skipna=skipna)
 
 
 @dataclasses.dataclass
@@ -311,7 +339,9 @@ class SpatialMAE(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
+    del skipna  # Ignored
     return abs(forecast - truth)
 
 
@@ -324,8 +354,9 @@ class Bias(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
-    return _spatial_average(forecast - truth, region=region)
+    return _spatial_average(forecast - truth, region=region, skipna=skipna)
 
 
 @dataclasses.dataclass
@@ -337,7 +368,9 @@ class SpatialBias(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
+    del skipna  # Ignored
     return forecast - truth
 
 
@@ -356,6 +389,7 @@ class ACC(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     if "init_time" in forecast.dims:
       time_dim = "valid_time"
@@ -371,10 +405,12 @@ class ACC(Metric):
     forecast_anom = forecast - climatology_chunk
     truth_anom = truth - climatology_chunk
     return _spatial_average(
-        forecast_anom * truth_anom, region=region
+        forecast_anom * truth_anom,
+        region=region,
+        skipna=skipna,
     ) / np.sqrt(
-        _spatial_average(forecast_anom**2, region=region)
-        * _spatial_average(truth_anom**2, region=region)
+        _spatial_average(forecast_anom**2, region=region, skipna=skipna)
+        * _spatial_average(truth_anom**2, region=region, skipna=skipna)
     )
 
 
@@ -435,7 +471,9 @@ class SpatialSEEPS(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
+    del skipna  # Ignored, must be effectively True because of p1 mask.
     forecast_cat = self._convert_precip_to_seeps_cat(forecast)
     truth_cat = self._convert_precip_to_seeps_cat(truth)
 
@@ -479,9 +517,10 @@ class SEEPS(SpatialSEEPS):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
+    del skipna  # Ignored, must be effectively True because of p1 mask.
     result = super().compute_chunk(forecast, truth, region)
-    # Need skipna = True because of p1 mask
     return _spatial_average(result, region=region, skipna=True)
 
 
@@ -494,6 +533,7 @@ def _debiased_ensemble_mean_mse(
     forecast: xr.Dataset,
     truth: xr.Dataset,
     ensemble_dim: str,
+    skipna: bool,
 ) -> xr.Dataset:
   """Debiased estimate of E(forecast.mean() - truth)².
 
@@ -513,12 +553,14 @@ def _debiased_ensemble_mean_mse(
     forecast: A forecast dataset.
     truth: A ground truth dataset.
     ensemble_dim: Dimension indexing ensembles in the forecast.
+    skipna: Whether to skip NaN values in both forecasts and observations during
+      evaluation.
 
   Returns:
     Dataset with debiased (forecast - truth)².
   """
-  forecast_mean = forecast.mean(ensemble_dim, skipna=False)
-  forecast_var = forecast.var(ensemble_dim, skipna=False, ddof=1)
+  forecast_mean = forecast.mean(ensemble_dim, skipna=skipna)
+  forecast_var = forecast.var(ensemble_dim, skipna=skipna, ddof=1)
   biased_mse = (truth - forecast_mean) ** 2
   return biased_mse - forecast_var / _get_n_ensemble(forecast, ensemble_dim)
 
@@ -617,12 +659,19 @@ class CRPS(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """CRPS, averaged over space, for a time chunk of data."""
     return CRPSSkill(self.ensemble_dim).compute_chunk(
-        forecast, truth, region=region
+        forecast,
+        truth,
+        region=region,
+        skipna=skipna,
     ) - 0.5 * CRPSSpread(self.ensemble_dim).compute_chunk(
-        forecast, truth, region=region
+        forecast,
+        truth,
+        region=region,
+        skipna=skipna,
     )
 
 
@@ -635,11 +684,13 @@ class CRPSSpread(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """CRPSSpread, averaged over space, for a time chunk of data."""
     return _spatial_average(
-        _pointwise_crps_spread(forecast, self.ensemble_dim),
+        _pointwise_crps_spread(forecast, self.ensemble_dim, skipna=skipna),
         region=region,
+        skipna=skipna,
     )
 
 
@@ -652,11 +703,15 @@ class CRPSSkill(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """CRPSSkill, averaged over space, for a time chunk of data."""
     return _spatial_average(
-        _pointwise_crps_skill(forecast, truth, self.ensemble_dim),
+        _pointwise_crps_skill(
+            forecast, truth, self.ensemble_dim, skipna=skipna
+        ),
         region=region,
+        skipna=skipna,
     )
 
 
@@ -669,12 +724,19 @@ class SpatialCRPS(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """CRPS, averaged over space, for a time chunk of data."""
     return SpatialCRPSSkill(self.ensemble_dim).compute_chunk(
-        forecast, truth, region=region
+        forecast,
+        truth,
+        region=region,
+        skipna=skipna,
     ) - 0.5 * SpatialCRPSSpread(self.ensemble_dim).compute_chunk(
-        forecast, truth, region=region
+        forecast,
+        truth,
+        region=region,
+        skipna=skipna,
     )
 
 
@@ -687,9 +749,10 @@ class SpatialCRPSSpread(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """CRPSSpread, averaged over space, for a time chunk of data."""
-    return _pointwise_crps_spread(forecast, self.ensemble_dim)
+    return _pointwise_crps_spread(forecast, self.ensemble_dim, skipna=skipna)
 
 
 @dataclasses.dataclass
@@ -701,9 +764,12 @@ class SpatialCRPSSkill(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """CRPSSkill, averaged over space, for a time chunk of data."""
-    return _pointwise_crps_skill(forecast, truth, self.ensemble_dim)
+    return _pointwise_crps_skill(
+        forecast, truth, self.ensemble_dim, skipna=skipna
+    )
 
 
 @utils.dataset_safe_lru_cache(
@@ -713,7 +779,9 @@ class SpatialCRPSSkill(EnsembleMetric):
     maxsize=1,
 )
 def _pointwise_crps_spread(
-    forecast: xr.Dataset, ensemble_dim: str
+    forecast: xr.Dataset,
+    ensemble_dim: str,
+    skipna: bool,
 ) -> xr.Dataset:
   """CRPS spread at each point in truth, averaged over ensemble only."""
   n_ensemble = _get_n_ensemble(forecast, ensemble_dim)
@@ -738,7 +806,7 @@ def _pointwise_crps_spread(
       2
       * (
           ((2 * rank - n_ensemble - 1) * forecast).mean(
-              ensemble_dim, skipna=False
+              ensemble_dim, skipna=skipna
           )
       )
       / (n_ensemble - 1)
@@ -746,11 +814,14 @@ def _pointwise_crps_spread(
 
 
 def _pointwise_crps_skill(
-    forecast: xr.Dataset, truth: xr.Dataset, ensemble_dim: str
+    forecast: xr.Dataset,
+    truth: xr.Dataset,
+    ensemble_dim: str,
+    skipna: bool,
 ) -> xr.Dataset:
   """CRPS skill at each point in truth, averaged over ensemble only."""
   _get_n_ensemble(forecast, ensemble_dim)  # Will raise if no ensembles.
-  return abs(truth - forecast).mean(ensemble_dim, skipna=False)
+  return abs(truth - forecast).mean(ensemble_dim, skipna=skipna)
 
 
 def _rank_ds(ds: xr.Dataset, dim: str) -> xr.Dataset:
@@ -784,11 +855,13 @@ class GaussianCRPS(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """GaussianCRPS, averaged over space, for a time chunk of data."""
     return _spatial_average(
         _pointwise_gaussian_crps(forecast, truth),
         region=region,
+        skipna=skipna,
     )
 
 
@@ -844,6 +917,7 @@ class GaussianVariance(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """GaussianVariance, averaged over space, for a time chunk of data."""
     del truth  # unused
@@ -859,6 +933,7 @@ class GaussianVariance(Metric):
     return _spatial_average(
         xr.Dataset(dataset, coords=forecast.coords),
         region=region,
+        skipna=skipna,
     )
 
 
@@ -892,6 +967,7 @@ class GaussianBrierScore(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
 
     if isinstance(self.threshold, thresholds.Threshold):
@@ -927,7 +1003,9 @@ class GaussianBrierScore(Metric):
 
       brier_scores.append(
           _spatial_average(
-              (forecast_probability - truth_probability) ** 2, region=region
+              (forecast_probability - truth_probability) ** 2,
+              region=region,
+              skipna=skipna,
           ).expand_dims(dim={"quantile": [quantile]})
       )
 
@@ -963,6 +1041,7 @@ class GaussianIgnoranceScore(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
 
     if isinstance(self.threshold, thresholds.Threshold):
@@ -1000,9 +1079,9 @@ class GaussianIgnoranceScore(Metric):
       )
 
       ignorance_scores.append(
-          _spatial_average(ignorance_score, region=region).expand_dims(
-              dim={"quantile": [quantile]}
-          )
+          _spatial_average(
+              ignorance_score, region=region, skipna=skipna
+          ).expand_dims(dim={"quantile": [quantile]})
       )
 
     return xr.merge(ignorance_scores).assign_attrs(
@@ -1038,6 +1117,7 @@ class GaussianRPS(Metric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
 
     var_list = []
@@ -1062,7 +1142,9 @@ class GaussianRPS(Metric):
       forecast_cdf = xr.Dataset(cdf_values, coords=forecast.coords)
       rps_per_threshold.append((forecast_cdf - truth_ecdf) ** 2)
 
-    return _spatial_average(sum(rps_per_threshold), region=region)
+    return _spatial_average(
+        sum(rps_per_threshold), region=region, skipna=skipna
+    )
 
 
 @dataclasses.dataclass
@@ -1094,6 +1176,7 @@ class EnsembleStddevSqrtBeforeTimeAvg(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Ensemble Stddev, averaged over space, for a time chunk of data."""
     del truth  # unused
@@ -1103,13 +1186,16 @@ class EnsembleStddevSqrtBeforeTimeAvg(EnsembleMetric):
       return xr.zeros_like(
           # Compute the average, even though we return zeros_like. Why? Because,
           # this will preserve the scalar values of lat/lon coords correctly.
-          _spatial_average(forecast, region=region).mean(
-              self.ensemble_dim, skipna=False
+          _spatial_average(forecast, region=region, skipna=skipna).mean(
+              self.ensemble_dim,
+              skipna=skipna,
           )
       )
     else:
       return _spatial_average_l2_norm(
-          forecast.std(self.ensemble_dim, ddof=1, skipna=False), region=region
+          forecast.std(self.ensemble_dim, ddof=1, skipna=skipna),
+          region=region,
+          skipna=skipna,
       )
 
 
@@ -1122,6 +1208,7 @@ class EnsembleVariance(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """EnsembleVariance, averaged over space, for a time chunk of data."""
     del truth  # unused
@@ -1131,13 +1218,15 @@ class EnsembleVariance(EnsembleMetric):
       return xr.zeros_like(
           # Compute the average, even though we return zeros_like. Why? Because,
           # this will preserve the scalar values of lat/lon coords correctly.
-          _spatial_average(forecast, region=region).mean(
-              self.ensemble_dim, skipna=False
+          _spatial_average(forecast, region=region, skipna=skipna).mean(
+              self.ensemble_dim, skipna=skipna
           )
       )
     else:
       return _spatial_average(
-          forecast.var(self.ensemble_dim, ddof=1, skipna=False), region=region
+          forecast.var(self.ensemble_dim, ddof=1, skipna=skipna),
+          region=region,
+          skipna=skipna,
       )
 
 
@@ -1150,6 +1239,7 @@ class SpatialEnsembleVariance(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Ensemble variance, for a time chunk of data."""
     del truth  # unused
@@ -1160,9 +1250,9 @@ class SpatialEnsembleVariance(EnsembleMetric):
           # Compute the average, even though we return zeros_like. Why? Because,
           # this will preserve the scalar values of lat/lon coords correctly.
           forecast
-      ).mean(self.ensemble_dim, skipna=False)
+      ).mean(self.ensemble_dim, skipna=skipna)
     else:
-      return forecast.var(self.ensemble_dim, ddof=1, skipna=False)
+      return forecast.var(self.ensemble_dim, ddof=1, skipna=skipna)
 
 
 @dataclasses.dataclass
@@ -1194,12 +1284,15 @@ class EnsembleMeanRMSESqrtBeforeTimeAvg(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """EnsembleMeanRMSE, averaged over space, for a time chunk of data."""
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
 
     return _spatial_average_l2_norm(
-        truth - forecast.mean(self.ensemble_dim, skipna=False), region=region
+        truth - forecast.mean(self.ensemble_dim, skipna=skipna),
+        region=region,
+        skipna=skipna,
     )
 
 
@@ -1217,13 +1310,15 @@ class EnsembleMeanMSE(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """EnsembleMeanRMSE, averaged over space, for a time chunk of data."""
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
 
     return _spatial_average(
-        (truth - forecast.mean(self.ensemble_dim, skipna=False)) ** 2,
+        (truth - forecast.mean(self.ensemble_dim, skipna=skipna)) ** 2,
         region=region,
+        skipna=skipna,
     )
 
 
@@ -1243,13 +1338,17 @@ class DebiasedEnsembleMeanMSE(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """DebiasedEnsembleMeanMSE, averaged over space, for one time chunk."""
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
 
     return _spatial_average(
-        _debiased_ensemble_mean_mse(forecast, truth, self.ensemble_dim),
+        _debiased_ensemble_mean_mse(
+            forecast, truth, self.ensemble_dim, skipna=skipna
+        ),
         region=region,
+        skipna=skipna,
     )
 
 
@@ -1262,11 +1361,12 @@ class SpatialEnsembleMeanMSE(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Squared error in the ensemble mean, for a time chunk of data."""
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
 
-    return (truth - forecast.mean(self.ensemble_dim, skipna=False)) ** 2
+    return (truth - forecast.mean(self.ensemble_dim, skipna=skipna)) ** 2
 
 
 @dataclasses.dataclass
@@ -1278,11 +1378,14 @@ class DebiasedSpatialEnsembleMeanMSE(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Squared error in the ensemble mean, for a time chunk of data."""
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
 
-    return _debiased_ensemble_mean_mse(forecast, truth, self.ensemble_dim)
+    return _debiased_ensemble_mean_mse(
+        forecast, truth, self.ensemble_dim, skipna=skipna
+    )
 
 
 @dataclasses.dataclass
@@ -1334,12 +1437,19 @@ class EnergyScore(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Energy score, averaged over space, for a time chunk of data."""
     return EnergyScoreSkill(self.ensemble_dim).compute_chunk(
-        forecast, truth, region=region
+        forecast,
+        truth,
+        region=region,
+        skipna=skipna,
     ) - 0.5 * EnergyScoreSpread(self.ensemble_dim).compute_chunk(
-        forecast, truth, region=region
+        forecast,
+        truth,
+        region=region,
+        skipna=skipna,
     )
 
 
@@ -1352,6 +1462,7 @@ class EnergyScoreSpread(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Energy score spread, averaged over space, for a time chunk of data."""
     n_ensemble = _get_n_ensemble(forecast, self.ensemble_dim)
@@ -1360,15 +1471,18 @@ class EnergyScoreSpread(EnsembleMetric):
       return xr.zeros_like(
           # Compute the average, even though we return zeros_like. Why? Because,
           # this will preserve the scalar values of lat/lon coords correctly.
-          _spatial_average(forecast, region=region).mean(
-              self.ensemble_dim, skipna=False
+          _spatial_average(forecast, region=region, skipna=skipna).mean(
+              self.ensemble_dim,
+              skipna=skipna,
           )
       )
     else:
       return _spatial_average_l2_norm(
           self._ensemble_slice(forecast, slice(None, -1))
           - self._ensemble_slice(forecast, slice(1, None)),
-      ).mean(self.ensemble_dim, skipna=False)
+          region=region,
+          skipna=skipna,
+      ).mean(self.ensemble_dim, skipna=skipna)
 
 
 @dataclasses.dataclass
@@ -1380,11 +1494,15 @@ class EnergyScoreSkill(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Energy score skill, averaged over space, for a time chunk of data."""
     _get_n_ensemble(forecast, self.ensemble_dim)  # Will raise if no ensembles.
-    return _spatial_average_l2_norm(forecast - truth).mean(
-        self.ensemble_dim, skipna=False
+    return _spatial_average_l2_norm(
+        forecast - truth, region=region, skipna=skipna
+    ).mean(
+        self.ensemble_dim,
+        skipna=skipna,
     )
 
 
@@ -1415,7 +1533,8 @@ class _BaseEnsembleBrierScore(EnsembleMetric):
       debias: bool,
       forecast: xr.Dataset,
       truth: xr.Dataset,
-      region: t.Optional[Region] = None,
+      region: t.Optional[Region],
+      skipna: bool,
   ) -> xr.Dataset:
     """Common implementation of compute_chunk."""
 
@@ -1430,23 +1549,29 @@ class _BaseEnsembleBrierScore(EnsembleMetric):
     for threshold in threshold_seq:
       quantile = threshold.quantile
       threshold = threshold.compute(truth)
+      # Notice we allow NaN in truth/forecast probabilities, then skipna during
+      # computation of BrierScore (which is really just an MSE over the
+      # probabilities).
       truth_probability = xr.where(
           truth.isnull(),
           np.nan,
           xr.where(truth > threshold, 1.0, 0.0),
       )
       forecast_probability = xr.where(
-          forecast.isnull(), np.nan, xr.where(forecast > threshold, 1.0, 0.0)
+          forecast.isnull(),
+          np.nan,
+          xr.where(forecast > threshold, 1.0, 0.0),
       )
       if debias:
         mse_of_probabilities = _debiased_ensemble_mean_mse(
             forecast_probability,
             truth_probability,
             self.ensemble_dim,
+            skipna=skipna,
         )
       else:
         mse_of_probabilities = (
-            forecast_probability.mean(self.ensemble_dim, skipna=False)
+            forecast_probability.mean(self.ensemble_dim, skipna=skipna)
             - truth_probability
         ) ** 2
 
@@ -1454,6 +1579,7 @@ class _BaseEnsembleBrierScore(EnsembleMetric):
           _spatial_average(
               mse_of_probabilities,
               region=region,
+              skipna=skipna,
           ).expand_dims(dim={"quantile": [quantile]})
       )
 
@@ -1511,9 +1637,14 @@ class EnsembleBrierScore(_BaseEnsembleBrierScore):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     return self._compute_chunk_impl(
-        debias=False, forecast=forecast, truth=truth, region=region
+        debias=False,
+        forecast=forecast,
+        truth=truth,
+        region=region,
+        skipna=skipna,
     )
 
 
@@ -1569,9 +1700,14 @@ class DebiasedEnsembleBrierScore(_BaseEnsembleBrierScore):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     return self._compute_chunk_impl(
-        debias=True, forecast=forecast, truth=truth, region=region
+        debias=True,
+        forecast=forecast,
+        truth=truth,
+        region=region,
+        skipna=skipna,
     )
 
 
@@ -1608,6 +1744,7 @@ class EnsembleIgnoranceScore(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
 
     if isinstance(self.threshold, thresholds.Threshold):
@@ -1624,7 +1761,8 @@ class EnsembleIgnoranceScore(EnsembleMetric):
       truth_probability = xr.where(truth > threshold, 1.0, 0.0)
       forecast_probability = xr.where(forecast > threshold, 1.0, 0.0)
       ensemble_forecast_probability = forecast_probability.mean(
-          self.ensemble_dim, skipna=False
+          self.ensemble_dim,
+          skipna=skipna,
       )
       ignorance_score = -xr.where(
           truth_probability,
@@ -1635,6 +1773,7 @@ class EnsembleIgnoranceScore(EnsembleMetric):
           _spatial_average(
               ignorance_score,
               region=region,
+              skipna=skipna,
           ).expand_dims(dim={"quantile": [quantile]})
       )
 
@@ -1692,6 +1831,7 @@ class EnsembleRPS(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Spatially averaged RPS of the ensemble forecast."""
     rps_per_threshold = []
@@ -1701,12 +1841,15 @@ class EnsembleRPS(EnsembleMetric):
       truth_ecdf = xr.where(truth < threshold, 1.0, 0.0)
       forecast_ecdf = xr.where(forecast < threshold, 1.0, 0.0)
       ensemble_forecast_ecdf = forecast_ecdf.mean(
-          self.ensemble_dim, skipna=False
+          self.ensemble_dim,
+          skipna=skipna,
       )
 
       rps_per_threshold.append((ensemble_forecast_ecdf - truth_ecdf) ** 2)
 
-    return _spatial_average(sum(rps_per_threshold), region=region)
+    return _spatial_average(
+        sum(rps_per_threshold), region=region, skipna=skipna
+    )
 
 
 @dataclasses.dataclass
@@ -1727,6 +1870,8 @@ class RankHistogram(EnsembleMetric):
   will be (num_bins - 1) / (N num_bins²). Since the expected value is
   1 / num_bins, the relative error is
     Sqrt(variance) / expected = Sqrt((num_bins - 1) / N).
+
+  NaN values are treated as larger than any other. The skipna kwarg is ignored.
   """
 
   def __init__(
@@ -1770,8 +1915,18 @@ class RankHistogram(EnsembleMetric):
       forecast: xr.Dataset,
       truth: xr.Dataset,
       region: t.Optional[Region] = None,
+      skipna: bool = False,
   ) -> xr.Dataset:
     """Computes one-hot encoding of rank on a chunk of forecast/truth."""
+
+    if skipna and (
+        any(truth[v].isnull().any() for v in truth)
+        or any(forecast[v].isnull().any() for v in forecast)
+    ):
+      logging.warning(
+          "NaN values detected in truth or forecast. skipna=True but it will be"
+          " ignored."
+      )
     # Create a fake ensemble member for truth. This is for concatenation.
     truth_realization = forecast[self.ensemble_dim].data.min() - 1
     truth = truth.assign_coords({self.ensemble_dim: truth_realization})
