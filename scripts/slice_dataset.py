@@ -146,6 +146,7 @@ def main(argv: abc.Sequence[str]) -> None:
     ds = ds.drop_vars(DROP_VARIABLES.value)
   elif KEEP_VARIABLES.value:
     ds = ds[KEEP_VARIABLES.value]
+  input_chunks = {k: v for k, v in input_chunks.items() if k in ds.dims}
 
   isel, sel = _get_selections(ISEL.value, SEL.value)
   if isel:
