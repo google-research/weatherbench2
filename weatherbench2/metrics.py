@@ -67,7 +67,7 @@ def _get_climatology_chunk(
     climatology_chunk = climatology[list(truth.keys())]
   except KeyError as e:
     not_found = set(truth.keys()).difference(climatology.data_vars)
-    clim_var_dict = {key + "_mean": key for key in truth.keys()}  # pytype: disable=unsupported-operands
+    clim_var_dict = {str(key) + "_mean": key for key in truth.keys()}
     not_found_means = set(clim_var_dict).difference(climatology.data_vars)
     if not_found and not_found_means:
       raise KeyError(

@@ -164,14 +164,16 @@ class SEEPSThreshold:
     not_dry = ds.where(~is_dry)
     heavy_threshold = not_dry
     if weights is not None:
-      heavy_threshold = heavy_threshold.weighted(weights)  # pytype: disable=wrong-arg-types
+      heavy_threshold = heavy_threshold.weighted(
+          weights
+      )  # pytype: disable=wrong-arg-types
     heavy_threshold = heavy_threshold.quantile(2 / 3, dim=dim)
     out = xr.Dataset(
         {
             f'{self.var}_seeps_threshold': heavy_threshold.drop('quantile'),
             f'{self.var}_seeps_dry_fraction': dry_fraction,
         }
-    )
+    )  # fmt: skip
     return out
 
 
@@ -323,7 +325,7 @@ def main(argv: list[str]) -> None:
               f'{v}_seeps_threshold': clim_template[v],
               f'{v}_seeps_dry_fraction': clim_template[v],
           }
-      )
+      )  # fmt: skip
 
   def _compute_seeps(kv):
     k, _ = kv

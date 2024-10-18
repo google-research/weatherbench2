@@ -30,7 +30,9 @@ def _get_climatology_mean(
     climatology_mean = climatology[variables]
   except KeyError as e:
     not_found = set(variables).difference(climatology.data_vars)
-    clim_var_dict = {var + "_mean": var for var in variables}  # pytype: disable=unsupported-operands
+    clim_var_dict = {
+        var + "_mean": var for var in variables
+    }  # pytype: disable=unsupported-operands
     not_found_means = set(clim_var_dict).difference(climatology.data_vars)
     if not_found and not_found_means:
       raise KeyError(
@@ -47,7 +49,9 @@ def _get_climatology_std(
     climatology: xr.Dataset, variables: abc.Sequence[str]
 ) -> xr.Dataset:
   """Returns the climatological standard deviation of the given variables."""
-  clim_std_dict = {key + "_std": key for key in variables}  # pytype: disable=unsupported-operands
+  clim_std_dict = {
+      key + "_std": key for key in variables
+  }  # pytype: disable=unsupported-operands
   try:
     climatology_std = climatology[list(clim_std_dict.keys())].rename(
         clim_std_dict

@@ -75,12 +75,13 @@ def _decode_pressure_level_suffixes(forecast: xr.Dataset) -> xr.Dataset:
     forecast = forecast['forecast'].to_dataset('channel')
 
   for var in forecast:
+    var = str(var)
     # TODO(srasp): Consider writing this using regular expressions instead,
     # via something like re.fullmatch(r'(\w+)_(\d+)', channel)
     da = forecast[var]
-    if var.split('_')[-1].isdigit():  # Check for pressure level suffix  # pytype: disable=attribute-error
-      da = da.assign_coords(level=int(var.split('_')[-1]))  # pytype: disable=attribute-error
-      da = da.rename('_'.join(var.split('_')[:-1])).expand_dims({'level': 1})  # pytype: disable=attribute-error
+    if var.split('_')[-1].isdigit():  # Check for pressure level suffix
+      da = da.assign_coords(level=int(var.split('_')[-1]))
+      da = da.rename('_'.join(var.split('_')[:-1])).expand_dims({'level': 1})
     das.append(da)
 
   ds = xr.merge(das)
@@ -155,7 +156,9 @@ def _impose_data_selection(
     dataset = dataset.sel(level=selection.levels)
   if select_time:
     dataset = dataset.sel({time_dim: selection.time_slice})
-  _ensure_nonempty(dataset, message='Selection created empty dataset')  # pytype: disable=wrong-arg-types
+  _ensure_nonempty(
+      dataset, message='Selection created empty dataset'
+  )  # pytype: disable=wrong-arg-types
   return dataset  # pytype: disable=bad-return-type
 
 
