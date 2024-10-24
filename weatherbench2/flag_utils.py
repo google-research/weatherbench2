@@ -96,8 +96,11 @@ class _DimValuePairParser(flags.ArgumentParser):
     return 'dict[str, int | float | str]'
 
 
-def _get_dim_value(value_string: str) -> DimValueType:
+def get_dim_value(value_string: str) -> DimValueType:
   """Tries returning int then float, fallback to string."""
+  # If typing fails to catch a float being passed, then the first try/except
+  # will just return it as an int.
+  value_string = str(value_string)
   try:
     return int(value_string)
   except ValueError:
@@ -117,7 +120,7 @@ def _parse_dim_value_pairs(
   if dim_value_string:
     for entry in dim_value_string.split(','):
       key, value = entry.split('=')
-      pairs[key] = _get_dim_value(value)
+      pairs[key] = get_dim_value(value)
   return pairs
 
 

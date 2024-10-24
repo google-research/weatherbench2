@@ -39,7 +39,9 @@ Example Usage:
 """
 
 from collections import abc
+import logging
 import re
+import typing as t
 
 from absl import app
 from absl import flags
@@ -56,17 +58,47 @@ SEL = flag_utils.DEFINE_dim_value_pairs(
     'sel',
     '',
     help=(
-        'Selection criteria, to pass to xarray.Dataset.sel. Passed as key=value'
-        ' pairs, with key = VARNAME_{start,stop,step}'
+        'Selection criteria, to pass to xarray.Dataset.sel. Passed as'
+        ' key=value pairs, with key = VARNAME_{start,stop,step,list}. '
+        'If key ends with start, stop, or step, the value should be strings '
+        '(defaulting to None). If key ends with "list", the value should be '
+        'a list of "+" delimited ints/floats/strings.'
     ),
 )
 
-ISEL = flag_utils.DEFINE_dim_integer_pairs(
+ISEL = flag_utils.DEFINE_dim_value_pairs(
     'isel',
     '',
     help=(
         'Selection criteria, to pass to xarray.Dataset.isel. Passed as'
-        ' key=value pairs, with key = VARNAME_{start,stop,step}'
+        ' key=value pairs, with key = VARNAME_{start,stop,step,list}. '
+        'If key ends with start, stop, or step, the value should be integers '
+        '(defaulting to None). If key ends with "list", the value should be '
+        'a list of "+" delimited ints.'
+    ),
+)
+
+DROP_SEL = flag_utils.DEFINE_dim_value_pairs(
+    'drop_sel',
+    '',
+    help=(
+        'Selection criteria, to pass to xarray.Dataset.drop_sel. Passed as'
+        ' key=value pairs, with key = VARNAME_{start,stop,step,list}. '
+        'If key ends with start, stop, or step, the value should be strings '
+        '(defaulting to None). If key ends with "list", the value should be '
+        'a list of "+" delimited ints/floats/strings.'
+    ),
+)
+
+DROP_ISEL = flag_utils.DEFINE_dim_value_pairs(
+    'drop_isel',
+    '',
+    help=(
+        'Selection criteria, to pass to xarray.Dataset.drop_isel. Passed as'
+        ' key=value pairs, with key = VARNAME_{start,stop,step,list}. '
+        'If key ends with start, stop, or step, the value should be integers '
+        '(defaulting to None). If key ends with "list", the value should be '
+        'a list of "+" delimited ints.'
     ),
 )
 
@@ -101,41 +133,52 @@ NUM_THREADS = flags.DEFINE_integer(
     help='Number of chunks to read/write in parallel per worker.',
 )
 
+# pylint: disable=logging-fstring-interpolation
+
 
 def _get_selections(
-    isel_flag_value: dict[str, int],
-    sel_flag_value: dict[str, flag_utils.DimValueType],
-) -> tuple[dict[str, slice], dict[str, slice]]:
-  """Gets dictionaries for `xr.isel` and `xr.sel`."""
-  isel_parts = {}
-  sel_parts = {}
-  for parts_dict, flag_value in [
-      (isel_parts, isel_flag_value),
-      (sel_parts, sel_flag_value),
-  ]:
-    for k, v in flag_value.items():
-      match = re.search(r'^(.*)_(start|stop|step)$', k)
-      if not match:
-        raise ValueError(f'Flag {k} did not end in _(start|stop|step)')
-      dim, placement = match.groups()
-      if dim not in parts_dict:
-        parts_dict[dim] = [None, None, None]
-      if placement == 'start':
-        parts_dict[dim][0] = v
-      elif placement == 'stop':
-        parts_dict[dim][1] = v
-      else:
-        parts_dict[dim][2] = v
+    flag_values: dict[str, flag_utils.DimValueType],
+) -> list[dict[str, t.Union[str, int, list[int], slice]]]:
+  """Gets parts used to select based on flags."""
 
-  overlap = set(isel_parts).intersection(sel_parts)
-  if overlap:
-    raise ValueError(
-        f'--isel {isel_flag_value} and --sel {sel_flag_value} overlapped for'
-        f' variables {overlap}'
+  list_selectors = {}
+  value_selectors = {}
+  for k, v in flag_values.items():
+    # Validate and parse.
+    match = re.search(r'^(.*)_(start|stop|step|list)$', k)
+    if not match:
+      raise ValueError(f'Flag {k} did not end in _(start|stop|step|list)')
+    dim, placement = match.groups()
+    # Handle list types
+    if placement == 'list':
+      # Convert to string to allow .split('+') even if v was a single item list
+      # that cong converted to a float or int by the flag parser.
+      v = str(v)
+      if '++' in v:
+        raise ValueError(f'Found ambiguous "++" in {dim=} flag value {v}')
+      list_selectors[dim] = [
+          flag_utils.get_dim_value(v_i) for v_i in v.split('+')
+      ]
+    else:  # Else handle non-list types
+      v = flag_utils.get_dim_value(v)
+      if dim not in value_selectors:
+        value_selectors[dim] = [None, None, None]
+      if placement == 'start':
+        value_selectors[dim][0] = v
+      elif placement == 'stop':
+        value_selectors[dim][1] = v
+      else:
+        value_selectors[dim][2] = v
+
+  selections = []
+  for dim, selector in list_selectors.items():
+    selections.append({dim: selector})
+  for dim, selector in value_selectors.items():
+    selections.append(
+        {dim: slice(*selector) if isinstance(selector, list) else selector}
     )
-  isel = {k: slice(*v) for k, v in isel_parts.items()}
-  sel = {k: slice(*v) for k, v in sel_parts.items()}
-  return isel, sel
+  logging.info(f'Deduced selections {selections=} from {flag_values=}')
+  return selections  # pytype: disable=bad-return-type
 
 
 def main(argv: abc.Sequence[str]) -> None:
@@ -148,11 +191,14 @@ def main(argv: abc.Sequence[str]) -> None:
     ds = ds[KEEP_VARIABLES.value]
   input_chunks = {k: v for k, v in input_chunks.items() if k in ds.dims}
 
-  isel, sel = _get_selections(ISEL.value, SEL.value)
-  if isel:
-    ds = ds.isel(isel)
-  if sel:
-    ds = ds.sel(sel)
+  for selection in _get_selections(ISEL.value):
+    ds = ds.isel(selection)
+  for selection in _get_selections(SEL.value):
+    ds = ds.sel(selection)
+  for selection in _get_selections(DROP_ISEL.value):
+    ds = ds.drop_isel(selection)
+  for selection in _get_selections(DROP_SEL.value):
+    ds = ds.drop_sel(selection)
 
   template = xbeam.make_template(ds)
 
