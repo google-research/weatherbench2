@@ -33,6 +33,8 @@ Example of getting the (average) vertical profile of temperature, by latitude.
     --job_name=compute-vertical-profile-$USER
   ```
 """
+import typing as t
+
 from absl import app
 from absl import flags
 import apache_beam as beam
@@ -104,7 +106,11 @@ NUM_THREADS = flags.DEFINE_integer(
 # pylint: disable=expression-not-assigned
 
 
-def _impose_data_selection(ds: xr.Dataset) -> xr.Dataset:
+def _impose_data_selection(
+    ds: xr.Dataset,
+    source_chunks: t.Mapping[str, int],
+) -> tuple[xr.Dataset, dict[str, int]]:
+  """Select requested subset of data and trim chunks if needed."""
   if VARIABLES.value is not None:
     ds = ds[VARIABLES.value]
   selection = {
@@ -113,12 +119,14 @@ def _impose_data_selection(ds: xr.Dataset) -> xr.Dataset:
   if LEVELS.value:
     selection['level'] = [float(l) for l in LEVELS.value]
   ds = ds.sel({k: v for k, v in selection.items() if k in ds.dims})
-  return ds
+  return ds, {k: v for k, v in source_chunks.items() if k in ds.dims}
 
 
 def main(argv: list[str]):
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
-  source_dataset = _impose_data_selection(source_dataset)
+  source_dataset, source_chunks = _impose_data_selection(
+      source_dataset, source_chunks
+  )
   template = xbeam.make_template(
       source_dataset.isel({d: 0 for d in AVERAGING_DIMS.value}, drop=True)
   )

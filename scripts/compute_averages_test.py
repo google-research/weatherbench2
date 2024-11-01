@@ -32,6 +32,11 @@ class ComputeAveragesTest(test_util.TestCase):
     output_path = self.create_tempdir('destination').full_path
 
     input_ds = utils.random_like(schema.mock_forecast_data(ensemble_size=3))
+
+    # Add a variable (that will be dropped) that contains a new extra dimension
+    # (that will be dropped upon VARIABLE selection).
+    input_ds['extra'] = input_ds['2m_temperature'].expand_dims(extra_dim=[1])
+
     input_ds.chunk({'time': 31}).to_zarr(input_path)
 
     with flagsaver.flagsaver(
@@ -60,6 +65,11 @@ class ComputeAveragesTest(test_util.TestCase):
     output_path = self.create_tempdir('destination').full_path
 
     input_ds = utils.random_like(schema.mock_forecast_data(ensemble_size=3))
+
+    # Add a variable (that will be dropped) that contains a new extra dimension
+    # (that will be dropped upon VARIABLE selection).
+    input_ds['extra'] = input_ds['2m_temperature'].expand_dims(extra_dim=[1])
+
     input_ds.chunk({'time': 31}).to_zarr(input_path)
 
     with flagsaver.flagsaver(
