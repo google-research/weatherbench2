@@ -66,8 +66,7 @@ OR
 
 Notes:
 - It expects datasets with "time" and "prediction_timedelta"
-  dimensions, matching the output of DeepMind's data pipeline:
-  google3/learning/deepmind/research/weather/data_pipelines/hres/grib_to_zarr.py
+  dimensions.
 - Initializing times are expected to be spaced at some multiple of the interval
   between forecast lead times.
 - For more on forecast alignment, see the climpred documentation. This pipeline
