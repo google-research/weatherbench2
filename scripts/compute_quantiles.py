@@ -159,10 +159,10 @@ def evaluate_chunk(
 def _evaluate_chunk_core(chunk: xr.Dataset) -> xr.Dataset:
   """Implementation of evaluate_chunk that doesn't use a key."""
   preserve_dims = _get_preserve_dims(chunk)
-  if not preserve_dims.issubset(chunk.dims.keys()):
+  if not preserve_dims.issubset(set(chunk.dims)):
     raise ValueError(
         f'User specified {DIM.value=}, which results in preserved dims'
-        f' {preserve_dims} , not being a subset of {chunk.dims.keys()=}'
+        f' {preserve_dims} , not being a subset of {set(chunk.dims)=}'
     )
 
   quantiles = [float(q) for q in QUANTILES.value]

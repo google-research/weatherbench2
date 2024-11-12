@@ -251,10 +251,10 @@ class ZonalEnergySpectrumTest(parameterized.TestCase):
 
     # 'longitude' gets changed to 'wavenumber', whose length is shorter (as we
     # store only the positive frequencies).
-    expected_dims = dict(dataset.dims)
-    expected_dims['zonal_wavenumber'] = dataset.dims['longitude'] // 2 + 1
+    expected_dims = dict(dataset.sizes)
+    expected_dims['zonal_wavenumber'] = dataset.sizes['longitude'] // 2 + 1
     del expected_dims['longitude']
-    spectrum_dims = dict(zip(spectrum.dims, spectrum.shape))
+    spectrum_dims = dict(spectrum.sizes)
     self.assertEqual(expected_dims, spectrum_dims)
 
     # A new coordinate is 'frequency'

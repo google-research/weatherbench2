@@ -740,10 +740,10 @@ class EnsembleMeanRMSEAndStddevTest(parameterized.TestCase):
 
     for dataset in [rmse, ensemble_stddev]:
       self.assertEqual(
-          dict(dataset.dims),
+          dict(dataset.sizes),
           {
               k: v
-              for k, v in forecast.dims.items()
+              for k, v in forecast.sizes.items()
               if k not in ['realization', 'latitude', 'longitude']
           },
       )
@@ -760,7 +760,7 @@ class EnsembleMeanRMSEAndStddevTest(parameterized.TestCase):
 
     # Since truth and forecast both came from the same random distribution,
     # we expect spread and skill to be equal.
-    n_independent_samples = np.prod(list(rmse.dims.values()))
+    n_independent_samples = np.prod(list(rmse.sizes.values()))
 
     # At each time point, the estimator is biased ~ 1 / ensemble_size.
     atol = 4 * (1 / np.sqrt(n_independent_samples) + 1 / ensemble_size)
@@ -824,7 +824,7 @@ class DebiasedEnsembleMeanMSETest(parameterized.TestCase):
     observed_bias = (mse_small_ensemble - mse_large_ensemble).mean()
     xr.testing.assert_allclose(observed_bias, anticipated_bias, rtol=0.05)
 
-    total_points = np.prod(list(truth.dims.values()))
+    total_points = np.prod(list(truth.sizes.values()))
     stderr = np.sqrt(var_large_ensemble.geopotential.max() / total_points)
 
     xr.testing.assert_allclose(
@@ -843,7 +843,7 @@ def _crps_brute_force(
   def _l1_norm(x):
     return metrics._spatial_average(abs(x), region=None, skipna=skipna)
 
-  n_ensemble = forecast.dims[metrics.REALIZATION]
+  n_ensemble = forecast.sizes[metrics.REALIZATION]
   skill = _l1_norm(truth - forecast).mean(metrics.REALIZATION, skipna=skipna)
   if n_ensemble == 1:
     spread = xr.zeros_like(skill)
@@ -877,10 +877,10 @@ class EnergyScoreTest(parameterized.TestCase):
 
     for dataset in [score, spread, skill]:
       self.assertEqual(
-          dict(dataset.dims),
+          dict(dataset.sizes),
           {
               k: v
-              for k, v in forecast.dims.items()
+              for k, v in forecast.sizes.items()
               if k not in ['realization', 'latitude', 'longitude']
           },
       )
@@ -897,7 +897,7 @@ class EnergyScoreTest(parameterized.TestCase):
 
     # Since truth and forecast both came from the same random distribution,
     # we expect spread and skill to be equal.
-    n_independent_samples = np.prod(list(score.dims.values()))
+    n_independent_samples = np.prod(list(score.sizes.values()))
     xr.testing.assert_allclose(
         spread.mean(),
         skill.mean(),
@@ -1123,7 +1123,7 @@ class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
         observed_bias.geopotential.data, anticipated_bias, rtol=0.05
     )
 
-    total_points = np.prod(list(truth.dims.values()))
+    total_points = np.prod(list(truth.sizes.values()))
     stderr = np.sqrt(variance / total_points)
 
     # Large ensemble gives the same result as small ensemble, since we debias.

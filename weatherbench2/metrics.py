@@ -573,7 +573,7 @@ def _get_n_ensemble(
   """Returns the size of `ensemble_dim`, optionally asserting size at least."""
   if ensemble_dim not in ds.dims:
     raise ValueError(f"{ensemble_dim=} not found in {ds.dims=}")
-  n_ensemble = ds.dims[ensemble_dim]
+  n_ensemble = ds.sizes[ensemble_dim]
   if n_ensemble < expect_n_ensemble_at_least:
     raise ValueError(
         f"{n_ensemble=} is less than expected size of "
@@ -592,7 +592,7 @@ class EnsembleMetric(Metric):
     """Slice `ds` and assign coords to [0, ..., len(slice)]."""
     ds = ds.isel({self.ensemble_dim: slice_obj})
     return ds.assign_coords(
-        {self.ensemble_dim: np.arange(ds.dims[self.ensemble_dim])}
+        {self.ensemble_dim: np.arange(ds.sizes[self.ensemble_dim])}
     )
 
   def compute(

@@ -181,7 +181,7 @@ def _impose_data_selection(
       k: v for k, v in source_chunks.items() if k in source.dims
   }
   source_chunks = {  # Truncate chunks that are shorter after data selection
-      k: min(source.dims[k], source_chunks[k]) for k in source_chunks
+      k: min(source.sizes[k], source_chunks[k]) for k in source_chunks
   }
   return source, source_chunks
 
