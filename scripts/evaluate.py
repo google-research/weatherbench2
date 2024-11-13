@@ -512,13 +512,13 @@ def main(argv: list[str]) -> None:
       'ensemble_binary': config.Eval(
           metrics={
               'brier_score': metrics.EnsembleBrierScore(
-                  ensemble_dim=ENSEMBLE_DIM.value, threshold=threshold_list
+                  ensemble_dim=ENSEMBLE_DIM.value, thresholds=threshold_list
               ),
               'debiased_brier_score': metrics.DebiasedEnsembleBrierScore(
-                  ensemble_dim=ENSEMBLE_DIM.value, threshold=threshold_list
+                  ensemble_dim=ENSEMBLE_DIM.value, thresholds=threshold_list
               ),
               'ignorance_score': metrics.EnsembleIgnoranceScore(
-                  ensemble_dim=ENSEMBLE_DIM.value, threshold=threshold_list
+                  ensemble_dim=ENSEMBLE_DIM.value, thresholds=threshold_list
               ),
           },
           regions=regions,
@@ -583,6 +583,26 @@ def main(argv: list[str]) -> None:
           probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
           output_format='zarr',
       ),
+      'ensemble_binary_spatial': config.Eval(
+          metrics={
+              'brier_score': metrics.SpatialEnsembleBrierScore(
+                  ensemble_dim=ENSEMBLE_DIM.value, thresholds=threshold_list
+              ),
+              'debiased_brier_score': metrics.SpatialDebiasedEnsembleBrierScore(
+                  ensemble_dim=ENSEMBLE_DIM.value, thresholds=threshold_list
+              ),
+              'ignorance_score': metrics.SpatialEnsembleIgnoranceScore(
+                  ensemble_dim=ENSEMBLE_DIM.value, thresholds=threshold_list
+              ),
+          },
+          against_analysis=False,
+          derived_variables=derived_variables,
+          evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
+          probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
+          probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
+          probabilistic_climatology_hour_interval=PROBABILISTIC_CLIMATOLOGY_HOUR_INTERVAL.value,
+          output_format='zarr',
+      ),
       'probabilistic_spatial_histograms': config.Eval(
           metrics={
               'rank_histogram': metrics.RankHistogram(
@@ -609,10 +629,10 @@ def main(argv: list[str]) -> None:
       'gaussian_binary': config.Eval(
           metrics={
               'brier_score': metrics.GaussianBrierScore(
-                  threshold=threshold_list
+                  thresholds=threshold_list
               ),
               'ignorance_score': metrics.GaussianIgnoranceScore(
-                  threshold=threshold_list
+                  thresholds=threshold_list
               ),
           },
           against_analysis=False,

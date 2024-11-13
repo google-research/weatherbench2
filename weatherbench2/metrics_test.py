@@ -402,7 +402,7 @@ class GaussianBrierScoreTest(parameterized.TestCase):
       threshold = thresholds.GaussianQuantileThreshold(
           climatology=climatology, quantile=0.8
       )
-      result = metrics.GaussianBrierScore(threshold).compute(forecast, truth)
+      result = metrics.GaussianBrierScore([threshold]).compute(forecast, truth)
       expected_arr = np.array([[expected_1, expected_1]])
       np.testing.assert_allclose(
           result['2m_temperature'].values, expected_arr, rtol=1e-4
@@ -416,7 +416,7 @@ class GaussianBrierScoreTest(parameterized.TestCase):
       threshold = thresholds.QuantileThreshold(
           climatology=climatology, quantile=0.8
       )
-      result = metrics.GaussianBrierScore(threshold).compute(forecast, truth)
+      result = metrics.GaussianBrierScore([threshold]).compute(forecast, truth)
       expected_arr = np.array([[expected_2, expected_2]])
       np.testing.assert_allclose(
           result['2m_temperature'].values, expected_arr, rtol=1e-4
@@ -458,7 +458,9 @@ class GaussianIgnoranceScoreTest(parameterized.TestCase):
     threshold = thresholds.GaussianQuantileThreshold(
         climatology=climatology, quantile=0.8
     )
-    result = metrics.GaussianIgnoranceScore(threshold).compute(forecast, truth)
+    result = metrics.GaussianIgnoranceScore([threshold]).compute(
+        forecast, truth
+    )
     expected_arr = np.array([[expected, expected]])
     np.testing.assert_allclose(
         result['2m_temperature'].values, expected_arr, rtol=1e-4
@@ -963,7 +965,7 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
     threshold = thresholds.GaussianQuantileThreshold(
         climatology=climatology, quantile=0.2
     )
-    result = metrics.EnsembleBrierScore(threshold).compute(forecast, truth)
+    result = metrics.EnsembleBrierScore([threshold]).compute(forecast, truth)
     expected_arr = np.array([[expected, expected]])
     np.testing.assert_allclose(
         result['2m_temperature'].values, expected_arr, rtol=1e-4
@@ -1017,7 +1019,7 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
     with self.subTest('forecast has nan'):
       # When forecast has nan in prediction_timedelta, only that timedelta will
       # be NaN.
-      result = metrics.EnsembleBrierScore(threshold).compute(
+      result = metrics.EnsembleBrierScore([threshold]).compute(
           forecast_with_nan,
           truth,
           skipna=skipna,
@@ -1034,7 +1036,7 @@ class EnsembleBrierScoreTest(parameterized.TestCase):
     with self.subTest('truth has nan'):
       # When truth has nan, the final average over times means the entire
       # score is NaN.
-      result = metrics.EnsembleBrierScore(threshold).compute(
+      result = metrics.EnsembleBrierScore([threshold]).compute(
           forecast,
           truth_with_nan,
           skipna=skipna,
@@ -1080,14 +1082,14 @@ class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
         quantile=quantile,
     )
 
-    bs_large_ensemble = metrics.EnsembleBrierScore(threshold).compute(
+    bs_large_ensemble = metrics.EnsembleBrierScore([threshold]).compute(
         forecast, truth
     )
-    bs_small_ensemble = metrics.EnsembleBrierScore(threshold).compute(
+    bs_small_ensemble = metrics.EnsembleBrierScore([threshold]).compute(
         small_ensemble_forecast, truth
     )
     bs_debiased_small_ensemble = metrics.DebiasedEnsembleBrierScore(
-        threshold
+        [threshold]
     ).compute(small_ensemble_forecast, truth)
 
     # Get some variants using a bit of NaN values
@@ -1102,13 +1104,13 @@ class DebiasedEnsembleBrierScoreTest(parameterized.TestCase):
         small_ensemble_forecast, frac_nan=frac_nan, seed=0
     )
     truth_w_nan = test_utils.insert_nan(truth, frac_nan=frac_nan, seed=1)
-    bs_small_ensemble_w_nan = metrics.EnsembleBrierScore(threshold).compute(
+    bs_small_ensemble_w_nan = metrics.EnsembleBrierScore([threshold]).compute(
         small_ensemble_forecast_w_nan,
         truth_w_nan,
         skipna=True,
     )
     bs_debiased_small_ensemble_w_nan = metrics.DebiasedEnsembleBrierScore(
-        threshold
+        [threshold]
     ).compute(small_ensemble_forecast_w_nan, truth_w_nan, skipna=True)
 
     # Make sure the test is not trivial by showing that without debiasing we get
@@ -1177,7 +1179,9 @@ class EnsembleIgnoranceScoreTest(parameterized.TestCase):
     threshold = thresholds.GaussianQuantileThreshold(
         climatology=climatology, quantile=0.2
     )
-    result = metrics.EnsembleIgnoranceScore(threshold).compute(forecast, truth)
+    result = metrics.EnsembleIgnoranceScore([threshold]).compute(
+        forecast, truth
+    )
     expected_arr = np.array([[expected, expected]])
     np.testing.assert_allclose(
         result['2m_temperature'].values, expected_arr, rtol=1e-4
