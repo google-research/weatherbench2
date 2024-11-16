@@ -114,7 +114,7 @@ class Eval:
       by-valid convention. For by-init, specify analysis dataset as obs.
     derived_variables: dict of DerivedVariable instances to compute on the fly.
     temporal_mean: Compute temporal mean (over time/init_time) for metrics.
-    output_format: Wether to save to 'netcdf' or 'zarr'.
+    output_format: whether to save to 'netcdf' or 'zarr'.
   """
 
   metrics: t.Dict[str, Metric]

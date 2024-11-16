@@ -258,12 +258,21 @@ RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 FANOUT = flags.DEFINE_integer(
     'fanout',
     None,
-    help='Beam CombineFn fanout. Might be required for large dataset.',
+    help='Beam CombineFn fanout. Recommended when evaluating large datasets.',
 )
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads',
     None,
     help='Number of chunks to read/write Zarr in parallel per worker.',
+)
+SHUFFLE_BEFORE_TEMPORAL_MEAN = flags.DEFINE_bool(
+    'shuffle_before_temporal_mean',
+    False,
+    help=(
+        'Shuffle before computing the temporal mean. This is a good idea when'
+        ' evaluation metric outputs are small compared to the size of the'
+        ' input data, such as when aggregating over space or a large ensemble.'
+    ),
 )
 
 
@@ -661,6 +670,7 @@ def main(argv: list[str]) -> None:
         skipna=SKIPNA.value,
         fanout=FANOUT.value,
         num_threads=NUM_THREADS.value,
+        shuffle_before_temporal_mean=SHUFFLE_BEFORE_TEMPORAL_MEAN.value,
         argv=argv,
     )
   else:
