@@ -100,6 +100,14 @@ CLIMATOLOGY_END_YEAR = flags.DEFINE_integer(
     2020,
     help='Inclusive end year of --input_path to include.',
 )
+LEVELS = flags.DEFINE_list(
+    'levels',
+    None,
+    help=(
+        'Comma delimited list of pressure levels to compute spectra on. If'
+        ' empty, compute on all levels of --input_path'
+    ),
+)
 VARIABLES = flags.DEFINE_list(
     'variables',
     None,
@@ -504,6 +512,9 @@ def main(argv: abc.Sequence[str]) -> None:
 
   if VARIABLES.value:
     input_ds = input_ds[VARIABLES.value]
+  if LEVELS.value:
+    input_ds = input_ds.sel(level=[int(l) for l in LEVELS.value])
+
   input_chunks = {k: v for k, v in input_chunks.items() if k in input_ds.dims}
 
   _check_input_spacing_and_time_flags(input_ds)

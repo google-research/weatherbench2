@@ -17,12 +17,13 @@ import setuptools
 
 base_requires = [
     'apache_beam>=2.31.0',
+    'cftime>=1.6.2',
     'jax[cpu]',
-    'numpy',
-    'pandas==2.0.3',
+    'numpy>=2.1.3',
+    'pandas>=2.2.3',
     'scipy',
     'scikit-learn',
-    'xarray==2023.7.0',
+    'xarray>=2024.11.0',
     'xarray-beam',
     'zarr',
 ]
@@ -48,7 +49,7 @@ gcp_requires = [
 
 setuptools.setup(
     name='weatherbench2',
-    version='0.2.0',
+    version='0.2.1',
     license='Apache 2.0',
     author='Google LLC',
     author_email='noreply@google.com',
