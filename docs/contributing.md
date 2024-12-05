@@ -33,11 +33,8 @@ for this purpose. If possible, consider reviewing [Google's Code Review Guide](h
 
 ### Development Setup
 
-After cloning the project, we recommend creating a local Python3.9 environment
+After cloning the project, we recommend creating a local Python3.11 environment
 for development (try [Miniconda](https://docs.conda.io/en/latest/miniconda.html)).
-
-> Note: We'll soon support Python 3.10 & 3.11 ([#3](https://github.com/google-research/weatherbench2/issues/3)).
-> At that point, we will recommend creating a Python3.10 environment.
 
 To locally install the project for development, please run:
 ```shell
