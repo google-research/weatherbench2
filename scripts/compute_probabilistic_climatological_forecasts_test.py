@@ -25,22 +25,28 @@ import xarray_beam
 
 from . import compute_probabilistic_climatological_forecasts as cpcf
 
+SOURCE_TIME = cpcf.SOURCE_TIME
+
+
+def assert_uniform(values, stderr_tol=4, expected_min=None, expected_max=None):
+  """Asserts values counts uniformly distributed up to 4 standard errors."""
+  values = np.asarray(values)
+  if expected_min is not None:
+    np.testing.assert_array_equal(values.min(), expected_min)
+  if expected_max is not None:
+    np.testing.assert_array_equal(values.max(), expected_max)
+  counts = pd.Series(values).value_counts().sort_index()
+  ensemble_size = counts.sum()
+  fracs = counts / ensemble_size
+  expected_frac = 1 / len(counts)
+  standard_error = np.sqrt(expected_frac * (1 - expected_frac) / ensemble_size)
+  np.testing.assert_allclose(
+      fracs, expected_frac, atol=stderr_tol * standard_error
+  )
+
 
 class GetSampledInitTimesTest(parameterized.TestCase):
   """Test this private method, mostly because the style guide says not to."""
-
-  def assert_uniform(self, values, stderr_tol):
-    """Asserts values counts uniformly distributed up to 4 standard errors."""
-    counts = pd.Series(values).value_counts().sort_index()
-    ensemble_size = counts.sum()
-    fracs = counts / ensemble_size
-    expected_frac = 1 / len(counts)
-    standard_error = np.sqrt(
-        expected_frac * (1 - expected_frac) / ensemble_size
-    )
-    np.testing.assert_allclose(
-        fracs, expected_frac, atol=stderr_tol * standard_error
-    )
 
   @parameterized.named_parameters(
       dict(
@@ -124,22 +130,19 @@ class GetSampledInitTimesTest(parameterized.TestCase):
           not with_replacement and ensemble_size == -1
       )
       if no_edge_effects:
-        self.assert_uniform(
+        assert_uniform(
             perturbation.days,
             stderr_tol=0 if expect_everything_sampled_once else 4,
-        )
-        self.assertEqual(perturbation.days.min(), -day_window_size // 2)
-        self.assertEqual(
-            perturbation.days.max(),
-            day_window_size // 2 + day_window_size % 2 - 1,
+            expected_min=-day_window_size // 2,
+            expected_max=day_window_size // 2 + day_window_size % 2 - 1,
         )
 
       # The years should be uniform.
-      years = pd.to_datetime(sampled_t).year
-      self.assertEqual(years.min(), climatology_start_year)
-      self.assertEqual(years.max(), climatology_end_year)
-      self.assert_uniform(
-          years, stderr_tol=0 if expect_everything_sampled_once else 4
+      assert_uniform(
+          pd.to_datetime(sampled_t).year,
+          stderr_tol=0 if expect_everything_sampled_once else 4,
+          expected_min=climatology_start_year,
+          expected_max=climatology_end_year,
       )
 
 
@@ -170,7 +173,13 @@ class MainTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(testcase_name='Default'),
-      dict(testcase_name='CustomTimeName', time_dim='init'),
+      # A larger ensemble better tests that the distribution of days is uniform.
+      dict(testcase_name='LargeEnsemble', ensemble_size=100),
+      dict(
+          testcase_name='CustomTimeNameNoSourceTime',
+          time_dim='init',
+          add_source_time=False,
+      ),
       dict(testcase_name='OddWindow', day_window_size=3),
       dict(testcase_name='OutputIsLeapYearInFeb', output_leap_location='feb'),
       dict(testcase_name='OutputIsLeapYearInDec', output_leap_location='dec'),
@@ -226,7 +235,11 @@ class MainTest(parameterized.TestCase):
       data_year_hasleap=False,
       custom_prediction_timedelta_chunk=False,
       with_replacement=True,
+      # Note that all tests passed with ensemble_size=500.
+      # This is relevant, since the tolerance below is proportional to
+      # 1 / sqrt(ensemble_size).
       ensemble_size=20,
+      add_source_time=True,
   ):
     input_ds = self._make_dataset_that_grows_by_one_with_every_timedelta(
         input_time_resolution=input_time_resolution,
@@ -287,6 +300,7 @@ class MainTest(parameterized.TestCase):
         day_window_size=str(day_window_size),
         ensemble_size=str(ensemble_size),
         with_replacement=str(with_replacement).lower(),
+        add_source_time=str(add_source_time).lower(),
         variables='temperature',
         output_chunks=output_chunks_flag,
         runner='DirectRunner',
@@ -327,7 +341,10 @@ class MainTest(parameterized.TestCase):
     )
 
     # Check variables (this is the exciting part!)
-    self.assertCountEqual(['temperature'], list(output_ds))
+    self.assertCountEqual(
+        ['temperature'] + ([SOURCE_TIME] if add_source_time else []),
+        list(output_ds),
+    )
 
     # Ensemble members differ.
     np.testing.assert_array_less(0, output_ds.temperature.var('realization'))
@@ -338,14 +355,20 @@ class MainTest(parameterized.TestCase):
         1, output_ds.temperature.diff('prediction_timedelta')
     )
 
+    # Source time should also be contiguous
+    if add_source_time:
+      np.testing.assert_array_equal(
+          pd.to_timedelta(timedelta_spacing).to_numpy(),
+          output_ds[SOURCE_TIME].diff('prediction_timedelta').data,
+      )
+
     timedeltas_in_a_year = pd.Timedelta(
         f'{365 + output_dates_have_leap}d'
     ) / pd.Timedelta(timedelta_spacing)
     timedeltas_in_a_day = pd.Timedelta('1d') / pd.Timedelta(timedelta_spacing)
 
     # Check that the initial times output_t, came from input days of year within
-    # the specified window. Use the fact that temperature is growing at a rate
-    # of 1 for every timedelta.
+    # the specified window.
     for region in [
         dict(latitude=0, longitude=0, level=0),
         dict(
@@ -359,6 +382,35 @@ class MainTest(parameterized.TestCase):
         temperature = (
             output_ds.isel(region).isel({time_dim: i_time}).temperature
         )
+
+        # Precise check using SOURCE_TIME.
+        # Notice that this check always runs and requires the expected uniform
+        # distribution, regardless of leap year.
+        if add_source_time:
+          output_time = pd.to_datetime(
+              temperature.isel(prediction_timedelta=0)[time_dim].data
+          )
+          source_time = pd.to_datetime(
+              output_ds.isel(region)
+              .isel(prediction_timedelta=0)
+              .isel({time_dim: i_time})[SOURCE_TIME]
+              .data
+          )
+          assert_uniform(
+              source_time.year,
+              expected_min=climatology_start_year,
+              expected_max=climatology_end_year,
+          )
+          assert_uniform(
+              source_time.dayofyear,
+              expected_min=output_time.dayofyear - day_window_size // 2,
+              expected_max=output_time.dayofyear
+              + day_window_size // 2
+              + day_window_size % 2
+              - 1,
+          )
+
+        # Rough check using the values
         # Since temperature is growing linearly at a rate of 1 for every
         # timedelta, we expect a certain spread of temperatures...roughly equal
         # to the day_window_size. There are edge effects due to way windows

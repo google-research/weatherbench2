@@ -146,12 +146,22 @@ FORECAST_DURATION = flags.DEFINE_string(
 )
 TIMEDELTA_SPACING = flags.DEFINE_string(
     'timedelta_spacing',
-    '12h',
+    '6h',
     help=(
         'Distance between lead times in forecasts. Must be a multiple of'
         ' difference between times in INPUT. Must be a multiple or divisor of'
         ' both one day and INITIAL_TIME_SPACING. Cannot specify resolution'
         ' finer than one hour.'
+    ),
+)
+
+SOURCE_TIME = 'source_time'
+ADD_SOURCE_TIME = flags.DEFINE_boolean(
+    'add_source_time',
+    False,
+    help=(
+        f'Whether to add a "{SOURCE_TIME}" variable, indicating what time in'
+        ' INPUT_PATH was used for each output sample'
     ),
 )
 
@@ -496,9 +506,17 @@ def _emit_sampled_weather(
   # output times to scatter it to. That's okay, we will Yield nothing.
   for info in values['time_key_and_index_info']:
     info = info.copy()
-    del info['sampled_time_value']  #  Was only for ValueError printouts above.
+    output_ds = ds.copy()
+    sampled_time_value = info.pop('sampled_time_value')
+    if ADD_SOURCE_TIME.value:
+      output_ds[SOURCE_TIME] = xr.DataArray(
+          # Insert as a DataArray, which lets us assign the proper dims.
+          [sampled_time_value],
+          dims=TIME_DIM.value,
+          coords={TIME_DIM.value: ds[TIME_DIM.value]},
+      )
     output_ds = (
-        ds.expand_dims({DELTA: [info.pop('timedelta_value')]})
+        output_ds.expand_dims({DELTA: [info.pop('timedelta_value')]})
         .assign_coords({TIME_DIM.value: [info.pop('output_init_time_value')]})
         .expand_dims({REALIZATION_NAME.value: [info[REALIZATION_NAME.value]]})
     )
@@ -560,6 +578,24 @@ def main(argv: abc.Sequence[str]) -> None:
   assert isinstance(input_ds, xr.Dataset)  # To satisfy pytype.
   if DELTA in input_ds.dims:
     raise ValueError(f'INPUT_PATH data already had {DELTA} as a dimension')
+  if ADD_SOURCE_TIME.value:
+    input_ds = input_ds.assign(
+        # Assign SOURCE_TIME with an arbitrary DataArray of type datetime64[ns].
+        # Using a DataArray with time index is important: It ensures it will be
+        # stored as a data_var, and will get indices sliced/expanded below
+        # correctly. It is also important to not directly use input_ds.time.
+        {
+            # TODO(langmore) Remove the "+1" once Xarray bug is fixed;
+            # https://github.com/pydata/xarray/issues/9859
+            # Until then, assigning to input_ds[TIME_DIM.value] without the "+1"
+            # results in an error:
+            # ValueError: Cannot assign to the .data attribute of dimension
+            # coordinate a.k.a. IndexVariable 'time'. Instead, add 1 so it is a
+            # new variable.
+            SOURCE_TIME: (input_ds[TIME_DIM.value]
+                          + np.array(1, dtype='timedelta64[ns]'))  # fmt: skip
+        }
+    )
   template = (
       xbeam.make_template(input_ds)
       .isel({TIME_DIM.value: 0}, drop=True)
