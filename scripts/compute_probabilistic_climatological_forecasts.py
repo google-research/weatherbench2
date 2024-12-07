@@ -133,7 +133,7 @@ INITIAL_TIME_END = flags.DEFINE_string(
 )
 INITIAL_TIME_SPACING = flags.DEFINE_string(
     'initial_time_spacing',
-    '12h',
+    '6h',
     help=(
         'Spacing between initial forecast times. Must be a multiple of spacing'
         ' between times in INPUT. Must be a multiple or divisor of both one day'
