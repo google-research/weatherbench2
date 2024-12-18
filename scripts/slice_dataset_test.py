@@ -30,16 +30,35 @@ class GetSelectionsTest(parameterized.TestCase):
         flag_values={
             'A_start': '1 day',
             'A_stop': '10 days',
-            'A_step': '2 days',
+            'A_step': 2,
             'B_stop': 2.2,
             'C_step': 3,
             'D_list': 'planes+trains+automobiles',
         },
+        is_sel_or_dropsel=False,
     )
     expected_sel = [
-        {'A': slice('1 day', '10 days', '2 days')},
+        {'A': slice('1 day', '10 days', 2)},
         {'B': slice(None, 2.2, None)},
         {'C': slice(None, None, 3)},
+        {'D': ['planes', 'trains', 'automobiles']},
+    ]
+    self.assertCountEqual(expected_sel, sel)
+
+  def test_valid_selections_is_sel_or_dropsel(self):
+    sel = slice_dataset._get_selections(
+        flag_values={
+            'A_start': '1 day',
+            'A_stop': '10 days',
+            'A_step': 2,
+            'B_stop': 2020,  # As in the year 2020 for a date
+            'D_list': 'planes+trains+automobiles',
+        },
+        is_sel_or_dropsel=True,
+    )
+    expected_sel = [
+        {'A': slice('1 day', '10 days', 2)},
+        {'B': slice(None, '2020', None)},
         {'D': ['planes', 'trains', 'automobiles']},
     ]
     self.assertCountEqual(expected_sel, sel)
@@ -56,6 +75,7 @@ class GetSelectionsTest(parameterized.TestCase):
             'Z_start': 1,
             'W_step': 2,
         },
+        is_sel_or_dropsel=False,
     )
     expected_isel = [
         {'A': [9, -1, 0]},
@@ -76,6 +96,7 @@ class GetSelectionsTest(parameterized.TestCase):
                 'X_stop': 10,
                 'X_bad': 2,
             },
+            is_sel_or_dropsel=False,
         )
 
     with self.subTest('Not ending in (start|stop|step|list) raises 2'):
@@ -86,6 +107,7 @@ class GetSelectionsTest(parameterized.TestCase):
                 'X_stop': 10,
                 'X_step_and_more': 2,
             },
+            is_sel_or_dropsel=False,
         )
 
     with self.subTest('Not ending in (start|stop|step|list) raises 2'):
@@ -96,6 +118,7 @@ class GetSelectionsTest(parameterized.TestCase):
                 'X_stop': 10,
                 'X_step_': 2,
             },
+            is_sel_or_dropsel=False,
         )
 
 

@@ -60,8 +60,9 @@ SEL = flag_utils.DEFINE_dim_value_pairs(
     help=(
         'Selection criteria, to pass to xarray.Dataset.sel. Passed as'
         ' key=value pairs, with key = VARNAME_{start,stop,step,list}. '
-        'If key ends with start, stop, or step, the value should be strings '
-        '(defaulting to None). If key ends with "list", the value should be '
+        'If key ends with start, stop, or step, the values are used in a slice '
+        'as slice(str(start), str(stop), int(step)). start/stop/step default to'
+        ' None. If key ends with "list", the value should be '
         'a list of "+" delimited ints/floats/strings.'
     ),
 )
@@ -84,8 +85,9 @@ DROP_SEL = flag_utils.DEFINE_dim_value_pairs(
     help=(
         'Selection criteria, to pass to xarray.Dataset.drop_sel. Passed as'
         ' key=value pairs, with key = VARNAME_{start,stop,step,list}. '
-        'If key ends with start, stop, or step, the value should be strings '
-        '(defaulting to None). If key ends with "list", the value should be '
+        'If key ends with start, stop, or step, the values are used in a slice '
+        'as slice(str(start), str(stop), int(step)). start/stop/step default to'
+        ' None. If key ends with "list", the value should be '
         'a list of "+" delimited ints/floats/strings.'
     ),
 )
@@ -138,8 +140,14 @@ NUM_THREADS = flags.DEFINE_integer(
 
 def _get_selections(
     flag_values: dict[str, flag_utils.DimValueType],
+    is_sel_or_dropsel: bool,
 ) -> list[dict[str, t.Union[str, int, list[int], slice]]]:
   """Gets parts used to select based on flags."""
+
+  def maybe_tostr(v):
+    if is_sel_or_dropsel:
+      return str(v)
+    return v
 
   list_selectors = {}
   value_selectors = {}
@@ -157,18 +165,20 @@ def _get_selections(
       if '++' in v:
         raise ValueError(f'Found ambiguous "++" in {dim=} flag value {v}')
       list_selectors[dim] = [
-          flag_utils.get_dim_value(v_i) for v_i in v.split('+')
+          maybe_tostr(flag_utils.get_dim_value(v_i)) for v_i in v.split('+')
       ]
     else:  # Else handle non-list types
       v = flag_utils.get_dim_value(v)
       if dim not in value_selectors:
         value_selectors[dim] = [None, None, None]
       if placement == 'start':
-        value_selectors[dim][0] = v
+        value_selectors[dim][0] = maybe_tostr(v)
       elif placement == 'stop':
-        value_selectors[dim][1] = v
-      else:
-        value_selectors[dim][2] = v
+        value_selectors[dim][1] = maybe_tostr(v)
+      else:  # Else 'step'
+        # In Xarray, step must be an int.
+        # https://github.com/pydata/xarray/issues/5228
+        value_selectors[dim][2] = int(v)
 
   selections = []
   for dim, selector in list_selectors.items():
@@ -191,13 +201,13 @@ def main(argv: abc.Sequence[str]) -> None:
     ds = ds[KEEP_VARIABLES.value]
   input_chunks = {k: v for k, v in input_chunks.items() if k in ds.dims}
 
-  for selection in _get_selections(ISEL.value):
+  for selection in _get_selections(ISEL.value, is_sel_or_dropsel=False):
     ds = ds.isel(selection)
-  for selection in _get_selections(SEL.value):
+  for selection in _get_selections(SEL.value, is_sel_or_dropsel=True):
     ds = ds.sel(selection)
-  for selection in _get_selections(DROP_ISEL.value):
+  for selection in _get_selections(DROP_ISEL.value, is_sel_or_dropsel=False):
     ds = ds.drop_isel(selection)
-  for selection in _get_selections(DROP_SEL.value):
+  for selection in _get_selections(DROP_SEL.value, is_sel_or_dropsel=True):
     ds = ds.drop_sel(selection)
 
   template = xbeam.make_template(ds)
