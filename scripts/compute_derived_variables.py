@@ -144,10 +144,21 @@ def _strip_offsets(
 
 
 def main(argv: list[str]) -> None:
-  derived_variables = {
-      variable_name: dvs.DERIVED_VARIABLE_DICT[variable_name]
-      for variable_name in DERIVED_VARIABLES.value
-  }
+  derived_variables = {}
+  for variable_name in DERIVED_VARIABLES.value:
+    # Remove suffix for precipitation accumulations
+    # E.g. total_precipitation_24hr_from_6hr should also be called
+    # total_precipitation_24hr
+    dv = dvs.DERIVED_VARIABLE_DICT[variable_name]
+    if (
+        variable_name.startswith('total_precipitation_')
+        and '_from_' in variable_name
+    ):
+      variable_name = variable_name.split('_from_')[0]
+      assert (
+          variable_name not in DERIVED_VARIABLES.value
+      ), 'Duplicate variable name after removing suffix.'
+    derived_variables[variable_name] = dv
 
   source_dataset, source_chunks = xbeam.open_zarr(INPUT_PATH.value)
 
