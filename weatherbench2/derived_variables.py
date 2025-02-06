@@ -686,16 +686,16 @@ def interpolate_spectral_frequencies(
 class AggregatePrecipitationAccumulation(DerivedVariable):
   """Compute longer aggregation periods from existing shorter accumulations.
 
-  Note: This assumes a 6h raw time step and prediction_timedelta starting at 6h.
-
   Attributes:
     accumulation_hours: Hours to accumulate precipitaiton over
-    raw_accumulation_name: Name of the 6hr accumulation
+    raw_accumulation_name: Name of the  accumulation
+    raw_accumulation_hours: Hours of the raw accumulation
     lead_time_name: Name of lead_time dimension
   """
 
   accumulation_hours: int
   raw_accumulation_name: str = 'total_precipitation_6hr'
+  raw_accumulation_hours: int = 6
   lead_time_name: str = 'prediction_timedelta'
 
   @property
@@ -711,7 +711,8 @@ class AggregatePrecipitationAccumulation(DerivedVariable):
 
     # Compute aggregation steps
     steps = float(
-        np.timedelta64(self.accumulation_hours, 'h') / np.timedelta64(6, 'h')
+        np.timedelta64(self.accumulation_hours, 'h')
+        / np.timedelta64(self.raw_accumulation_hours, 'h')
     )
     assert steps.is_integer(), 'Accumulation time must be multiple of timestep.'
     # Compute accumulation
@@ -762,5 +763,11 @@ DERIVED_VARIABLE_DICT = {
     'total_precipitation_24hr_from_6hr': AggregatePrecipitationAccumulation(
         accumulation_hours=24,
         lead_time_name='prediction_timedelta',
+    ),
+    'total_precipitation_24hr_from_12hr': AggregatePrecipitationAccumulation(
+        accumulation_hours=24,
+        lead_time_name='prediction_timedelta',
+        raw_accumulation_name='total_precipitation_12hr',
+        raw_accumulation_hours=12,
     ),
 }
