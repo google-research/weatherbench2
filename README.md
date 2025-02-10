@@ -10,6 +10,8 @@
 
 # WeatherBench 2 - A benchmark for the next generation of data-driven global weather models
 
+**🚨🚨🚨 [WeatherBench-X](https://github.com/google-research/weatherbenchX) has been released. It provides an updated version of our evaluation code base. We encourage users to switch to the new codebase. The [data guide] (https://weatherbench2.readthedocs.io/en/latest/data-guide.html) is still up-to-date. 🚨🚨🚨**
+
 [arXiv paper](https://arxiv.org/abs/2308.15560)   
 [Google AI Blog post](http://ai.googleblog.com/2023/08/weatherbench-2-benchmark-for-next.html)
 
