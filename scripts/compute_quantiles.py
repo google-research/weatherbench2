@@ -51,6 +51,15 @@ DIM = flags.DEFINE_list(
     default=[],
     help='Comma delimited list of dimensions to reduce over.',
 )
+NAME_SUFFIX = flags.DEFINE_string(
+    'name_suffix',
+    '',
+    help=(
+        'Suffix to add to variable names. If you add "_quantile", then the'
+        ' output can be used as climatology for Weatherbench 2 thresholded'
+        ' scores.'
+    ),
+)
 SKIPNA = flags.DEFINE_boolean(
     'skipna',
     False,
@@ -170,7 +179,8 @@ def _evaluate_chunk_core(chunk: xr.Dataset) -> xr.Dataset:
     raise ValueError(
         f'Expected all quantiles to be in [0, 1]. Found {quantiles=}'
     )
-  return chunk.quantile(quantiles, dim=DIM.value, skipna=SKIPNA.value)
+  values = chunk.quantile(quantiles, dim=DIM.value, skipna=SKIPNA.value)
+  return values.rename_vars({v: v + NAME_SUFFIX.value for v in values})
 
 
 def main(argv: list[str]) -> None:

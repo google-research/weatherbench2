@@ -46,9 +46,10 @@ class ComputeQuantileTest(parameterized.TestCase):
           output_chunks={'time': 2},
       ),
       dict(
-          testcase_name='SpecifyInputOutputChunks2',
+          testcase_name='SpecifyInputOutputChunks2_NameSuffix',
           input_chunks={'timedelta': 2},
           output_chunks={'time': -1},
+          name_suffix='_quantile',
       ),
   )
   def test_basic_dataset(
@@ -56,6 +57,7 @@ class ComputeQuantileTest(parameterized.TestCase):
       input_chunks=None,
       output_chunks=None,
       working_chunks=None,
+      name_suffix='',
   ):
     input_chunks = input_chunks or {}
     output_chunks = output_chunks or {}
@@ -107,6 +109,7 @@ class ComputeQuantileTest(parameterized.TestCase):
         time_start='2023-01-01',
         time_stop='2023-01-03',
         quantiles=','.join(str(q) for q in quantiles),
+        name_suffix=name_suffix,
         runner='DirectRunner',
     ):
       compute_quantiles.main([])
@@ -128,7 +131,10 @@ class ComputeQuantileTest(parameterized.TestCase):
     self.assertEqual(expected_output_chunks, actual_output_chunks)
 
     xr.testing.assert_equal(
-        input_ds[['precip']].isel(time=slice(3)).quantile(quantiles, dim='lat'),
+        input_ds[['precip']]
+        .isel(time=slice(3))
+        .quantile(quantiles, dim='lat')
+        .rename_vars({'precip': 'precip' + name_suffix}),
         output,
     )
 
