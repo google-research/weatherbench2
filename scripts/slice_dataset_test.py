@@ -35,7 +35,7 @@ class GetSelectionsTest(parameterized.TestCase):
             'C_step': 3,
             'D_list': 'planes+trains+automobiles',
         },
-        is_sel_or_dropsel=False,
+        force_string=False,
     )
     expected_sel = [
         {'A': slice('1 day', '10 days', 2)},
@@ -54,7 +54,7 @@ class GetSelectionsTest(parameterized.TestCase):
             'B_stop': 2020,  # As in the year 2020 for a date
             'D_list': 'planes+trains+automobiles',
         },
-        is_sel_or_dropsel=True,
+        force_string=True,
     )
     expected_sel = [
         {'A': slice('1 day', '10 days', 2)},
@@ -75,7 +75,7 @@ class GetSelectionsTest(parameterized.TestCase):
             'Z_start': 1,
             'W_step': 2,
         },
-        is_sel_or_dropsel=False,
+        force_string=False,
     )
     expected_isel = [
         {'A': [9, -1, 0]},
@@ -96,7 +96,7 @@ class GetSelectionsTest(parameterized.TestCase):
                 'X_stop': 10,
                 'X_bad': 2,
             },
-            is_sel_or_dropsel=False,
+            force_string=False,
         )
 
     with self.subTest('Not ending in (start|stop|step|list) raises 2'):
@@ -107,7 +107,7 @@ class GetSelectionsTest(parameterized.TestCase):
                 'X_stop': 10,
                 'X_step_and_more': 2,
             },
-            is_sel_or_dropsel=False,
+            force_string=False,
         )
 
     with self.subTest('Not ending in (start|stop|step|list) raises 2'):
@@ -118,7 +118,7 @@ class GetSelectionsTest(parameterized.TestCase):
                 'X_stop': 10,
                 'X_step_': 2,
             },
-            is_sel_or_dropsel=False,
+            force_string=False,
         )
 
 
@@ -146,7 +146,11 @@ class SliceDatasetTest(parameterized.TestCase):
     output_path = self.create_tempdir('destination').full_path
 
     input_chunks = {'time': 40, 'longitude': 6, 'latitude': 5, 'level': 3}
-    input_ds.chunk(input_chunks).to_zarr(input_path)
+
+    # Reverse it so we can make it right in the script.
+    input_ds.sel(latitude=input_ds.latitude.data[::-1]).chunk(
+        input_chunks
+    ).to_zarr(input_path)
 
     with flagsaver.as_parsed(
         input_path=input_path,
@@ -159,6 +163,7 @@ class SliceDatasetTest(parameterized.TestCase):
         ),
         isel='latitude_stop=5',
         drop_variables='should_drop',
+        make_dims_increasing='latitude',
         runner='DirectRunner',
     ):
       slice_dataset.main([])
