@@ -46,7 +46,9 @@ import typing as t
 from absl import app
 from absl import flags
 import apache_beam as beam
+import numpy as np
 from weatherbench2 import flag_utils
+import xarray as xr
 import xarray_beam as xbeam
 
 
@@ -129,6 +131,11 @@ OUTPUT_CHUNKS = flag_utils.DEFINE_chunks(
 RUNNER = flags.DEFINE_string(
     'runner', None, help='Beam runner. Use DirectRunner for local execution.'
 )
+MAKE_DIMS_INCREASING = flags.DEFINE_list(
+    'make_dims_increasing',
+    [],
+    help='Dimensions to make increasing, reversing order if needed.',
+)
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads',
     None,
@@ -136,6 +143,20 @@ NUM_THREADS = flags.DEFINE_integer(
 )
 
 # pylint: disable=logging-fstring-interpolation
+
+
+def _maybe_make_some_dims_increasing(ds: xr.Dataset) -> xr.Dataset:
+  """Specified monotonic dims are made increasing, raise if non-monotonic."""
+  for dim in MAKE_DIMS_INCREASING.value:
+    x = ds[dim].data
+    is_increasing = np.diff(x) > 0
+    if np.all(is_increasing):
+      pass  # Already increasing, great!
+    elif np.all(~is_increasing):
+      ds = ds.sel({dim: x[::-1]})
+    else:
+      raise ValueError(f'Cannot make non-monotonic dimension {dim} increasing')
+  return ds
 
 
 def _get_selections(
@@ -194,6 +215,8 @@ def _get_selections(
 def main(argv: abc.Sequence[str]) -> None:
 
   ds, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
+
+  ds = _maybe_make_some_dims_increasing(ds)
 
   if DROP_VARIABLES.value:
     ds = ds.drop_vars(DROP_VARIABLES.value)

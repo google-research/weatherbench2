@@ -60,11 +60,21 @@ LATITUDE_NODES = flags.DEFINE_integer(
 LONGITUDE_NODES = flags.DEFINE_integer(
     'longitude_nodes', None, help='number of desired longitude nodes'
 )
-LATITUDE_SPACING = flags.DEFINE_enum(
+LATITUDE_SPACING = flags.DEFINE_enum_class(
     'latitude_spacing',
-    'equiangular_with_poles',
-    ['equiangular_with_poles', 'equiangular_without_poles'],
-    help='desired latitude spacing',
+    regridding.LatitudeSpacing.EQUIANGULAR_WITH_POLES,
+    regridding.LatitudeSpacing,
+    help='Desired latitude spacing.',
+)
+LONGITUDE_SCHEME = flags.DEFINE_enum_class(
+    'longitude_scheme',
+    regridding.LongitudeScheme.START_AT_ZERO,
+    regridding.LongitudeScheme,
+    help=(
+        'What values the output longitude dimension will have. With Δ = 360 /'
+        ' LONGITUDE_NODES, "START_AT_ZERO" means longitude=[0, ..., 360 - Δ].'
+        ' "CENTER_AT_ZERO" means longitude=[-180 + Δ/2, ..., 180 - Δ/2]'
+    ),
 )
 REGRIDDING_METHOD = flags.DEFINE_enum(
     'regridding_method',
@@ -101,20 +111,16 @@ def main(argv):
   input_chunks['longitude'] = -1
   input_chunks['latitude'] = -1
 
-  if LATITUDE_SPACING.value == 'equiangular_with_poles':
-    lat_start = -90
-    lat_stop = 90
-  else:
-    assert LATITUDE_SPACING.value == 'equiangular_without_poles'
-    lat_start = -90 + 0.5 * 180 / LATITUDE_NODES.value
-    lat_stop = 90 - 0.5 * 180 / LATITUDE_NODES.value
-
   old_lon = source_ds.coords['longitude'].data
   old_lat = source_ds.coords['latitude'].data
 
-  new_lon = np.linspace(0, 360, num=LONGITUDE_NODES.value, endpoint=False)
-  new_lat = np.linspace(
-      lat_start, lat_stop, num=LATITUDE_NODES.value, endpoint=True
+  new_lon = regridding.longitude_values(
+      LONGITUDE_SCHEME.value,
+      LONGITUDE_NODES.value,
+  )
+  new_lat = regridding.latitude_values(
+      LATITUDE_SPACING.value,
+      LATITUDE_NODES.value,
   )
 
   regridder_cls = {
@@ -133,8 +139,10 @@ def main(argv):
       .expand_dims(longitude=new_lon, latitude=new_lat)
       .transpose(..., 'longitude', 'latitude')
   )
+  itemsize = max(var.dtype.itemsize for var in template.values())
 
-  output_chunks = OUTPUT_CHUNKS.value
+  output_chunks = input_chunks.copy()
+  output_chunks.update(OUTPUT_CHUNKS.value)
   print('OUTPUT_CHUNKS:', repr(output_chunks))
 
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
@@ -148,7 +156,12 @@ def main(argv):
         )
         | 'Regrid'
         >> beam.MapTuple(lambda k, v: (k, regridder.regrid_dataset(v)))
-        | xarray_beam.ConsolidateChunks(output_chunks)
+        | xarray_beam.Rechunk(
+            template.sizes,
+            input_chunks,
+            output_chunks,
+            itemsize=itemsize,
+        )
         | xarray_beam.ChunksToZarr(
             OUTPUT_PATH.value,
             template,
