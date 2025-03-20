@@ -30,13 +30,40 @@ For each output initial time T, forecasts are created in two steps.
 2. For each ti, create a forecast (indexed by "prediction_timedelta") comprised
    of the historical weather starting at ti.
 
-Each "ti" is selected to be a perturbation of the output init time T as
+Each source time "ti" is a perturbation of the output init time T:
 
 * t.minute = T.minute
 * t.hour = T.hour
 * t.year ~ Uniform({CLIMATOLOGY_START_YEAR,..., CLIMATOLOGY_END_YEAR})
 * t.day = (T.day + δ) % [days in t.year], where the day offset δ is uniform:
   δ ~ Uniform(-DAY_WINDOW_SIZE // 2, DAY_WINDOW_SIZE // 2) + DAY_WINDOW_SIZE % 2
+
+The (T.day + δ) % [days in t.year] step is the default behavior indicated by
+INITIAL_TIME_EDGE_BEHAVIOR=WRAP_YEAR. This is needed to ensure every year and
+dayofyear is sampled with/without replacement. If instead,
+INITIAL_TIME_EDGE_BEHAVIOR=REFLECT_RANGE, then
+
+  t.day = (T.day + δ) % [days in t.year]
+  t.year = T.year + (T.day + δ) // [days in t.year]
+
+except at the climatology start/end boundary, where T.day is reflected back into
+bounds.
+
+By default, every initial time has its day and year sampled independently. This
+means every single forecast could come from an entirely different season.
+SAMPLE_HOLD_DAYS provides the ability to alter this behavior, by making each
+realization fix the number of days between the output time and source time,
+(T - t).days, for SAMPLE_HOLD_DAYS days in a row. After SAMPLE_HOLD_DAYS days,
+each realization selects (independently) a new (T - t).days. This option is most
+useful when used with INITIAL_TIME_EDGE_BEHAVIOR=REFLECT_RANGE. In that case,
+
+* SAMPLE_HOLD_DAYS=365 means realizations each come from a random season (year
+  and time of year), and this random season is changed only once every 365 days.
+  This emulates a forecast model that may or may not have the seasonal trends
+  (e.g. ENSO) correct.
+* SAMPLE_HOLD_DAYS=50 emulates forecast model that may or may not have the
+  subseasonal trends correct.
+
 
 Example Usage:
 
@@ -141,6 +168,38 @@ INITIAL_TIME_SPACING = flags.DEFINE_string(
         ' hour.'
     ),
 )
+SAMPLE_HOLD_DAYS = flags.DEFINE_integer(
+    'sample_hold_days',
+    0,
+    help=(
+        'Non-negative multiple of INITIAL_TIME_SPACING. 0 means no hold. If'
+        ' nonzero, the total days perturbation is constant for this time.'
+        ' Warning: If INITIAL_TIME_EDGE_BEHAVIOR=WRAP_YEAR, The "hold" means'
+        ' observations may be needed an additional year before or after the'
+        ' CLIMATOLOGY START and END.'
+    ),
+)
+WRAP_YEAR = 'WRAP_YEAR'
+NO_EDGE = 'NO_EDGE'
+REFLECT_RANGE = 'REFLECT_RANGE'
+INITIAL_TIME_EDGE_BEHAVIOR = flags.DEFINE_enum(
+    'initial_time_edge_behavior',
+    WRAP_YEAR,
+    enum_values=[WRAP_YEAR, NO_EDGE, REFLECT_RANGE],
+    help=(
+        'What to do when the day perturbation would select a time before or'
+        f' after the sampled year. "{WRAP_YEAR}" means e.g. YYYY-12-31 + 5 days'
+        f' becomes YYYY-01-05, for ever year YYYY.  "{NO_EDGE}" means the '
+        'climatological edge is ignored, and initial times come from beyond the'
+        ' [CLIMATOLOGY_START_YEAR, CLIMATOLOGY_END_YEAR] interval. If INPUT'
+        ' does not extend far enough, a noisy failure will be raised. '
+        f'"{REFLECT_RANGE}" means we'
+        ' reflect the perturbation, but only do this at climatology boundary'
+        ' years. So, if start/end is 1990, 2000, then 2000-12-31 + 5 days ='
+        ' 2000-12-31 - 5 days = 2000-12-26, but 1995-12-31 + 5 days ='
+        ' 1996-01-05. This ensures IID sampling from each year.'
+    ),
+)
 FORECAST_DURATION = flags.DEFINE_string(
     'forecast_duration', '15 days', help='Length of forecasts.'
 )
@@ -169,7 +228,9 @@ ADD_SOURCE_TIME = flags.DEFINE_boolean(
 DAY_WINDOW_SIZE = flags.DEFINE_integer(
     'day_window_size',
     10,
-    help='Width of window (in days) to take samples from.',
+    help=(
+        'Width of window (in days) to take samples from. Must be in [0, 2*364].'
+    ),
 )
 ENSEMBLE_SIZE = flags.DEFINE_integer(
     'ensemble_size',
@@ -179,13 +240,18 @@ ENSEMBLE_SIZE = flags.DEFINE_integer(
         ' the same as ensemble_size = "number of possible day perturbations" x'
         ' "number of possible years." If WITH_REPLACEMENT=False as well, this'
         ' means every possible day and year combination will be used exactly'
-        ' once.'
+        f' once (if INITIAL_TIME_EDGE_BEHAVIOR="{WRAP_YEAR}").'
     ),
 )
 WITH_REPLACEMENT = flags.DEFINE_boolean(
     'with_replacement',
     True,
-    help='Whether sampling is done with or without replacement.',
+    help=(
+        'Whether sampling is done with or without replacement. Warning: If'
+        f' INITIAL_TIME_EDGE_BEHAVIOR="{REFLECT_RANGE}", then some samples may'
+        ' be repeated near the climatological boundary, even if'
+        ' with_replacement=False.'
+    ),
 )
 SEED = flags.DEFINE_integer(
     'seed', 802701, help='Seed for the random number generator.'
@@ -307,6 +373,8 @@ def _get_sampled_init_times(
     day_window_size: int,
     ensemble_size: int,
     with_replacement: bool,
+    sample_hold_days: int,
+    initial_time_edge_behavior: str,
     seed: int,
 ) -> np.ndarray:
   """For each output time, get the times to sample from observations.
@@ -333,12 +401,21 @@ def _get_sampled_init_times(
     day_window_size: Size of window, in dayofyear, to grab samples.
     ensemble_size: Number of samples (per init time) to grab.
     with_replacement: Whether to sample with or without replacement.
+    sample_hold_days: How long consecutive initial times use the same
+      perturbation.  0 means switch perturbations every consecutive init time.
+    initial_time_edge_behavior: How to deal with perturbations that move the
+      sampled day outside of sampled year.
     seed: Integer seed for the RNG.
 
   Returns:
     Shape [ensemble_size, len(output_times)] array of np.datetime64[ns].
   """
   rng = np.random.default_rng(seed)
+
+  if day_window_size > 2 * 364:
+    # This complicates the REFLECT_RANGE behavior, and no sensible human would
+    # want this.
+    raise ValueError(f'{day_window_size=} > 2 * 364, which is not allowed.')
 
   # The scheme below samples uniformly over initial day (ignoring leap years).
   # Conceptually, think of each climatology year as a circle. The days
@@ -417,16 +494,38 @@ def _get_sampled_init_times(
     )
   # End of get sampled years and day_perturbations.
 
-  # If output_times is near the start or end of the year, we want the
-  # perturbation to wrap around and find a date within the same year.
   dayofyears = output_times.dayofyear.values + day_perturbations
-  for year in range(climatology_start_year, climatology_end_year + 1):
-    mask = years == year
-    dayofyears[mask] = (dayofyears[mask] - 1) % (
-        365 + calendar.isleap(year)
-    ) + 1
 
-  return (
+  if initial_time_edge_behavior == WRAP_YEAR:
+    for year in range(climatology_start_year, climatology_end_year + 1):
+      mask = years == year
+      days_in_this_year = 365 + calendar.isleap(year)
+      dayofyears[mask] = (dayofyears[mask] - 1) % days_in_this_year + 1
+
+  elif initial_time_edge_behavior == REFLECT_RANGE:
+    for year in {climatology_start_year, climatology_end_year}:
+      mask = years == year
+      days_in_this_year = 365 + calendar.isleap(year)
+      if year == climatology_start_year:
+        # Transform e.g. 1 --> 1, 0 --> 2, -1 --> 3
+        dayofyears[mask] = np.where(
+            dayofyears[mask] >= 1,
+            dayofyears[mask],
+            np.abs(dayofyears[mask]) + 2,
+        )
+      elif year == climatology_end_year:
+        dayofyears[mask] = np.where(
+            dayofyears[mask] <= days_in_this_year,
+            dayofyears[mask],
+            # If d > 365, set to 2*365 - d = 365 - (d - 365)
+            2 * days_in_this_year - dayofyears[mask],
+        )
+  elif initial_time_edge_behavior == NO_EDGE:
+    pass
+  else:
+    raise ValueError(f'Unhandled {initial_time_edge_behavior=}')
+
+  sampled_times = (
       # Years is always defined in years since the epoch.
       np.array(years - 1970, dtype='datetime64[Y]')
       # Add daysofyears - 1 to year, since e.g. if dayofyear = 1, then we will
@@ -434,6 +533,62 @@ def _get_sampled_init_times(
       + np.array(dayofyears - 1, dtype='timedelta64[D]')
       + np.array(output_times.hour, dtype='timedelta64[h]')
   ).astype('datetime64[ns]')
+
+  if sample_hold_days:
+    output_time_strides = set(output_times.diff()[1:])
+    if len(output_time_strides) > 1:
+      raise ValueError(
+          f'Cannot sample hold with more than one {output_time_strides=}'
+      )
+    output_time_stride = output_time_strides.pop()
+    hold_dt = pd.Timedelta(f'{sample_hold_days}d')
+    hold_stride = hold_dt // output_time_stride
+    if output_time_stride * hold_stride != hold_dt:
+      raise ValueError(
+          f'{sample_hold_days=} was not a multiple of {output_time_stride=}'
+      )
+    hold_idx = np.repeat(
+        # E.g. hold_idx = [0, 0, ..., 0, 1, 1, ..., 1, 2, ...]
+        np.arange(len(output_times) // hold_stride + 1)[:, np.newaxis],
+        hold_stride,
+        axis=1,
+    ).ravel()[: len(output_times)]
+
+    # Convert np datetimes into δ days, sample-hold, then add back to datetimes.
+    delta_days = np.array(
+        pd.to_timedelta((sampled_times - output_times.values).ravel()).days,
+        dtype=np.int64,
+    ).reshape(sampled_times.shape)
+
+    delta_days = np.take(delta_days, hold_idx, axis=1)
+    sampled_times = output_times.values + np.array(
+        delta_days, dtype='timedelta64[D]'
+    )
+
+  return sampled_times
+
+
+def _check_times_in_dataset(
+    times: np.ndarray | pd.DatetimeIndex, ds: xr.Dataset
+) -> None:
+  """Checks that `times` are in `ds` and gives a nice error if not."""
+  missing_times = pd.to_datetime(times).difference(ds[TIME_DIM.value])
+  if not missing_times.size:
+    return
+  err_lines = []
+  if INITIAL_TIME_EDGE_BEHAVIOR.value == WRAP_YEAR and SAMPLE_HOLD_DAYS.value:
+    err_lines.append(
+        f'{INITIAL_TIME_EDGE_BEHAVIOR.value=} and'
+        f' {SAMPLE_HOLD_DAYS.value=} means observations may be needed up to 1'
+        ' year before/after the [CLIMATOLOGY_START_YEAR, CLIMATOLOGY_END_YEAR]'
+        ' interval.'
+    )
+  err_lines.append(
+      'Time flags (INITIAL_TIME_EDGE_BEHAVIOR, CLIMATOLOGY_START_YEAR,'
+      ' CLIMATOLOGY_END_YEAR, TIMEDELTA_SPACING, SAMPLE_HOLD_DAYS) asked for'
+      f' values in INPUT that are not available. {missing_times=}.'
+  )
+  raise flags.ValidationError('\n'.join(err_lines))
 
 
 def _check_input_spacing_and_time_flags(input_ds: xr.Dataset) -> None:
@@ -543,29 +698,6 @@ def main(argv: abc.Sequence[str]) -> None:
       DAY_WINDOW_SIZE.value,
   )
 
-  # Select all needed samples from INPUT.
-  time_buffer = pd.to_timedelta(FORECAST_DURATION.value) + pd.to_timedelta(
-      f'{DAY_WINDOW_SIZE.value}d'
-  )
-  sample_spacing = min(
-      ONE_DAY,
-      pd.Timedelta(TIMEDELTA_SPACING.value),
-      pd.Timedelta(INITIAL_TIME_SPACING.value),
-  )
-  times_needed_for_sampling = pd.date_range(
-      pd.to_datetime(f'{CLIMATOLOGY_START_YEAR.value}-01-01'),
-      pd.to_datetime(f'{CLIMATOLOGY_END_YEAR.value}-12-31') + time_buffer,
-      freq=sample_spacing,
-  )
-  missing_times = times_needed_for_sampling.difference(input_ds[TIME_DIM.value])
-  if missing_times.size:
-    raise flags.ValidationError(
-        'Time flags (CLIMATOLOGY_START_YEAR, CLIMATOLOGY_END_YEAR,'
-        ' TIMEDELTA_SPACING) asked for values in INPUT that are not available.'
-        f' {missing_times=}.'
-    )
-  input_ds = input_ds.sel({TIME_DIM.value: times_needed_for_sampling})
-
   # Define output times and the template.
   output_init_times = pd.date_range(
       INITIAL_TIME_START.value,
@@ -578,6 +710,35 @@ def main(argv: abc.Sequence[str]) -> None:
   assert isinstance(input_ds, xr.Dataset)  # To satisfy pytype.
   if DELTA in input_ds.dims:
     raise ValueError(f'INPUT_PATH data already had {DELTA} as a dimension')
+
+  sampled_init_times = _get_sampled_init_times(
+      # _get_sampled_init_times returns shape [ensemble_size, n_times] array of
+      # np.datetime64. These are use as initial times for output samples.
+      # Ravel it into shape [ensemble_size * n_times] set of times.
+      output_times=output_init_times,
+      climatology_start_year=CLIMATOLOGY_START_YEAR.value,
+      climatology_end_year=CLIMATOLOGY_END_YEAR.value,
+      day_window_size=DAY_WINDOW_SIZE.value,
+      ensemble_size=ensemble_size,
+      with_replacement=WITH_REPLACEMENT.value,
+      initial_time_edge_behavior=INITIAL_TIME_EDGE_BEHAVIOR.value,
+      sample_hold_days=SAMPLE_HOLD_DAYS.value,
+      seed=SEED.value,
+  ).ravel()
+
+  def sampled_times_for_timedelta(timedelta: pd.Timedelta) -> np.ndarray:
+    """Times to grab from input for forecasts at this timedelta."""
+    # Simply add the timedelta to the sampled_init_times, ensuring the forecasts
+    # are continuous in time.
+    times = sampled_init_times + timedelta.to_numpy()
+    return times
+
+  times_needed_for_sampling = np.unique(
+      np.stack([sampled_times_for_timedelta(td) for td in timedeltas])
+  )
+  _check_times_in_dataset(times_needed_for_sampling, input_ds)
+  input_ds = input_ds.sel({TIME_DIM.value: times_needed_for_sampling})
+
   if ADD_SOURCE_TIME.value:
     input_ds = input_ds.assign(
         # Assign SOURCE_TIME with an arbitrary DataArray of type datetime64[ns].
@@ -603,25 +764,6 @@ def main(argv: abc.Sequence[str]) -> None:
       .expand_dims({DELTA: timedeltas})
       .expand_dims({REALIZATION_NAME.value: np.arange(ensemble_size)})
   )
-
-  sampled_init_times = _get_sampled_init_times(
-      # _get_sampled_init_times returns shape [ensemble_size, n_times] array of
-      # np.datetime64. These are use as initial times for output samples.
-      # Ravel it into shape [ensemble_size * n_times] set of times.
-      output_init_times,
-      CLIMATOLOGY_START_YEAR.value,
-      CLIMATOLOGY_END_YEAR.value,
-      DAY_WINDOW_SIZE.value,
-      ensemble_size,
-      WITH_REPLACEMENT.value,
-      SEED.value,
-  ).ravel()
-
-  def sampled_times_for_timedelta(timedelta: pd.Timedelta) -> np.ndarray:
-    """Times to grab from input for forecasts at this timedelta."""
-    # Simply add the timedelta to the sampled_init_times, ensuring the forecasts
-    # are continuous in time.
-    return sampled_init_times + timedelta.to_numpy()
 
   # init_time_offsets[i] is the (init_time, realization) offset to use with
   # sampled_init_times[i].
