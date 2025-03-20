@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+import collections
 
 from absl.testing import absltest
 from absl.testing import flagsaver
@@ -50,27 +51,56 @@ class GetSampledInitTimesTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(
-          testcase_name='WithReplacement_Ensemble50',
+          testcase_name='WithReplacement_Ensemble200_REFLECT_RANGE',
           with_replacement=True,
-          ensemble_size=50,
+          ensemble_size=200,
+          initial_time_edge_behavior=cpcf.REFLECT_RANGE,
       ),
       dict(
-          testcase_name='WithoutReplacement_Ensemble50',
+          testcase_name='WithReplacement_Ensemble200_NO_EDGE',
+          with_replacement=True,
+          ensemble_size=200,
+          initial_time_edge_behavior=cpcf.NO_EDGE,
+      ),
+      dict(
+          testcase_name='WithReplacement_Ensemble200_WRAP_YEAR',
+          with_replacement=True,
+          ensemble_size=200,
+      ),
+      dict(
+          testcase_name='WithoutReplacement_Ensemble50_WRAP_YEAR',
           with_replacement=False,
           ensemble_size=50,
       ),
       dict(
-          testcase_name='WithReplacement_EnsembleNeg1',
+          testcase_name='WithReplacement_EnsembleNeg1_WRAP_YEAR',
           with_replacement=True,
           ensemble_size=-1,
       ),
       dict(
-          testcase_name='WithoutReplacement_EnsembleNeg1',
+          testcase_name='WithoutReplacement_EnsembleNeg1_WRAP_YEAR',
           with_replacement=False,
           ensemble_size=-1,
+      ),
+      dict(
+          testcase_name='WithoutReplacement_EnsembleNeg1_REFLECT_RANGE',
+          with_replacement=False,
+          ensemble_size=-1,
+          initial_time_edge_behavior=cpcf.REFLECT_RANGE,
+      ),
+      dict(
+          testcase_name='WithoutReplacement_EnsembleNeg1_NO_EDGE',
+          with_replacement=False,
+          ensemble_size=-1,
+          initial_time_edge_behavior=cpcf.NO_EDGE,
       ),
   )
-  def test_sample_statistics(self, with_replacement, ensemble_size):
+  def test_sample_statistics_no_hold_time(
+      self,
+      with_replacement,
+      ensemble_size,
+      initial_time_edge_behavior=cpcf.WRAP_YEAR,
+  ):
     output_times = pd.to_datetime(
         ['1990-01-02T12', '1995-06-01T00', '2000-12-30T07']
     )
@@ -84,6 +114,8 @@ class GetSampledInitTimesTest(parameterized.TestCase):
         day_window_size=day_window_size,
         ensemble_size=ensemble_size,
         with_replacement=with_replacement,
+        sample_hold_days=0,
+        initial_time_edge_behavior=initial_time_edge_behavior,
         seed=802701,
     )
     allowed_sample_years = cpcf._get_possible_year_values(
@@ -95,6 +127,11 @@ class GetSampledInitTimesTest(parameterized.TestCase):
         climatology_start_year,
         climatology_end_year,
         day_window_size,
+    )
+    expect_everything_sampled_once = (
+        not with_replacement
+        and ensemble_size == -1
+        and initial_time_edge_behavior != cpcf.REFLECT_RANGE
     )
 
     for output_idx in range(len(output_times)):
@@ -120,16 +157,57 @@ class GetSampledInitTimesTest(parameterized.TestCase):
       # We should perturb by an integer number of days.
       np.testing.assert_array_equal(0, perturbation.seconds)
 
-      # The selected day perturbation should be uniformly distributed.
-      # ...but, they will not be perfectly uniform at the edges since we turn
-      # e.g. Jan1 - 3 days into Dec31 - 2 days.
-      no_edge_effects = (
-          day_window_size < output_t.dayofyear < 365 - day_window_size
-      )
-      expect_everything_sampled_once = (
-          not with_replacement and ensemble_size == -1
-      )
-      if no_edge_effects:
+      # Check the distribution of perturbations.
+      if initial_time_edge_behavior == cpcf.REFLECT_RANGE:
+        sampled_t = pd.to_datetime(sampled_t)
+        is_start_year = (sampled_t.year == climatology_start_year) & (
+            sampled_t.dayofyear < day_window_size
+        )
+        is_end_year = (sampled_t.year == climatology_end_year) & (
+            sampled_t.dayofyear > 365 - day_window_size
+        )
+        assert_uniform(
+            # If the sampled time was not the start/end, then the perturbation
+            # should be uniform.
+            perturbation[~(is_start_year | is_end_year)].days,
+            stderr_tol=0 if expect_everything_sampled_once else 4,
+            expected_min=-day_window_size // 2,
+            expected_max=day_window_size // 2 + day_window_size % 2 - 1,
+        )
+        if is_start_year.sum():
+          # At the start of climatological boundary, perturbations are reflected
+          # to the right.
+          self.assertEqual(
+              -output_t.dayofyear + 1,
+              perturbation[is_start_year].min().days,
+          )
+          self.assertEqual(
+              day_window_size // 2 + day_window_size % 2 - 1,
+              perturbation[is_start_year].max().days,
+          )
+        if is_end_year.sum():
+          # At the end of climatological boundary, perturbations are reflected
+          # to the left.
+          self.assertEqual(
+              -day_window_size // 2,
+              perturbation[is_end_year].min().days,
+          )
+      elif initial_time_edge_behavior == cpcf.WRAP_YEAR:
+        # The selected day perturbation should be uniformly distributed.
+        # ...but, they will not be perfectly uniform at the edges since we turn
+        # e.g. Jan1 - 3 days into Dec31 - 2 days.
+        no_edge_effects = (
+            day_window_size < output_t.dayofyear < 365 - day_window_size
+        )
+        if no_edge_effects:
+          assert_uniform(
+              perturbation.days,
+              stderr_tol=0 if expect_everything_sampled_once else 4,
+              expected_min=-day_window_size // 2,
+              expected_max=day_window_size // 2 + day_window_size % 2 - 1,
+          )
+      elif initial_time_edge_behavior == cpcf.NO_EDGE:
+        # The selected day perturbation should be uniformly distributed.
         assert_uniform(
             perturbation.days,
             stderr_tol=0 if expect_everything_sampled_once else 4,
@@ -137,13 +215,169 @@ class GetSampledInitTimesTest(parameterized.TestCase):
             expected_max=day_window_size // 2 + day_window_size % 2 - 1,
         )
 
-      # The years should be uniform.
-      assert_uniform(
-          pd.to_datetime(sampled_t).year,
-          stderr_tol=0 if expect_everything_sampled_once else 4,
-          expected_min=climatology_start_year,
-          expected_max=climatology_end_year,
+      if initial_time_edge_behavior != cpcf.NO_EDGE:
+        # The years should be uniform.
+        assert_uniform(
+            pd.to_datetime(sampled_t).year,
+            stderr_tol=0 if expect_everything_sampled_once else 4,
+            expected_min=climatology_start_year,
+            expected_max=climatology_end_year,
+        )
+
+  @parameterized.parameters(
+      dict(
+          initial_time_edge_behavior=cpcf.WRAP_YEAR,
+          with_replacement=False,
+          ensemble_size=-1,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.WRAP_YEAR,
+          with_replacement=True,
+          ensemble_size=-1,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.REFLECT_RANGE,
+          with_replacement=False,
+          ensemble_size=-1,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.REFLECT_RANGE,
+          with_replacement=True,
+          ensemble_size=-1,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.NO_EDGE,
+          with_replacement=False,
+          ensemble_size=-1,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.NO_EDGE,
+          with_replacement=True,
+          ensemble_size=-1,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.WRAP_YEAR,
+          with_replacement=False,
+          ensemble_size=10,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.WRAP_YEAR,
+          with_replacement=True,
+          ensemble_size=10,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.REFLECT_RANGE,
+          with_replacement=False,
+          ensemble_size=10,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.REFLECT_RANGE,
+          with_replacement=True,
+          ensemble_size=10,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.NO_EDGE,
+          with_replacement=False,
+          ensemble_size=10,
+      ),
+      dict(
+          initial_time_edge_behavior=cpcf.NO_EDGE,
+          with_replacement=True,
+          ensemble_size=10,
+      ),
+  )
+  def test_sample_statistics_with_hold_time(
+      self,
+      ensemble_size,
+      initial_time_edge_behavior=cpcf.WRAP_YEAR,
+      with_replacement=False,
+  ):
+    output_freq_days = 10
+    sample_hold_days = 30
+    assert output_freq_days < sample_hold_days, 'Jump test wont work'
+    climatology_start_year = 1990
+    climatology_end_year = 2000
+    output_times = pd.date_range(
+        start='2021', end='2025', freq=f'{output_freq_days}d'
+    )
+    day_window_size = 5
+
+    expected_ensemble_size = cpcf._get_ensemble_size(
+        ensemble_size,
+        climatology_start_year,
+        climatology_end_year,
+        day_window_size,
+    )
+
+    sampled_times = cpcf._get_sampled_init_times(
+        output_times,
+        climatology_start_year=climatology_start_year,
+        climatology_end_year=climatology_end_year,
+        day_window_size=day_window_size,
+        ensemble_size=ensemble_size,
+        with_replacement=with_replacement,
+        sample_hold_days=sample_hold_days,
+        initial_time_edge_behavior=initial_time_edge_behavior,
+        seed=802701,
+    )
+    self.assertEqual(
+        (expected_ensemble_size, len(output_times)), sampled_times.shape
+    )
+
+    # For every output time, check that realizations give the right spread
+    # of samples.
+    for i, output_t in enumerate(output_times):
+      sampled_t = pd.to_datetime(sampled_times[:, i])
+      assert sample_hold_days < 31, 'Will violate no_edge_effects assumption'
+      no_edge_effects = (
+          1 < output_t.month < 12
+          or initial_time_edge_behavior in {cpcf.WRAP_YEAR, cpcf.NO_EDGE}
       )
+      if ensemble_size == -1 and no_edge_effects and not with_replacement:
+        # Every time is sampled.
+        self.assertLen(np.unique(sampled_t), expected_ensemble_size)
+
+    # For every realization, check that the perturbations do a sample hold.
+    # Do this by counting when realizations jump by more than output_freq_days.
+    time_between_jump_counts = collections.Counter()
+    for r in range(expected_ensemble_size):
+      # A "jump" is when the difference in datetimes jumps by more than
+      # output_freq_days.
+      abs_diff = np.abs(pd.to_datetime(sampled_times[r]).diff().days)[1:]
+      less_than_freq_jumps = np.diff(
+          np.concat(([False], abs_diff <= output_freq_days, [False])).astype(
+              int
+          )
+      )
+      starts = np.where(less_than_freq_jumps == 1)[0]
+      ends = np.where(less_than_freq_jumps == -1)[0]
+      # Count the time between jumps. Don't include the last time, since the
+      # striding may not match up exactly with the output time range.
+      time_between_jump_counts.update(int(t) for t in (ends - starts)[:-1])
+
+    # We have a jump on sample_hold_days // output_freq_days, so the time
+    # between jumps is this minus 1.
+    # Sometimes (rarely), the "jump" will be to the same perturbation, in which
+    # case it will look like there was a longer time between jumps.
+    expected_most_common_time_between_jump = (
+        sample_hold_days // output_freq_days - 1
+    )
+    self.assertEqual(
+        # We never jump before the jump time.
+        expected_most_common_time_between_jump,
+        min(time_between_jump_counts),
+    )
+    self.assertEqual(
+        # The jump time with the highest count is
+        # expected_most_common_time_between_jump
+        time_between_jump_counts[expected_most_common_time_between_jump],
+        max(time_between_jump_counts.values()),
+    )
+    self.assertGreater(
+        # The count is so large that it's more than 5x the second place!
+        time_between_jump_counts[expected_most_common_time_between_jump],
+        sorted(time_between_jump_counts.values())[-2] * 5,
+    )
 
 
 class MainTest(parameterized.TestCase):
@@ -157,7 +391,7 @@ class MainTest(parameterized.TestCase):
         schema.mock_truth_data(
             variables_2d=[],
             variables_3d=['temperature', 'geopotential'],
-            time_start='2000-01-01',
+            time_start='1999-01-01',
             time_stop='2005-01-01',
             spatial_resolution_in_degrees=90.0,
             time_resolution=input_time_resolution,
@@ -172,6 +406,7 @@ class MainTest(parameterized.TestCase):
     return ds
 
   @parameterized.named_parameters(
+      dict(testcase_name='SampleHoldTime7d', sample_hold_days=7),
       dict(testcase_name='Default'),
       # A larger ensemble better tests that the distribution of days is uniform.
       dict(testcase_name='LargeEnsemble', ensemble_size=100),
@@ -180,8 +415,16 @@ class MainTest(parameterized.TestCase):
           time_dim='init',
           add_source_time=False,
       ),
-      dict(testcase_name='OddWindow', day_window_size=3),
-      dict(testcase_name='OutputIsLeapYearInFeb', output_leap_location='feb'),
+      dict(
+          testcase_name='OddWindow_NO_EDGE',
+          day_window_size=3,
+          initial_time_edge_behavior=cpcf.NO_EDGE,
+      ),
+      dict(
+          testcase_name='OutputIsLeapYearInFeb_REFLECT_RANGE',
+          output_leap_location='feb',
+          initial_time_edge_behavior=cpcf.REFLECT_RANGE,
+      ),
       dict(testcase_name='OutputIsLeapYearInDec', output_leap_location='dec'),
       dict(testcase_name='DataHasLeapYear', data_year_hasleap=True),
       dict(
@@ -239,6 +482,8 @@ class MainTest(parameterized.TestCase):
       # This is relevant, since the tolerance below is proportional to
       # 1 / sqrt(ensemble_size).
       ensemble_size=20,
+      sample_hold_days=0,
+      initial_time_edge_behavior=cpcf.WRAP_YEAR,
       add_source_time=True,
   ):
     input_ds = self._make_dataset_that_grows_by_one_with_every_timedelta(
@@ -299,6 +544,8 @@ class MainTest(parameterized.TestCase):
         timedelta_spacing=timedelta_spacing,
         day_window_size=str(day_window_size),
         ensemble_size=str(ensemble_size),
+        sample_hold_days=str(sample_hold_days),
+        initial_time_edge_behavior=initial_time_edge_behavior,
         with_replacement=str(with_replacement).lower(),
         add_source_time=str(add_source_time).lower(),
         variables='temperature',
@@ -386,7 +633,7 @@ class MainTest(parameterized.TestCase):
         # Precise check using SOURCE_TIME.
         # Notice that this check always runs and requires the expected uniform
         # distribution, regardless of leap year.
-        if add_source_time:
+        if add_source_time and not sample_hold_days:
           output_time = pd.to_datetime(
               temperature.isel(prediction_timedelta=0)[time_dim].data
           )
