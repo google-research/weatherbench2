@@ -146,7 +146,11 @@ class SliceDatasetTest(parameterized.TestCase):
     output_path = self.create_tempdir('destination').full_path
 
     input_chunks = {'time': 40, 'longitude': 6, 'latitude': 5, 'level': 3}
-    input_ds.chunk(input_chunks).to_zarr(input_path)
+
+    # Reverse it so we can make it right in the script.
+    input_ds.sel(latitude=input_ds.latitude.data[::-1]).chunk(
+        input_chunks
+    ).to_zarr(input_path)
 
     with flagsaver.as_parsed(
         input_path=input_path,
@@ -159,6 +163,7 @@ class SliceDatasetTest(parameterized.TestCase):
         ),
         isel='latitude_stop=5',
         drop_variables='should_drop',
+        make_dims_increasing='latitude',
         runner='DirectRunner',
     ):
       slice_dataset.main([])
