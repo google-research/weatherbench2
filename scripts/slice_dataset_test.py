@@ -35,7 +35,7 @@ class GetSelectionsTest(parameterized.TestCase):
             'C_step': 3,
             'D_list': 'planes+trains+automobiles',
         },
-        is_sel_or_dropsel=False,
+        force_string=False,
     )
     expected_sel = [
         {'A': slice('1 day', '10 days', 2)},
@@ -54,7 +54,7 @@ class GetSelectionsTest(parameterized.TestCase):
             'B_stop': 2020,  # As in the year 2020 for a date
             'D_list': 'planes+trains+automobiles',
         },
-        is_sel_or_dropsel=True,
+        force_string=True,
     )
     expected_sel = [
         {'A': slice('1 day', '10 days', 2)},
@@ -75,7 +75,7 @@ class GetSelectionsTest(parameterized.TestCase):
             'Z_start': 1,
             'W_step': 2,
         },
-        is_sel_or_dropsel=False,
+        force_string=False,
     )
     expected_isel = [
         {'A': [9, -1, 0]},
@@ -96,7 +96,7 @@ class GetSelectionsTest(parameterized.TestCase):
                 'X_stop': 10,
                 'X_bad': 2,
             },
-            is_sel_or_dropsel=False,
+            force_string=False,
         )
 
     with self.subTest('Not ending in (start|stop|step|list) raises 2'):
@@ -107,7 +107,7 @@ class GetSelectionsTest(parameterized.TestCase):
                 'X_stop': 10,
                 'X_step_and_more': 2,
             },
-            is_sel_or_dropsel=False,
+            force_string=False,
         )
 
     with self.subTest('Not ending in (start|stop|step|list) raises 2'):
@@ -118,7 +118,7 @@ class GetSelectionsTest(parameterized.TestCase):
                 'X_stop': 10,
                 'X_step_': 2,
             },
-            is_sel_or_dropsel=False,
+            force_string=False,
         )
 
 
