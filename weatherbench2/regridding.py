@@ -28,6 +28,7 @@ https://gist.github.com/shoyer/c0f1ddf409667650a076c058f9a17276
 from __future__ import annotations
 
 import dataclasses
+import enum
 import functools
 from typing import Union
 
@@ -35,9 +36,49 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from sklearn import neighbors
-import xarray
+import xarray as xr
 
 Array = Union[np.ndarray, jax.Array]
+
+
+class LongitudeScheme(enum.Enum):
+  # [0, Δ, 2Δ, ..., 360 - Δ]
+  START_AT_ZERO = enum.auto()
+
+  # [-180 + Δ/2, ..., 180 - Δ/2]
+  CENTER_AT_ZERO = enum.auto()
+
+
+class LatitudeSpacing(enum.Enum):
+  EQUIANGULAR_WITH_POLES = enum.auto()
+  EQUIANGULAR_WITHOUT_POLES = enum.auto()
+
+
+def latitude_values(latitude_spacing: LatitudeSpacing, num: int) -> np.ndarray:
+  """Latitude node values given spacing and number of nodes."""
+  if latitude_spacing == LatitudeSpacing.EQUIANGULAR_WITH_POLES:
+    lat_start = -90
+    lat_stop = 90
+  elif latitude_spacing == LatitudeSpacing.EQUIANGULAR_WITHOUT_POLES:
+    lat_start = -90 + 0.5 * 180 / num
+    lat_stop = 90 - 0.5 * 180 / num
+  else:
+    raise ValueError(f'Unhandled {latitude_spacing=}')
+  return np.linspace(lat_start, lat_stop, num=num)
+
+
+def longitude_values(longitude_scheme: LongitudeScheme, num: int) -> np.ndarray:
+  """Longitude node values given scheme and number of nodes."""
+  lon_delta = 360 / num
+  if longitude_scheme == LongitudeScheme.START_AT_ZERO:
+    lon_start = 0
+    lon_stop = 360 - lon_delta
+  elif longitude_scheme == LongitudeScheme.CENTER_AT_ZERO:
+    lon_start = -180 + lon_delta / 2
+    lon_stop = 180 - lon_delta / 2
+  else:
+    raise ValueError(f'Unhandled {longitude_scheme=}')
+  return np.linspace(lon_start, lon_stop, num=num)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,6 +95,14 @@ class Grid:
   @property
   def shape(self) -> tuple[int, int]:
     return (len(self.lon), len(self.lat))
+
+  @property
+  def latitude_spacing(self) -> LatitudeSpacing:
+    return _determine_latitude_spacing(self.lat)
+
+  @property
+  def longitude_scheme(self) -> LongitudeScheme:
+    return _determine_longitude_scheme(self.lon)
 
   def _to_tuple(self) -> tuple[tuple[float, ...], tuple[float, ...]]:
     return tuple(self.lon.tolist()), tuple(self.lat.tolist())
@@ -76,13 +125,13 @@ class Regridder:
     """Regrid an array with dimensions (..., lon, lat) from source to target."""
     raise NotImplementedError
 
-  def regrid_dataset(self, dataset: xarray.Dataset) -> xarray.Dataset:
-    """Regrid an xarray.Dataset from source to target."""
+  def regrid_dataset(self, dataset: xr.Dataset) -> xr.Dataset:
+    """Regrid an xr.Dataset from source to target."""
     if not (dataset['latitude'].diff('latitude') > 0).all():
       # ensure latitude is increasing
       dataset = dataset.isel(latitude=slice(None, None, -1))  # reverse
     assert (dataset['latitude'].diff('latitude') > 0).all()
-    dataset = xarray.apply_ufunc(
+    regridded = xr.apply_ufunc(
         self.regrid_array,
         dataset,
         input_core_dims=[['longitude', 'latitude']],
@@ -90,7 +139,46 @@ class Regridder:
         exclude_dims={'longitude', 'latitude'},
         vectorize=True,  # loop over level & time, for lower memory usage
     )
-    return dataset
+    return regridded.assign_coords(
+        latitude=latitude_values(
+            self.target.latitude_spacing, len(self.target.lat)
+        ),
+        longitude=longitude_values(
+            self.target.longitude_scheme, len(self.target.lon)
+        ),
+    ).transpose(*(dataset.dims))
+
+
+def _determine_latitude_spacing(
+    lat_in_radians: np.ndarray,
+) -> LatitudeSpacing:
+  """Determine latitude spacing."""
+  _assert_increasing(lat_in_radians)
+  _assert_equal_spacing(lat_in_radians)
+  eq = lambda a, b: np.allclose(a, b, atol=1e-5)
+  lat_in_degrees = np.rad2deg(lat_in_radians)
+  if eq(lat_in_degrees[0], -90) and eq(lat_in_degrees[-1], 90):
+    return LatitudeSpacing.EQUIANGULAR_WITH_POLES
+  elif eq(90 + lat_in_degrees[0], 90 - lat_in_degrees[-1]):
+    return LatitudeSpacing.EQUIANGULAR_WITHOUT_POLES
+  else:
+    raise ValueError(f'Unknown spacing for {lat_in_degrees=}')
+
+
+def _determine_longitude_scheme(
+    lon_in_radians: np.ndarray,
+) -> LongitudeScheme:
+  """Determine longitude scheme."""
+  _assert_increasing(lon_in_radians)
+  _assert_equal_spacing(lon_in_radians)
+  lon_in_degrees = np.rad2deg(lon_in_radians)
+  eq = lambda a, b: np.allclose(a, b, atol=1e-5)
+  if eq(lon_in_degrees[0], 0) and lon_in_degrees[-1] < 360:
+    return LongitudeScheme.START_AT_ZERO
+  elif lon_in_degrees[0] < 0 and eq(-lon_in_degrees[0], lon_in_degrees[-1]):
+    return LongitudeScheme.CENTER_AT_ZERO
+  else:
+    raise ValueError(f'Unknown longitude scheme for {lon_in_degrees=}')
 
 
 def nearest_neighbor_indices(
@@ -158,6 +246,12 @@ def _assert_increasing(x: np.ndarray) -> None:
     raise ValueError(f'array is not increasing: {x}')
 
 
+def _assert_equal_spacing(x: np.ndarray) -> None:
+  diffs = np.unique(np.diff(x))
+  if (diffs.max() - diffs.min()) / diffs.max() > 1e-5:
+    raise ValueError(f'array does not have equal spacing. {diffs=}, {x=}')
+
+
 def _latitude_cell_bounds(x: Array) -> jax.Array:
   pi_over_2 = jnp.array([np.pi / 2], dtype=x.dtype)
   return jnp.concatenate([-pi_over_2, (x[:-1] + x[1:]) / 2, pi_over_2])
@@ -223,11 +317,13 @@ def _align_phase_with(x, target, period):
 
 
 def _periodic_upper_bounds(x, period):
+  # Midpoint of x and roll(x, -1), unique up to multiple of 2π
   x_plus = _align_phase_with(jnp.roll(x, -1), x, period)
   return (x + x_plus) / 2
 
 
 def _periodic_lower_bounds(x, period):
+  # Midpoint of x and roll(x, +1), unique up to multiple of 2π
   x_minus = _align_phase_with(jnp.roll(x, +1), x, period)
   return (x_minus + x) / 2
 
@@ -277,6 +373,11 @@ def _conservative_longitude_weights(
   Returns:
     NumPy array with shape (new_size, old_size). Rows sum to 1.
   """
+  if len(target_points) < 3:
+    raise ValueError(
+        'Need 3 or more target points else overlap is not well defined. Found'
+        f' {len(target_points)}'
+    )
   _assert_increasing(source_points)
   _assert_increasing(target_points)
   weights = _longitude_overlap(target_points, source_points)

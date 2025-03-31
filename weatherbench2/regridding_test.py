@@ -15,9 +15,213 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 from weatherbench2 import regridding
+import xarray as xr
+
+LatitudeSpacing = regridding.LatitudeSpacing
+LongitudeScheme = regridding.LongitudeScheme
+
+
+def _maybe_roll_longitude(
+    ds: xr.Dataset, longitude_scheme: LongitudeScheme
+) -> xr.Dataset:
+  """Rolls longitude to approximate longitude_scheme."""
+  ds = ds.copy()
+  current = regridding._determine_longitude_scheme(
+      np.deg2rad(ds.longitude.data),
+  )
+  if current == longitude_scheme:
+    return ds
+
+  if (
+      current == LongitudeScheme.START_AT_ZERO
+      and longitude_scheme == LongitudeScheme.CENTER_AT_ZERO
+  ):
+    mid = ds.sizes['longitude'] // 2
+    ds['longitude'] = xr.where(
+        ds.longitude < ds.longitude[mid], ds.longitude, -(360 - ds.longitude)
+    )
+    return ds.roll(longitude=-mid, roll_coords=True)
+  elif (
+      current == LongitudeScheme.CENTER_AT_ZERO
+      and longitude_scheme == LongitudeScheme.START_AT_ZERO
+  ):
+    mid = ds.sizes['longitude'] // 2
+    ds['longitude'] = xr.where(
+        ds.longitude >= 0, ds.longitude, 180 - ds.longitude
+    )
+    return ds.roll(longitude=mid, roll_coords=True)
+  else:
+    raise ValueError(
+        f'Unhandled combination {current=} and {longitude_scheme=}'
+    )
 
 
 class RegriddingTest(parameterized.TestCase):
+
+  @parameterized.parameters(
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.START_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.START_AT_ZERO,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lat_spacing=LatitudeSpacing.EQUIANGULAR_WITHOUT_POLES,
+          target_lat_spacing=LatitudeSpacing.EQUIANGULAR_WITHOUT_POLES,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.START_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.START_AT_ZERO,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.START_AT_ZERO,
+          source_lat_spacing=LatitudeSpacing.EQUIANGULAR_WITHOUT_POLES,
+          target_lat_spacing=LatitudeSpacing.EQUIANGULAR_WITH_POLES,
+      ),
+      dict(
+          regridder_cls=regridding.BilinearRegridder,
+          source_lon_scheme=LongitudeScheme.START_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+      ),
+      dict(
+          regridder_cls=regridding.BilinearRegridder,
+          source_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.START_AT_ZERO,
+      ),
+      dict(
+          source_lon_scheme=LongitudeScheme.START_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+      ),
+      dict(
+          regridder_cls=regridding.NearestRegridder,
+          source_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.START_AT_ZERO,
+          source_lat_spacing=LatitudeSpacing.EQUIANGULAR_WITHOUT_POLES,
+          target_lat_spacing=LatitudeSpacing.EQUIANGULAR_WITH_POLES,
+      ),
+  )
+  def test_coarse_grid_interpolates(
+      self,
+      regridder_cls: regridding.Regridder = regridding.ConservativeRegridder,
+      source_lat_spacing: LatitudeSpacing = LatitudeSpacing.EQUIANGULAR_WITH_POLES,
+      source_lon_scheme: LongitudeScheme = LongitudeScheme.START_AT_ZERO,
+      target_lat_spacing: LatitudeSpacing = LatitudeSpacing.EQUIANGULAR_WITH_POLES,
+      target_lon_scheme: LongitudeScheme = LongitudeScheme.START_AT_ZERO,
+  ):
+    # Make source...
+    #  Continuous and periodic, so interpolation should work well.
+    #  Not symmetric w.r.t. CW, CCW, to test orientation
+    #  Have dims that are powers of 2 for easy lower/upper bound computation
+    #  below.
+    n_lats = 32
+    n_lons = 64
+    source = xr.Dataset(
+        {
+            'X': xr.DataArray(
+                np.zeros((1, n_lats, n_lons)),
+                dims=('time', 'latitude', 'longitude'),
+                name='X',
+            )
+        },
+        coords=dict(
+            time=[np.datetime64('2000-01-01T00')],
+            latitude=regridding.latitude_values(source_lat_spacing, n_lats),
+            longitude=regridding.longitude_values(source_lon_scheme, n_lons),
+        ),
+    )
+    theta = 2 * np.pi * source.longitude / 360
+    phi = 2 * np.pi * (source.latitude - 90) / 180
+    source += np.sin(phi) * (np.cos(theta) ** 2 + np.sin(theta))
+
+    # Test the "determine" functions.
+    self.assertEqual(
+        regridding._determine_latitude_spacing(np.deg2rad(source.latitude)),
+        source_lat_spacing,
+    )
+    self.assertEqual(
+        regridding._determine_longitude_scheme(np.deg2rad(source.longitude)),
+        source_lon_scheme,
+    )
+
+    reduce_factor = 2
+
+    # Get approximate target values just by choosing nearest values in source.
+    regridded_latitude = regridding.latitude_values(
+        target_lat_spacing,
+        source.sizes['latitude'] // reduce_factor,
+    )
+    regridded_longitude = regridding.longitude_values(
+        target_lon_scheme,
+        source.sizes['longitude'] // reduce_factor,
+    )
+
+    # E.g. if reduce_factor=2, [0, 1] -> [0, 0, 1, 1]
+    repeat = lambda x: np.repeat(x[:, np.newaxis], reduce_factor)
+    repeat_lon = xr.DataArray(
+        repeat(regridded_longitude), dims=['longitude'], name='longitude'
+    )
+    repeat_lat = xr.DataArray(
+        repeat(regridded_latitude), dims=['latitude'], name='latitude'
+    )
+
+    lower_bound = (
+        _maybe_roll_longitude(source, target_lon_scheme)
+        .groupby(repeat_lon, restore_coord_dims=True)
+        .min()
+        .groupby(repeat_lat, restore_coord_dims=True)
+        .min()
+    )
+    upper_bound = (
+        _maybe_roll_longitude(source, target_lon_scheme)
+        .groupby(repeat_lon, restore_coord_dims=True)
+        .max()
+        .groupby(repeat_lat, restore_coord_dims=True)
+        .max()
+    )
+
+    source_grid = regridding.Grid.from_degrees(
+        lon=source.longitude.data,
+        lat=source.latitude.data,
+    )
+    target_grid = regridding.Grid.from_degrees(
+        lon=regridded_longitude,
+        lat=regridded_latitude,
+    )
+    regridder = regridder_cls(source_grid, target_grid)
+
+    regridded_ds = regridder.regrid_dataset(source)
+
+    np.testing.assert_equal(regridded_latitude, regridded_ds.latitude)
+    np.testing.assert_equal(regridded_longitude, regridded_ds.longitude)
+    self.assertTrue(np.all(np.isfinite(regridded_ds.X)))
+
+    if source_lon_scheme == target_lon_scheme:
+      min_frac_obeying_bounds = 0.99
+    else:
+      min_frac_obeying_bounds = 0.5
+
+    # The regridded is always between the lower and upper bounds.
+    # This also checks that the indices align, and in particular that they are
+    # as expected.
+    self.assertGreaterEqual(
+        (lower_bound <= regridded_ds).mean().X, min_frac_obeying_bounds
+    )
+    self.assertGreaterEqual(
+        (regridded_ds <= upper_bound).mean().X, min_frac_obeying_bounds
+    )
 
   def test_conservative_latitude_weights(self):
     source_lat = np.pi / 180 * np.array([-75, -45, -15, 15, 45, 75])
@@ -31,7 +235,7 @@ class RegriddingTest(parameterized.TestCase):
             [1 - np.sqrt(3) / 2, (np.sqrt(3) - 1) / 2, 1 / 2, 0, 0, 0],
             [0, 0, 0, 1 / 2, (np.sqrt(3) - 1) / 2, 1 - np.sqrt(3) / 2],
         ]
-    )
+    )  # fmt: skip
     actual = regridding._conservative_latitude_weights(source_lat, target_lat)
     np.testing.assert_almost_equal(expected, actual)
 
@@ -47,7 +251,7 @@ class RegriddingTest(parameterized.TestCase):
     actual = regridding._align_phase_with(x, y, period=10)
     self.assertEqual(actual, expected)
 
-  def test_conservative_longitude_weights(self):
+  def test_conservative_longitude_weights_same_branch(self):
     source_lon = np.pi / 180 * np.array([0, 60, 120, 180, 240, 300])
     target_lon = np.pi / 180 * np.array([0, 90, 180, 270])
     expected = (
@@ -60,7 +264,14 @@ class RegriddingTest(parameterized.TestCase):
             ]
         )
         / 6
-    )
+    )  # fmt: skip
+    actual = regridding._conservative_longitude_weights(source_lon, target_lon)
+    np.testing.assert_allclose(expected, actual, atol=1e-5)
+
+  def test_conservative_longitude_weights_different_branch(self):
+    source_lon = np.pi / 180 * np.array([90, 180, 270, 360])
+    target_lon = np.pi / 180 * np.array([-270, -180, -90, 0])
+    expected = np.eye(4)
     actual = regridding._conservative_longitude_weights(source_lon, target_lon)
     np.testing.assert_allclose(expected, actual, atol=1e-5)
 
