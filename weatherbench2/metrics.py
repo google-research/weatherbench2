@@ -1917,6 +1917,8 @@ class RankHistogram(EnsembleMetric):
       self,
       ensemble_dim: str = REALIZATION,
       num_bins: t.Optional[int] = None,
+      break_ties_randomly: bool = True,
+      seed: int = 802701,
   ):
     """Initializes a RankHistogram.
 
@@ -1925,9 +1927,17 @@ class RankHistogram(EnsembleMetric):
       num_bins: Number of bins in histogram. If None, the number of bins will be
         `ensemble_size + 1`. If provided, `num_bins` must evenly divide into
         `ensemble_size + 1`.
+      break_ties_randomly: If True, break ties with the following behavior.
+        If a subset of bins are identical (due to identical ensemble members),
+        and truth falls within the corresponding bins, a random choice (within
+        the tied bins) is made. If truth is exactly equal to some ensemble
+        members, it is randomly assigned a bin within the tied bins.
+      seed: Seed for RNG used to break ties.
     """
     super().__init__(ensemble_dim=ensemble_dim)
     self.num_bins = num_bins
+    self._break_ties_randomly = break_ties_randomly
+    self._seed = seed
 
   def _num_bins_actual(self, ensemble_size: int) -> int:
     default_n_bins = ensemble_size + 1
@@ -1948,6 +1958,34 @@ class RankHistogram(EnsembleMetric):
       return ranks
     else:
       return ranks // reduction_factor
+
+  def _perturb_by_min_ensemble_diff(self, da: xr.DataArray) -> xr.DataArray:
+    """Perturbs da values by the minimum diff along ensemble_dim / 2."""
+    if da.sizes[self.ensemble_dim] < 2:
+      # The purpose of the perturbation is to break ties. No ties if only 1.
+      return da
+    idx = da.dims.index(self.ensemble_dim)
+    diffs = np.diff(np.sort(da, axis=idx), axis=idx)
+
+    # diff = 0 is a problem. We don't want to perturb by 0, since that does
+    # nothing. We want to perturb by the smallest diff that is > 0.
+    diffs_zero_replaced_by_inf = np.where(
+        diffs == 0,
+        np.inf,
+        diffs,
+    )
+    min_diff = diffs_zero_replaced_by_inf.min(axis=idx, keepdims=True)
+    perturbation_size = np.where(
+        # If all diffs were zero, then the minimum will be Inf, and in this case
+        # perturb by 1.
+        min_diff < np.inf,
+        min_diff / 2,
+        1,
+    )
+    perturbation = np.random.default_rng(self._seed).uniform(
+        size=da.shape, low=-perturbation_size / 2, high=perturbation_size / 2
+    )
+    return da + perturbation
 
   def compute_chunk(
       self,
@@ -1975,6 +2013,14 @@ class RankHistogram(EnsembleMetric):
         {self.ensemble_dim: forecast[self.ensemble_dim]}
     )
     combined = xr.concat([truth, forecast], dim=self.ensemble_dim)
+    if self._break_ties_randomly:
+      # It is not enough to just perturb forecast. Consider e.g. the case when
+      # forecast = [0, 0, 0, 0, 0], every time, and so is truth. Then, if we
+      # only perturb the forecast, truth will end up in the center bin more than
+      # the others.
+      combined = combined.map(
+          self._perturb_by_min_ensemble_diff, keep_attrs=True
+      )
 
     def array_rank_one_hot(da: xr.DataArray) -> xr.DataArray:
       ensemble_size = forecast.sizes[self.ensemble_dim]
