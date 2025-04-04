@@ -599,6 +599,53 @@ class RankHistogramTest(parameterized.TestCase):
     test_utils.assert_strictly_increasing(hist.sel(level=3))
     test_utils.assert_strictly_decreasing(hist.sel(level=4))
 
+  @parameterized.parameters(
+      dict(ensemble_size=1),
+      dict(ensemble_size=2),
+      dict(ensemble_size=3),
+      dict(ensemble_size=10),
+      dict(ensemble_size=1, cutoff_below=False),
+      dict(ensemble_size=2, cutoff_below=False),
+      dict(ensemble_size=3, cutoff_below=False),
+      dict(ensemble_size=10, cutoff_below=False),
+  )
+  def test_repeated_entries_get_random_bin(
+      self, ensemble_size, cutoff_below=True
+  ):
+    num_bins = ensemble_size + 1
+    # Forecast and truth both come from Normal(0, I).
+    truth, forecast = get_random_truth_and_forecast(
+        ensemble_size=ensemble_size,
+        # Get enough days so our sample size is large.
+        time_start='2019-12-01',
+        time_stop='2019-12-10',
+    )
+
+    # Give repeated values, but maintain that they are from the same dist.
+    comp = np.less_equal if cutoff_below else np.greater_equal
+    truth = xr.where(comp(truth, 0), 0, truth)
+    forecast = xr.where(comp(forecast, 0), 0, forecast)
+
+    one_hot_ranks = metrics.RankHistogram(
+        ensemble_dim='realization', num_bins=num_bins
+    ).compute_chunk(forecast, truth)
+
+    averaging_dims = [
+        # Reduce over all dims, since the distribution is IID.
+        # This increases statistical power.
+        'prediction_timedelta',
+        'time',
+        'latitude',
+        'longitude',
+        'level',
+    ]
+    sample_size = np.prod([one_hot_ranks.sizes[d] for d in averaging_dims])
+    rtol = 5 * np.sqrt((num_bins - 1) / sample_size)  # 5 standard errors.
+
+    hist = one_hot_ranks.mean(averaging_dims).geopotential
+
+    np.testing.assert_allclose(1 / num_bins, hist, rtol=rtol)
+
 
 class CentralReliabilityTest(parameterized.TestCase):
 
