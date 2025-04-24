@@ -40,6 +40,8 @@ tests_requires = [
     'absl-py',
     'pytest',
     'pyink',
+    # work around https://github.com/zarr-developers/zarr-python/issues/2963
+    'numcodecs<0.16.0',
 ]
 
 gcp_requires = [
