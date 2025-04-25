@@ -227,9 +227,9 @@ ADD_SOURCE_TIME = flags.DEFINE_boolean(
 # Determines how to form ensembles.
 DAY_WINDOW_SIZE = flags.DEFINE_integer(
     'day_window_size',
-    10,
+    15,
     help=(
-        'Width of window (in days) to take samples from. Must be in [0, 2*364].'
+        'Width of window (in days) to take samples from. Must be in [1, 2*364].'
     ),
 )
 ENSEMBLE_SIZE = flags.DEFINE_integer(
@@ -412,10 +412,10 @@ def _get_sampled_init_times(
   """
   rng = np.random.default_rng(seed)
 
-  if day_window_size > 2 * 364:
+  if day_window_size <= 0 or day_window_size > 2 * 364:
     # This complicates the REFLECT_RANGE behavior, and no sensible human would
     # want this.
-    raise ValueError(f'{day_window_size=} > 2 * 364, which is not allowed.')
+    raise ValueError(f'{day_window_size=} not in [1, 2 * 364] but should be.')
 
   # The scheme below samples uniformly over initial day (ignoring leap years).
   # Conceptually, think of each climatology year as a circle. The days
