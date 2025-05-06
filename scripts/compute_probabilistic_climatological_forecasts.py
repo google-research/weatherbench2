@@ -253,6 +253,26 @@ WITH_REPLACEMENT = flags.DEFINE_boolean(
         ' with_replacement=False.'
     ),
 )
+LEAVE_OUT_IF_IN_CLIMATOLOGY = flags.DEFINE_boolean(
+    'leave_out_if_in_climatology',
+    False,
+    help=(
+        'If True, and an initial_time is within the climatology year range, '
+        'sampling will exclude the year of the initial_time and the '
+        'subsequent year from the pool of available climatology years '
+        'for that specific initial_time. Only applies if with_replacement=True.'
+    ),
+)
+NUM_YEARS_TO_EXCLUDE = flags.DEFINE_integer(
+    'num_years_to_exclude',
+    0,
+    help=(
+        'Relevant only if LEAVE_OUT_IF_IN_CLIMATOLOGY=True. Number of years '
+        'to exclude from sampling for each initial_time (not including the '
+        'initial time-s year). '
+    ),
+)
+
 SEED = flags.DEFINE_integer(
     'seed', 802701, help='Seed for the random number generator.'
 )
@@ -341,9 +361,16 @@ def _get_ensemble_size(
     climatology_start_year: int,
     climatology_end_year: int,
     day_window_size: int,
+    leave_out_if_in_climatology: bool,
 ) -> int:
   """Computes the ensemble size from FLAGS."""
   if ensemble_size_flag_value == -1:
+    if leave_out_if_in_climatology:
+      raise flags.ValidationError(
+          'ensemble_size=-1 (all combinations) is not supported when '
+          'leave_out_if_in_climatology=True, as the number of available '
+          'years can change per initial_time.'
+      )
     return len(
         _get_possible_year_values(climatology_start_year, climatology_end_year)
     ) * len(_get_possible_day_perturbation_values(day_window_size))
@@ -375,6 +402,8 @@ def _get_sampled_init_times(
     with_replacement: bool,
     sample_hold_days: int,
     initial_time_edge_behavior: str,
+    leave_out_if_in_climatology: bool,
+    num_years_to_exclude: int,
     seed: int,
 ) -> np.ndarray:
   """For each output time, get the times to sample from observations.
@@ -405,6 +434,10 @@ def _get_sampled_init_times(
       perturbation.  0 means switch perturbations every consecutive init time.
     initial_time_edge_behavior: How to deal with perturbations that move the
       sampled day outside of sampled year.
+    leave_out_if_in_climatology: If True, and initial_time's year is within
+     climatology, exclude its year and subsequent num_years_to_exclude years.
+    num_years_to_exclude: Number of years after initial_time's year to
+      exclude.
     seed: Integer seed for the RNG.
 
   Returns:
@@ -428,41 +461,89 @@ def _get_sampled_init_times(
   day_perturbation_values = _get_possible_day_perturbation_values(
       day_window_size
   )
-  year_values = _get_possible_year_values(
+  base_climatology_year_pool = _get_possible_year_values(
       climatology_start_year, climatology_end_year
   )
   n_days = len(day_perturbation_values)
-  n_years = len(year_values)
+  n_base_years = len(base_climatology_year_pool)
   n_times = len(output_times)
   if ensemble_size > 0:
     pass
   elif ensemble_size == -1:
-    ensemble_size = n_days * n_years
+    if leave_out_if_in_climatology:
+      raise flags.ValidationError(
+          'ensemble_size=-1 (all combinations) is not supported when '
+          'leave_out_if_in_climatology=True.'
+      )
+    ensemble_size = n_days * n_base_years
   else:
     raise ValueError(f'{ensemble_size=} was not > 0 or -1.')
-
-  sample_shape = (ensemble_size, len(output_times))
+  sample_shape = (ensemble_size, n_times)
+  years = np.zeros(sample_shape, dtype=int)
 
   # Get sampled years and day_perturbations.
   if with_replacement:
-    # In this case, years and days are iid samples. Easy!
-    years = rng.integers(
-        year_values.min(),
-        year_values.max() + 1,  # +1 because the interval is open on the right.
-        size=sample_shape,
-    )
     day_perturbations = rng.integers(
         day_perturbation_values.min(),
         day_perturbation_values.max() + 1,
         size=sample_shape,
     )
-  else:
+    if leave_out_if_in_climatology:
+      if not base_climatology_year_pool.size and ensemble_size > 0:
+        raise ValueError(
+            'Climatology year range is empty. Cannot sample years for '
+            'leave_out_if_in_climatology=True. Check flags: '
+            f'climatology_start_year={climatology_start_year}, '
+            f'climatology_end_year={climatology_end_year}.'
+        )
+      for j, current_output_time in enumerate(output_times):
+        current_output_year = current_output_time.year
+        available_years_for_this_time = [
+            y
+            for y in base_climatology_year_pool
+            if y < current_output_year
+            or y > current_output_year + num_years_to_exclude
+        ]
+
+        if not available_years_for_this_time:
+          if ensemble_size > 0:
+            raise ValueError(
+                'No available climatology years to sample for output_time'
+            )
+        elif ensemble_size > 0:
+          years[:, j] = rng.choice(
+              available_years_for_this_time, size=ensemble_size, replace=True
+          )
+    else:
+      if not n_base_years and ensemble_size > 0:
+        raise ValueError(
+            'Climatology year range is empty. Cannot sample years. '
+            f'Check climatology_start_year={climatology_start_year}, '
+            f'climatology_end_year={climatology_end_year}.'
+        )
+      if n_base_years > 0:
+        years = rng.integers(
+            base_climatology_year_pool.min(),
+            base_climatology_year_pool.max() + 1,
+            size=sample_shape,
+        )
+
+  else:  # with_replacement == False
+    if leave_out_if_in_climatology:
+      raise NotImplementedError(
+          'leave_out_if_in_climatology=True is not currently supported with'
+          ' with_replacement=False due to the complexity of ensuring unique'
+          ' samples per output time with dynamically changing year'
+          ' availability.'
+      )
     if not isinstance(seed, int):
       raise AssertionError(
           f'{seed=} was not an integer. Seeding with None causes a nasty bug'
           ' whereby different choices will be used for day_perturbations and'
           ' years!'
       )
+    n_years = len(base_climatology_year_pool)
+    year_values = base_climatology_year_pool
     tiled_day_window_values = _repeat_along_new_axis(
         # tiled_day_window_values.shape = [n_years, n_days, n_times].
         # tiled_day_window_values[i, :, j] = day_window_values for every i, j.
@@ -497,27 +578,35 @@ def _get_sampled_init_times(
   dayofyears = output_times.dayofyear.values + day_perturbations
 
   if initial_time_edge_behavior == WRAP_YEAR:
-    for year in range(climatology_start_year, climatology_end_year + 1):
-      mask = years == year
-      days_in_this_year = 365 + calendar.isleap(year)
+    for year_in_sample in np.unique(years):
+      if ensemble_size == 0:
+        continue
+      mask = years == year_in_sample
+      days_in_this_year = 365 + calendar.isleap(year_in_sample)
       dayofyears[mask] = (dayofyears[mask] - 1) % days_in_this_year + 1
 
   elif initial_time_edge_behavior == REFLECT_RANGE:
-    for year in {climatology_start_year, climatology_end_year}:
-      mask = years == year
-      days_in_this_year = 365 + calendar.isleap(year)
-      if year == climatology_start_year:
-        # Transform e.g. 1 --> 1, 0 --> 2, -1 --> 3
+    for year_at_climatology_edge in {
+        climatology_start_year,
+        climatology_end_year,
+    }:
+      if ensemble_size == 0:
+        continue
+      mask = years == year_at_climatology_edge
+      if not np.any(mask):
+        continue
+
+      days_in_this_year = 365 + calendar.isleap(year_at_climatology_edge)
+      if year_at_climatology_edge == climatology_start_year:
         dayofyears[mask] = np.where(
             dayofyears[mask] >= 1,
             dayofyears[mask],
             np.abs(dayofyears[mask]) + 2,
         )
-      elif year == climatology_end_year:
+      elif year_at_climatology_edge == climatology_end_year:
         dayofyears[mask] = np.where(
             dayofyears[mask] <= days_in_this_year,
             dayofyears[mask],
-            # If d > 365, set to 2*365 - d = 365 - (d - 365)
             2 * days_in_this_year - dayofyears[mask],
         )
   elif initial_time_edge_behavior == NO_EDGE:
@@ -549,10 +638,10 @@ def _get_sampled_init_times(
       )
     hold_idx = np.repeat(
         # E.g. hold_idx = [0, 0, ..., 0, 1, 1, ..., 1, 2, ...]
-        np.arange(len(output_times) // hold_stride + 1)[:, np.newaxis],
+        np.arange(n_times // hold_stride + 1)[:, np.newaxis],
         hold_stride,
         axis=1,
-    ).ravel()[: len(output_times)]
+    ).ravel()[:n_times]
 
     # Convert np datetimes into δ days, sample-hold, then add back to datetimes.
     delta_days = np.array(
@@ -696,6 +785,7 @@ def main(argv: abc.Sequence[str]) -> None:
       CLIMATOLOGY_START_YEAR.value,
       CLIMATOLOGY_END_YEAR.value,
       DAY_WINDOW_SIZE.value,
+      LEAVE_OUT_IF_IN_CLIMATOLOGY.value,
   )
 
   # Define output times and the template.
@@ -723,6 +813,8 @@ def main(argv: abc.Sequence[str]) -> None:
       with_replacement=WITH_REPLACEMENT.value,
       initial_time_edge_behavior=INITIAL_TIME_EDGE_BEHAVIOR.value,
       sample_hold_days=SAMPLE_HOLD_DAYS.value,
+      leave_out_if_in_climatology=LEAVE_OUT_IF_IN_CLIMATOLOGY.value,
+      num_years_to_exclude=NUM_YEARS_TO_EXCLUDE.value,
       seed=SEED.value,
   ).ravel()
 

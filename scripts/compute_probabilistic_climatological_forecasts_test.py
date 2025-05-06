@@ -107,6 +107,8 @@ class GetSampledInitTimesTest(parameterized.TestCase):
     day_window_size = 6
     climatology_start_year = 1990
     climatology_end_year = 2001
+    current_leave_out = False
+    current_num_years_to_exclude = 0
     sampled_times = cpcf._get_sampled_init_times(
         output_times,
         climatology_start_year=climatology_start_year,
@@ -116,6 +118,8 @@ class GetSampledInitTimesTest(parameterized.TestCase):
         with_replacement=with_replacement,
         sample_hold_days=0,
         initial_time_edge_behavior=initial_time_edge_behavior,
+        leave_out_if_in_climatology=current_leave_out,
+        num_years_to_exclude=current_num_years_to_exclude,
         seed=802701,
     )
     allowed_sample_years = cpcf._get_possible_year_values(
@@ -127,6 +131,7 @@ class GetSampledInitTimesTest(parameterized.TestCase):
         climatology_start_year,
         climatology_end_year,
         day_window_size,
+        current_leave_out,
     )
     expect_everything_sampled_once = (
         not with_replacement
@@ -297,6 +302,8 @@ class GetSampledInitTimesTest(parameterized.TestCase):
     assert output_freq_days < sample_hold_days, 'Jump test wont work'
     climatology_start_year = 1990
     climatology_end_year = 2000
+    current_leave_out = False
+    current_num_years_to_exclude = 0
     output_times = pd.date_range(
         start='2021', end='2025', freq=f'{output_freq_days}d'
     )
@@ -307,6 +314,7 @@ class GetSampledInitTimesTest(parameterized.TestCase):
         climatology_start_year,
         climatology_end_year,
         day_window_size,
+        current_leave_out,
     )
 
     sampled_times = cpcf._get_sampled_init_times(
@@ -318,6 +326,8 @@ class GetSampledInitTimesTest(parameterized.TestCase):
         with_replacement=with_replacement,
         sample_hold_days=sample_hold_days,
         initial_time_edge_behavior=initial_time_edge_behavior,
+        leave_out_if_in_climatology=current_leave_out,
+        num_years_to_exclude=current_num_years_to_exclude,
         seed=802701,
     )
     self.assertEqual(
@@ -377,6 +387,99 @@ class GetSampledInitTimesTest(parameterized.TestCase):
         # The count is so large that it's more than 5x the second place!
         time_between_jump_counts[expected_most_common_time_between_jump],
         sorted(time_between_jump_counts.values())[-2] * 5,
+    )
+
+  def test_leave_out_climatology_true_behavior(self):
+    """Tests the behavior when leave_out_if_in_climatology is True."""
+    output_times = pd.to_datetime(['2005-06-15T12:00:00'])
+    climatology_start_year = 2000
+    climatology_end_year = 2010
+    day_window_size = 5
+    ensemble_size_param = 100
+    with_replacement = True
+    sample_hold_days = 0
+    initial_time_edge_behavior = cpcf.WRAP_YEAR
+    seed = 12345
+
+    # Scenario: Exclude current year (2005) and next year (2006)
+    leave_out_flag = True
+    num_years_to_exclude_val = 1
+
+    actual_ensemble_size = cpcf._get_ensemble_size(
+        ensemble_size_param,
+        climatology_start_year,
+        climatology_end_year,
+        day_window_size,
+        leave_out_flag,
+    )
+
+    sampled_times = cpcf._get_sampled_init_times(
+        output_times=output_times,
+        climatology_start_year=climatology_start_year,
+        climatology_end_year=climatology_end_year,
+        day_window_size=day_window_size,
+        ensemble_size=actual_ensemble_size,
+        with_replacement=with_replacement,
+        sample_hold_days=sample_hold_days,
+        initial_time_edge_behavior=initial_time_edge_behavior,
+        leave_out_if_in_climatology=leave_out_flag,
+        num_years_to_exclude=num_years_to_exclude_val,
+        seed=seed,
+    )
+
+    self.assertEqual(
+        sampled_times.shape, (actual_ensemble_size, len(output_times))
+    )
+
+    # Check the years sampled for the first (and only) output time
+    sampled_years_in_output = pd.to_datetime(sampled_times[:, 0]).year
+
+    self.assertNotIn(
+        2005, sampled_years_in_output, 'Initial year 2005 should be excluded.'
+    )
+    self.assertNotIn(
+        2006,
+        sampled_years_in_output,
+        'Year 2006 (initial_year + 1) should be excluded.',
+    )
+
+    # Check that other years from the climatology ARE sampled
+    # Expected pool: 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010
+    expected_sampled_pool = set(range(2000, 2005)) | set(range(2007, 2011))
+    unique_sampled_years = set(np.unique(sampled_years_in_output))
+
+    # All years in unique_sampled_years must come from expected_sampled_pool
+    self.assertTrue(
+        unique_sampled_years.issubset(expected_sampled_pool),
+        f'Sampled years {unique_sampled_years} contain unexpected years.'
+        f' Expected subset of {expected_sampled_pool}',
+    )
+
+    # Test with num_years_to_exclude = 0 (only current year excluded)
+    num_years_to_exclude_val_0 = 0
+    sampled_times_0_exclude = cpcf._get_sampled_init_times(
+        output_times=output_times,
+        climatology_start_year=climatology_start_year,
+        climatology_end_year=climatology_end_year,
+        day_window_size=day_window_size,
+        ensemble_size=actual_ensemble_size,
+        with_replacement=with_replacement,
+        sample_hold_days=sample_hold_days,
+        initial_time_edge_behavior=initial_time_edge_behavior,
+        leave_out_if_in_climatology=leave_out_flag,
+        num_years_to_exclude=num_years_to_exclude_val_0,
+        seed=seed,
+    )
+    sampled_years_0_exclude = pd.to_datetime(sampled_times_0_exclude[:, 0]).year
+    self.assertNotIn(
+        2005,
+        sampled_years_0_exclude,
+        'Initial year 2005 should be excluded (num_years_to_exclude=0).',
+    )
+    self.assertIn(
+        2006,
+        sampled_years_0_exclude,
+        'Year 2006 should NOT be excluded (num_years_to_exclude=0).',
     )
 
 
@@ -525,6 +628,7 @@ class MainTest(parameterized.TestCase):
         climatology_start_year,
         climatology_end_year,
         day_window_size,
+        leave_out_if_in_climatology=False,
     )
 
     output_chunks_flag = f'{time_dim}=1,level=1' + (
