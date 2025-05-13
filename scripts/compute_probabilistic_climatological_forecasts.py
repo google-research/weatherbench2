@@ -530,50 +530,82 @@ def _get_sampled_init_times(
 
   else:  # with_replacement == False
     if leave_out_if_in_climatology:
-      raise NotImplementedError(
-          'leave_out_if_in_climatology=True is not currently supported with'
-          ' with_replacement=False due to the complexity of ensuring unique'
-          ' samples per output time with dynamically changing year'
-          ' availability.'
-      )
-    if not isinstance(seed, int):
-      raise AssertionError(
-          f'{seed=} was not an integer. Seeding with None causes a nasty bug'
-          ' whereby different choices will be used for day_perturbations and'
-          ' years!'
-      )
-    n_years = len(base_climatology_year_pool)
-    year_values = base_climatology_year_pool
-    tiled_day_window_values = _repeat_along_new_axis(
-        # tiled_day_window_values.shape = [n_years, n_days, n_times].
-        # tiled_day_window_values[i, :, j] = day_window_values for every i, j.
-        _repeat_along_new_axis(
-            day_perturbation_values, repeats=n_years, axis=0
-        ),
-        repeats=n_times,
-        axis=-1,
-    )
-    day_perturbations = _independent_choice(
-        tiled_day_window_values.reshape(-1, n_times),
-        axis=0,
-        n=ensemble_size,
-        seed=seed,
-    )
+      if ensemble_size == -1:
+        raise flags.ValidationError(
+            'ensemble_size=-1 (all combinations) is not supported when '
+            'leave_out_if_in_climatology=True, as the number of available '
+            'years can change per initial_time.'
+        )
+      for j, current_output_time in enumerate(output_times):
+        current_output_year = current_output_time.year
+        available_years_for_this_time = [
+            y
+            for y in base_climatology_year_pool
+            if y < current_output_year
+            or y > current_output_year + num_years_to_exclude
+        ]
 
-    tiled_year_values = _repeat_along_new_axis(
-        # tiled_year_values.shape = [n_years, n_days, n_times].
-        # tiled_year_values[:, i, j] = year_values, for every i, j.
-        _repeat_along_new_axis(year_values, repeats=n_days, axis=-1),
-        repeats=n_times,
-        axis=-1,
-    )
-    years = _independent_choice(
-        tiled_year_values.reshape(-1, n_times),
-        axis=0,
-        n=ensemble_size,
-        seed=seed,
-    )
-  # End of get sampled years and day_perturbations.
+        if not available_years_for_this_time:
+          if ensemble_size > 0:
+            raise ValueError(
+                'No available climatology years to sample for output_time'
+            )
+        elif ensemble_size > 0:
+          if len(available_years_for_this_time) < ensemble_size:
+            raise ValueError(
+                'Not enough available climatology years to sample for'
+                ' output_time'
+            )
+          # note that here I assume we assume here that we don't allow a same
+          # year to be used twice (with_replacement=False)
+          years[:, j] = rng.choice(
+              available_years_for_this_time, size=ensemble_size, replace=False
+          )
+
+          day_perturbations = rng.integers(
+              day_perturbation_values.min(),
+              day_perturbation_values.max() + 1,
+              size=sample_shape,
+          )
+    else:
+      if not isinstance(seed, int):
+        raise AssertionError(
+            f'{seed=} was not an integer. Seeding with None causes a nasty bug'
+            ' whereby different choices will be used for day_perturbations and'
+            ' years!'
+        )
+      n_years = len(base_climatology_year_pool)
+      year_values = base_climatology_year_pool
+      tiled_day_window_values = _repeat_along_new_axis(
+          # tiled_day_window_values.shape = [n_years, n_days, n_times].
+          # tiled_day_window_values[i, :, j] = day_window_values for every i, j.
+          _repeat_along_new_axis(
+              day_perturbation_values, repeats=n_years, axis=0
+          ),
+          repeats=n_times,
+          axis=-1,
+      )
+      day_perturbations = _independent_choice(
+          tiled_day_window_values.reshape(-1, n_times),
+          axis=0,
+          n=ensemble_size,
+          seed=seed,
+      )
+
+      tiled_year_values = _repeat_along_new_axis(
+          # tiled_year_values.shape = [n_years, n_days, n_times].
+          # tiled_year_values[:, i, j] = year_values, for every i, j.
+          _repeat_along_new_axis(year_values, repeats=n_days, axis=-1),
+          repeats=n_times,
+          axis=-1,
+      )
+      years = _independent_choice(
+          tiled_year_values.reshape(-1, n_times),
+          axis=0,
+          n=ensemble_size,
+          seed=seed,
+      )
+    # End of get sampled years and day_perturbations.
 
   dayofyears = output_times.dayofyear.values + day_perturbations
 
