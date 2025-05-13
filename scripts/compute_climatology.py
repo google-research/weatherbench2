@@ -170,7 +170,7 @@ class SEEPSThreshold:
     heavy_threshold = heavy_threshold.quantile(2 / 3, dim=dim)
     out = xr.Dataset(
         {
-            f'{self.var}_seeps_threshold': heavy_threshold.drop('quantile'),
+            f'{self.var}_seeps_threshold': heavy_threshold.drop_vars('quantile'),
             f'{self.var}_seeps_dry_fraction': dry_fraction,
         }
     )  # fmt: skip
