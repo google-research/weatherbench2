@@ -939,6 +939,9 @@ def main(argv: abc.Sequence[str]) -> None:
       }
   )  # fmt: skip
   output_chunks.update(OUTPUT_CHUNKS.value)
+  output_chunks = {
+      k: min(output_chunks[k], template.sizes[k]) for k in output_chunks
+  }
 
   itemsize = max(var.dtype.itemsize for var in template.values())
 
