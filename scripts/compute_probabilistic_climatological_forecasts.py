@@ -295,6 +295,11 @@ REALIZATION_NAME = flags.DEFINE_string(
 )
 
 # Computing choices.
+MAX_MEM = flags.DEFINE_integer(
+    'max_mem',
+    2**30,
+    help='Maximum memory (in bytes) during rechunking.',
+)
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads',
     None,
@@ -1035,6 +1040,7 @@ def main(argv: abc.Sequence[str]) -> None:
             done_working_chunks,
             output_chunks,
             itemsize=itemsize,
+            max_mem=MAX_MEM.value,
         )
         | xbeam.ChunksToZarr(
             OUTPUT_PATH.value,
