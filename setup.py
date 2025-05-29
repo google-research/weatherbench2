@@ -16,10 +16,13 @@
 import setuptools
 
 base_requires = [
-    'absl-py==2.2.2',
+    'absl-py',
     'apache_beam>=2.31.0',
     'cftime>=1.6.2',
+    'gcsfs',
     'jax[cpu]',
+    # work around https://github.com/zarr-developers/zarr-python/issues/2963
+    'numcodecs<0.16.0',
     'numpy>=2.1.3',
     'pandas>=2.2.3',
     'scipy',
@@ -27,9 +30,6 @@ base_requires = [
     'xarray>=2024.11.0',
     'xarray-beam',
     'zarr',
-    # work around https://github.com/zarr-developers/zarr-python/issues/2963
-    'numcodecs<0.16.0',
-    'gcsfs',
 ]
 
 docs_requires = [
@@ -46,8 +46,6 @@ tests_requires = [
 ]
 
 gcp_requires = [
-    'apache_beam[gcp]>=2.31.0',
-    'gcsfs',
 ]
 
 setuptools.setup(
