@@ -9,3 +9,4 @@ docs/source/.ipynb_checkpoints
 docs/*.zarr
 __pycache__
 .pytest_cache
+*swp
