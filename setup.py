@@ -27,7 +27,7 @@ base_requires = [
     'pandas>=2.2.3',
     'scipy',
     'scikit-learn',
-    'xarray>=2024.11.0',
+    'xarray>=2024.11.0,<2025.6.0',
     'xarray-beam',
     'zarr',
 ]
@@ -37,8 +37,6 @@ docs_requires = [
     'myst-parser',
     'sphinx',
     'sphinx_rtd_theme',
-    # 'sphinx-book-theme',
-    'scipy',
 ]
 tests_requires = [
     'pytest',
@@ -46,6 +44,7 @@ tests_requires = [
 ]
 
 gcp_requires = [
+    'apache_beam[gcp]>=2.31.0',
 ]
 
 setuptools.setup(
