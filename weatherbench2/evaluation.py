@@ -382,6 +382,10 @@ def _get_output_path(
 
 def _to_netcdf(dataset: xr.Dataset, filename: str) -> None:
   with fsspec.open(filename, 'wb', auto_mkdir=True) as f:
+    for coord in dataset.coords:
+      if dataset[coord].dtype == 'timedelta64[ns]':
+        # Make sure to also override all other existing encodings.
+        dataset[coord].encoding = {'dtype': 'int32'}
     f.write(dataset.to_netcdf())
 
 
