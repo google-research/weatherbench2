@@ -113,6 +113,25 @@ MAX_VARS = flags.DEFINE_list(
         ' equivalent to listing every time dependent variable.'
     ),
 )
+SUM_VARS = flags.DEFINE_list(
+    'sum_vars',
+    [],
+    help=(
+        'Comma-delimited list of variables to compute the sum of. Will result'
+        ' in "_sum" suffix added to variables. Setting --sum_vars=ALL is'
+        ' equivalent to listing every time dependent variable.'
+    ),
+)
+LABEL_SIDE = flags.DEFINE_enum(
+    'label_side',
+    'left',
+    ['left', 'right'],
+    help=(
+        'Which side of the interval to label. "right" means the label T'
+        ' corresponds to the interval (T - period, T]. "left" means the label T'
+        ' corresponds to the interval [T, T + period].'
+    ),
+)
 ADD_MEAN_SUFFIX = flags.DEFINE_bool(
     'add_mean_suffix',
     False,
@@ -189,6 +208,7 @@ def resample_in_time_chunk(
     mean_vars: list[str],
     min_vars: list[str],
     max_vars: list[str],
+    sum_vars: list[str],
     add_mean_suffix: bool,
     skipna: bool = False,
 ) -> tuple[xbeam.Key, xr.Dataset]:
@@ -203,6 +223,7 @@ def resample_in_time_chunk(
     mean_vars: Variables to compute the mean of.
     min_vars: Variables to compute the min of.
     max_vars: Variables to compute the max of.
+    sum_vars: Variables to compute the sum of.
     add_mean_suffix: Whether to add a "_mean" suffix to variables after
       computing the mean.
     skipna: Whether to skip NaN values in both forecasts and observations during
@@ -236,6 +257,12 @@ def resample_in_time_chunk(
               chunk, method, period, 'max', skipna=skipna
           ).rename({chunk_var: f'{chunk_var}_max'})
       )
+    if chunk_var in sum_vars:
+      rsmp_chunks.append(
+          resample_in_time_core(
+              chunk, method, period, 'sum', skipna=skipna
+          ).rename({chunk_var: f'{chunk_var}_sum'})
+      )
 
   return rsmp_key, xr.merge(rsmp_chunks)
 
@@ -261,12 +288,25 @@ def resample_in_time_core(
         statistic,
     )(skipna=skipna)
   elif method == 'resample':
-    return getattr(
-        chunk.resample({TIME_DIM.value: period}, label='left'),
-        statistic,
-    )(skipna=skipna)
+    if LABEL_SIDE.value == 'left':
+      resampled = getattr(
+          chunk.resample({TIME_DIM.value: period}, label='left'),
+          statistic,
+      )(skipna=skipna)
+      return resampled
+    elif LABEL_SIDE.value == 'right':
+      resampled = getattr(
+          chunk.resample(
+              {TIME_DIM.value: period}, label='right', closed='right'
+          ),
+          statistic,
+      )(skipna=skipna)
+      return resampled.isel({TIME_DIM.value: slice(1, None)})
+    else:
+      raise ValueError(f'Unhandled {LABEL_SIDE.value=}')
   else:
     raise ValueError(f'Unhandled {method=}')
+  assert False  # Should not be reached
 
 
 def main(argv: abc.Sequence[str]) -> None:
@@ -283,8 +323,9 @@ def main(argv: abc.Sequence[str]) -> None:
   mean_vars = _get_vars(MEAN_VARS.value, time_dependent_vars)
   min_vars = _get_vars(MIN_VARS.value, time_dependent_vars)
   max_vars = _get_vars(MAX_VARS.value, time_dependent_vars)
+  sum_vars = _get_vars(SUM_VARS.value, time_dependent_vars)
 
-  keep_vars = set(mean_vars).union(min_vars).union(max_vars)
+  keep_vars = set(mean_vars).union(min_vars).union(max_vars).union(sum_vars)
   if keep_vars.intersection(nontime_vars):
     raise ValueError(
         'Statistics asked for on some variables that did not contain'
@@ -292,10 +333,6 @@ def main(argv: abc.Sequence[str]) -> None:
     )
   ds = ds[keep_vars]
 
-  # To ensure results at time T use data from [T, T + period], an offset needs
-  # to be added if the method is rolling.
-  # It would be wonderful if this was the default, or possible with appropriate
-  # kwargs in rolling, but alas...
   if METHOD.value == 'rolling':
     delta_ts = pd.to_timedelta(np.unique(np.diff(ds[TIME_DIM.value].data)))
     if len(delta_ts) != 1:
@@ -303,10 +340,18 @@ def main(argv: abc.Sequence[str]) -> None:
           f'Input data must have constant spacing. Found {delta_ts}'
       )
     delta_t = delta_ts[0]
-    ds = ds.assign_coords(
-        {TIME_DIM.value: ds[TIME_DIM.value] - period + delta_t}
-    )
-
+    if LABEL_SIDE.value == 'left':
+      # To ensure results at time T use data from [T, T + period],
+      # an offset needs to be added if the method is rolling.
+      ds = ds.assign_coords(
+          {TIME_DIM.value: ds[TIME_DIM.value] - period + delta_t}
+      )
+    elif LABEL_SIDE.value == 'right':
+      # To ensure results at time T use data from (T-period, T],
+      # an offset needs to be added if the method is rolling.
+      ds = ds.assign_coords({TIME_DIM.value: ds[TIME_DIM.value] + delta_t})
+    else:
+      raise ValueError(f'Unhandled {LABEL_SIDE.value=}')
   # Make the template
   if METHOD.value == 'resample':
     rsmp_times = resample_in_time_core(
@@ -337,6 +382,8 @@ def main(argv: abc.Sequence[str]) -> None:
     rsmp_template = rsmp_template.assign({f'{var}_min': template_copy[var]})
   for var in max_vars:
     rsmp_template = rsmp_template.assign({f'{var}_max': template_copy[var]})
+  for var in sum_vars:
+    rsmp_template = rsmp_template.assign({f'{var}_sum': template_copy[var]})
 
   # We've changed ds (e.g. dropped vars), so the dims may have changed.
   # Therefore, input_chunks may no longer be valid.
@@ -383,6 +430,7 @@ def main(argv: abc.Sequence[str]) -> None:
                 mean_vars=mean_vars,
                 min_vars=min_vars,
                 max_vars=max_vars,
+                sum_vars=sum_vars,
                 add_mean_suffix=ADD_MEAN_SUFFIX.value,
                 skipna=SKIPNA.value,
             )
