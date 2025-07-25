@@ -295,6 +295,11 @@ REALIZATION_NAME = flags.DEFINE_string(
 )
 
 # Computing choices.
+MAX_MEM = flags.DEFINE_integer(
+    'max_mem',
+    2**30,
+    help='Maximum memory (in bytes) during rechunking.',
+)
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads',
     None,
@@ -756,6 +761,9 @@ def _emit_sampled_weather(
     values: dict[
         str, t.Union[list[tuple[xbeam.Key, xr.Dataset]], list[dict[str, t.Any]]]
     ],
+    add_source_time: bool | None = None,
+    time_dim: str | None = None,
+    realization_name: str | None = None,
 ) -> t.Iterable[tuple[xbeam.Key, xr.Dataset]]:
   """Scatters one dataset to multiple init times and timedeltas.
 
@@ -768,6 +776,9 @@ def _emit_sampled_weather(
   Yields:
     Tuples of keys and Dataset chunks to use in an xbeam pipeline.
   """
+  if add_source_time is None or time_dim is None or realization_name is None:
+    raise ValueError('Must provide values for these inputs')
+
   # We should encounter one and only one (xbeam.key, Dataset) in values.
   if len(values['dataset_in_chunks']) != 1:
     raise AssertionError(
@@ -784,17 +795,17 @@ def _emit_sampled_weather(
     info = info.copy()
     output_ds = ds.copy()
     sampled_time_value = info.pop('sampled_time_value')
-    if ADD_SOURCE_TIME.value:
+    if add_source_time:
       output_ds[SOURCE_TIME] = xr.DataArray(
           # Insert as a DataArray, which lets us assign the proper dims.
           [sampled_time_value],
-          dims=TIME_DIM.value,
-          coords={TIME_DIM.value: ds[TIME_DIM.value]},
+          dims=time_dim,
+          coords={time_dim: ds[time_dim]},
       )
     output_ds = (
         output_ds.expand_dims({DELTA: [info.pop('timedelta_value')]})
-        .assign_coords({TIME_DIM.value: [info.pop('output_init_time_value')]})
-        .expand_dims({REALIZATION_NAME.value: [info[REALIZATION_NAME.value]]})
+        .assign_coords({time_dim: [info.pop('output_init_time_value')]})
+        .expand_dims({realization_name: [info[realization_name]]})
     )
     assert isinstance(xbeam_key, xbeam.Key), xbeam_key  # To satisfy pytype.
     yield xbeam_key.with_offsets(**info), output_ds
@@ -899,13 +910,18 @@ def main(argv: abc.Sequence[str]) -> None:
       axis=-1,
   ).reshape(-1, 2)
 
-  def make_index_info(timedelta: np.ndarray, timedelta_offset: int):
+  def make_index_info(
+      timedelta: np.ndarray,
+      timedelta_offset: int,
+      time_dim: str,
+      realization_name: str,
+  ):
     """Information about where a particular dataset should be scattered to."""
     return (
         {
             'timedelta_value': timedelta,
-            TIME_DIM.value: int(offset[0]),
-            REALIZATION_NAME.value: int(offset[1]),
+            time_dim: int(offset[0]),
+            realization_name: int(offset[1]),
             DELTA: timedelta_offset,
         }
         for offset in init_time_offsets
@@ -945,6 +961,10 @@ def main(argv: abc.Sequence[str]) -> None:
 
   itemsize = max(var.dtype.itemsize for var in template.values())
 
+  # Extract flags here, to avoid accessing in a lambda in a DoFn.
+  time_dim = TIME_DIM.value
+  realization_name = REALIZATION_NAME.value
+
   # TODO(langmore) Consider writing this as a "gather" into destination chunks,
   # rather than "scatter" from source chunks. This is potentially much less
   # expensive, because you can avoid two intermediate shuffles.
@@ -957,7 +977,12 @@ def main(argv: abc.Sequence[str]) -> None:
             lambda timedelta_offset, timedelta: zip(
                 sampled_times_for_timedelta(timedelta),
                 ensemble_of_output_init_times,
-                make_index_info(timedelta, timedelta_offset),
+                make_index_info(
+                    timedelta,
+                    timedelta_offset,
+                    time_dim,
+                    realization_name,
+                ),
             )
         )
         | 'KeyBySampledTimeAndAssembleIndexInfo'
@@ -988,7 +1013,7 @@ def main(argv: abc.Sequence[str]) -> None:
         | 'KeyByInputTime'
         >> beam.MapTuple(
             lambda xbeam_key, ds: (
-                str(ds[TIME_DIM.value].data[0]),
+                str(ds[time_dim].data[0]),
                 (xbeam_key, ds),
             )
         )
@@ -1000,7 +1025,13 @@ def main(argv: abc.Sequence[str]) -> None:
             'time_key_and_index_info': time_key_and_index_info,
         }
         | beam.CoGroupByKey()
-        | 'ScatterInputDataset' >> beam.FlatMapTuple(_emit_sampled_weather)
+        | 'ScatterInputDataset'
+        >> beam.FlatMapTuple(
+            _emit_sampled_weather,
+            add_source_time=ADD_SOURCE_TIME.value,
+            time_dim=TIME_DIM.value,
+            realization_name=REALIZATION_NAME.value,
+        )
         | 'RechunkToOutputChunks'
         >> xbeam.Rechunk(
             # Intermediate rechunk necessary since input/output chunks are
@@ -1009,6 +1040,7 @@ def main(argv: abc.Sequence[str]) -> None:
             done_working_chunks,
             output_chunks,
             itemsize=itemsize,
+            max_mem=MAX_MEM.value,
         )
         | xbeam.ChunksToZarr(
             OUTPUT_PATH.value,
