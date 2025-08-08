@@ -22,7 +22,7 @@ Example Usage:
   export PROJECT=my-project
   export REGION=us-central1
 
-  python scripts/resample_in_time.py \
+  python scripts/slice_dataset.py \
     --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
     --output_path=gs://$BUCKET/datasets/era5/$USER/2020-2021-weekly-average-temperature.zarr \
     --runner=DataflowRunner \
@@ -69,6 +69,7 @@ SEL = flag_utils.DEFINE_dim_value_pairs(
         'but falls back to string. '
     ),
 )
+flags.declare_key_flag('sel')  # To make it appear with --help or --helpshort
 
 SEL_STRINGS = flag_utils.DEFINE_dim_value_pairs(
     'sel_strings',
@@ -83,6 +84,7 @@ SEL_STRINGS = flag_utils.DEFINE_dim_value_pairs(
         'Useful, since years should be sliced using strings like "2000". '
     ),
 )
+flags.declare_key_flag('sel_strings')
 
 ISEL = flag_utils.DEFINE_dim_value_pairs(
     'isel',
@@ -95,6 +97,7 @@ ISEL = flag_utils.DEFINE_dim_value_pairs(
         'a list of "+" delimited ints.'
     ),
 )
+flags.declare_key_flag('isel')
 
 DROP_SEL = flag_utils.DEFINE_dim_value_pairs(
     'drop_sel',
@@ -109,6 +112,7 @@ DROP_SEL = flag_utils.DEFINE_dim_value_pairs(
         'but falls back to string. '
     ),
 )
+flags.declare_key_flag('drop_sel')
 
 DROP_SEL_STRINGS = flag_utils.DEFINE_dim_value_pairs(
     'drop_sel_strings',
@@ -123,6 +127,7 @@ DROP_SEL_STRINGS = flag_utils.DEFINE_dim_value_pairs(
         'Useful, since years should be sliced using strings like "2000". '
     ),
 )
+flags.declare_key_flag('drop_sel_strings')
 
 DROP_ISEL = flag_utils.DEFINE_dim_value_pairs(
     'drop_isel',
@@ -135,6 +140,7 @@ DROP_ISEL = flag_utils.DEFINE_dim_value_pairs(
         'a list of "+" delimited ints.'
     ),
 )
+flags.declare_key_flag('drop_isel')
 
 DROP_VARIABLES = flags.DEFINE_list(
     'drop_variables',
@@ -157,6 +163,7 @@ KEEP_VARIABLES = flags.DEFINE_list(
 OUTPUT_CHUNKS = flag_utils.DEFINE_chunks(
     'output_chunks', '', help='Chunk sizes overriding input chunks.'
 )
+flags.declare_key_flag('output_chunks')
 
 RUNNER = flags.DEFINE_string(
     'runner', None, help='Beam runner. Use DirectRunner for local execution.'
@@ -166,6 +173,11 @@ MAKE_DIMS_INCREASING = flags.DEFINE_list(
     [],
     help='Dimensions to make increasing, reversing order if needed.',
 )
+MAX_MEM = flags.DEFINE_integer(
+    'max_mem',
+    2**30,
+    help='Maximum memory (in bytes) during rechunking.',
+)
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads',
     None,
@@ -173,6 +185,13 @@ NUM_THREADS = flags.DEFINE_integer(
 )
 
 # pylint: disable=logging-fstring-interpolation
+
+
+def _assert_nonzero_sizes(sizes: dict[str, int]) -> None:
+  """Asserts every value (which should be a size) is nonzero."""
+  for k, v in sizes.items():
+    if v == 0:
+      raise ValueError(f'Size for {k} is not allowed: {v}')
 
 
 def _maybe_make_some_dims_increasing(ds: xr.Dataset) -> xr.Dataset:
@@ -280,6 +299,9 @@ def main(argv: abc.Sequence[str]) -> None:
     else:
       output_chunks[k] = min(output_chunks[k], ds.sizes[k])
 
+  _assert_nonzero_sizes(ds.sizes)
+  _assert_nonzero_sizes(output_chunks)
+
   itemsize = max(var.dtype.itemsize for var in template.values())
 
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
@@ -294,6 +316,7 @@ def main(argv: abc.Sequence[str]) -> None:
             input_chunks,
             output_chunks,
             itemsize=itemsize,
+            max_mem=MAX_MEM.value,
         )
         | xbeam.ChunksToZarr(
             OUTPUT_PATH.value,

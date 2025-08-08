@@ -133,9 +133,9 @@ NUM_THREADS = flags.DEFINE_integer(
 RUNNER = flags.DEFINE_string('runner', None, 'beam.runners.Runner')
 
 
-def _get_preserve_dims(ds: xr.Dataset) -> set[t.Hashable]:
+def _get_preserve_dims(ds: xr.Dataset, dim: list[str]) -> set[t.Hashable]:
   """Dims in ds that are preserved."""
-  return set([d for d in ds.dims if d not in DIM.value])
+  return set([d for d in ds.dims if d not in dim])
 
 
 def _impose_data_selection(
@@ -156,31 +156,46 @@ def _impose_data_selection(
 
 
 def evaluate_chunk(
-    key: xbeam.Key, chunk: xr.Dataset
+    key: xbeam.Key,
+    chunk: xr.Dataset,
+    dim: t.Optional[list[str]] = None,
+    quantiles: t.Optional[list[float]] = None,
+    skipna: t.Optional[bool] = None,
+    name_suffix: t.Optional[str] = None,
 ) -> tuple[xbeam.Key, xr.Dataset]:
-  new_chunk = _evaluate_chunk_core(chunk)
+  """Compute quantiles and modifiy key for one chunk."""
+  if dim is None or quantiles is None or skipna is None or name_suffix is None:
+    raise AssertionError(
+        f'Side inputs must have defaults, but must be defined at runtime.'
+    )
+  new_chunk = _evaluate_chunk_core(chunk, dim, quantiles, skipna, name_suffix)
   new_key = key.with_offsets(
       **{k: None for k in key.offsets if k not in new_chunk.dims}
   )
   return new_key, new_chunk
 
 
-def _evaluate_chunk_core(chunk: xr.Dataset) -> xr.Dataset:
+def _evaluate_chunk_core(
+    chunk: xr.Dataset,
+    dim: list[str],
+    quantiles: list[float],
+    skipna: bool,
+    name_suffix: str,
+) -> xr.Dataset:
   """Implementation of evaluate_chunk that doesn't use a key."""
-  preserve_dims = _get_preserve_dims(chunk)
+  preserve_dims = _get_preserve_dims(chunk, dim)
   if not preserve_dims.issubset(set(chunk.dims)):
     raise ValueError(
-        f'User specified {DIM.value=}, which results in preserved dims'
+        f'User specified {dim=}, which results in preserved dims'
         f' {preserve_dims} , not being a subset of {set(chunk.dims)=}'
     )
 
-  quantiles = [float(q) for q in QUANTILES.value]
   if any(q < 0 or q > 1 for q in quantiles):
     raise ValueError(
         f'Expected all quantiles to be in [0, 1]. Found {quantiles=}'
     )
-  values = chunk.quantile(quantiles, dim=DIM.value, skipna=SKIPNA.value)
-  return values.rename_vars({v: v + NAME_SUFFIX.value for v in values})
+  values = chunk.quantile(quantiles, dim=dim, skipna=skipna)
+  return values.rename_vars({v: v + name_suffix for v in values})
 
 
 def main(argv: list[str]) -> None:
@@ -188,7 +203,7 @@ def main(argv: list[str]) -> None:
       *xbeam.open_zarr(INPUT_PATH.value)
   )
 
-  preserve_dims = _get_preserve_dims(source_ds)
+  preserve_dims = _get_preserve_dims(source_ds, DIM.value)
 
   if not set(WORKING_CHUNKS.value).issubset(preserve_dims):
     raise flags.IllegalFlagValueError(
@@ -208,9 +223,17 @@ def main(argv: list[str]) -> None:
   }
   output_chunks.setdefault('quantile', -1)
 
+  quantiles = [float(q) for q in QUANTILES.value]
+
   # Make the template by evaluation (which reduces to produce a dataset with
   # correct output dims).
-  template = _evaluate_chunk_core(xbeam.make_template(source_ds))
+  template = _evaluate_chunk_core(
+      xbeam.make_template(source_ds),
+      DIM.value,
+      quantiles,
+      SKIPNA.value,
+      NAME_SUFFIX.value,
+  )
 
   output_chunks = {
       # The template may be smaller than output_chunks.
@@ -238,7 +261,14 @@ def main(argv: list[str]) -> None:
             working_chunks,
             itemsize=itemsize,
         )
-        | 'Compute_nan_fraction' >> beam.MapTuple(evaluate_chunk)
+        | 'ComputeQuantiles'
+        >> beam.MapTuple(
+            evaluate_chunk,
+            dim=DIM.value,
+            quantiles=quantiles,
+            skipna=SKIPNA.value,
+            name_suffix=NAME_SUFFIX.value,
+        )
         | 'RechunkToOutputChunks'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
             template.sizes,

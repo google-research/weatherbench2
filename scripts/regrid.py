@@ -54,6 +54,7 @@ OUTPUT_PATH = flags.DEFINE_string('output_path', None, help='zarr outputs')
 OUTPUT_CHUNKS = flag_utils.DEFINE_chunks(
     'output_chunks', '', help='desired chunking of output zarr'
 )
+flags.declare_key_flag('output_chunks')
 LATITUDE_NODES = flags.DEFINE_integer(
     'latitude_nodes', None, help='number of desired latitude nodes'
 )
@@ -73,6 +74,8 @@ LONGITUDE_SCHEME = flags.DEFINE_enum_class(
     help=(
         'What values the output longitude dimension will have. With Δ = 360 /'
         ' LONGITUDE_NODES, "START_AT_ZERO" means longitude=[0, ..., 360 - Δ].'
+        ' "START_AT_NEGATIVE_ONE_EIGHTY" means '
+        'longitude=[-180, -180 + Δ, ..., 180 - Δ].'
         ' "CENTER_AT_ZERO" means longitude=[-180 + Δ/2, ..., 180 - Δ/2]'
     ),
 )
@@ -87,6 +90,11 @@ LATITUDE_NAME = flags.DEFINE_string(
 )
 LONGITUDE_NAME = flags.DEFINE_string(
     'longitude_name', 'longitude', help='Name of longitude dimension in dataset'
+)
+MAX_MEM = flags.DEFINE_integer(
+    'max_mem',
+    2**30,
+    help='Maximum memory (in bytes) during rechunking.',
 )
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads',
@@ -161,6 +169,7 @@ def main(argv):
             input_chunks,
             output_chunks,
             itemsize=itemsize,
+            max_mem=MAX_MEM.value,
         )
         | xarray_beam.ChunksToZarr(
             OUTPUT_PATH.value,

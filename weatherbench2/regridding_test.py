@@ -32,11 +32,13 @@ def _maybe_roll_longitude(
   if current == longitude_scheme:
     return ds
 
+  mid = ds.sizes['longitude'] // 2
+  lon_delta = np.diff(ds.longitude)[0]
+
   if (
       current == LongitudeScheme.START_AT_ZERO
       and longitude_scheme == LongitudeScheme.CENTER_AT_ZERO
   ):
-    mid = ds.sizes['longitude'] // 2
     ds['longitude'] = xr.where(
         ds.longitude < ds.longitude[mid], ds.longitude, -(360 - ds.longitude)
     )
@@ -45,10 +47,33 @@ def _maybe_roll_longitude(
       current == LongitudeScheme.CENTER_AT_ZERO
       and longitude_scheme == LongitudeScheme.START_AT_ZERO
   ):
-    mid = ds.sizes['longitude'] // 2
     ds['longitude'] = xr.where(
         ds.longitude >= 0, ds.longitude, 180 - ds.longitude
     )
+    return ds.roll(longitude=mid, roll_coords=True)
+  elif (
+      current == LongitudeScheme.CENTER_AT_ZERO
+      and longitude_scheme == LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY
+  ):
+    ds['longitude'] = ds['longitude'] - lon_delta / 2
+    return ds
+  elif (
+      current == LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY
+      and longitude_scheme == LongitudeScheme.CENTER_AT_ZERO
+  ):
+    ds['longitude'] = ds['longitude'] + lon_delta / 2
+    return ds
+  elif (
+      current == LongitudeScheme.START_AT_ZERO
+      and longitude_scheme == LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY
+  ):
+    ds['longitude'] = ds['longitude'] - 180
+    return ds.roll(longitude=-mid, roll_coords=True)
+  elif (
+      current == LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY
+      and longitude_scheme == LongitudeScheme.START_AT_ZERO
+  ):
+    ds['longitude'] = ds['longitude'] + 180
     return ds.roll(longitude=mid, roll_coords=True)
   else:
     raise ValueError(
@@ -59,6 +84,31 @@ def _maybe_roll_longitude(
 class RegriddingTest(parameterized.TestCase):
 
   @parameterized.parameters(
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY,
+          target_lon_scheme=LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY,
+          target_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY,
+          target_lon_scheme=LongitudeScheme.START_AT_ZERO,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lon_scheme=LongitudeScheme.START_AT_ZERO,
+          target_lon_scheme=LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY,
+      ),
       dict(
           regridder_cls=regridding.ConservativeRegridder,
           source_lon_scheme=LongitudeScheme.CENTER_AT_ZERO,
