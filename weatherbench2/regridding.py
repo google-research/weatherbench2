@@ -48,6 +48,9 @@ class LongitudeScheme(enum.Enum):
   # [-180 + Δ/2, ..., 180 - Δ/2]
   CENTER_AT_ZERO = enum.auto()
 
+  # [-180, -180 + Δ, ..., 180 - Δ]
+  START_AT_NEGATIVE_ONE_EIGHTY = enum.auto()
+
 
 class LatitudeSpacing(enum.Enum):
   EQUIANGULAR_WITH_POLES = enum.auto()
@@ -73,6 +76,9 @@ def longitude_values(longitude_scheme: LongitudeScheme, num: int) -> np.ndarray:
   if longitude_scheme == LongitudeScheme.START_AT_ZERO:
     lon_start = 0
     lon_stop = 360 - lon_delta
+  elif longitude_scheme == LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY:
+    lon_start = -180
+    lon_stop = 180 - lon_delta
   elif longitude_scheme == LongitudeScheme.CENTER_AT_ZERO:
     lon_start = -180 + lon_delta / 2
     lon_stop = 180 - lon_delta / 2
@@ -175,6 +181,8 @@ def _determine_longitude_scheme(
   eq = lambda a, b: np.allclose(a, b, atol=1e-5)
   if eq(lon_in_degrees[0], 0) and lon_in_degrees[-1] < 360:
     return LongitudeScheme.START_AT_ZERO
+  elif eq(lon_in_degrees[0], -180) and lon_in_degrees[-1] < 180:
+    return LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY
   elif lon_in_degrees[0] < 0 and eq(-lon_in_degrees[0], lon_in_degrees[-1]):
     return LongitudeScheme.CENTER_AT_ZERO
   else:

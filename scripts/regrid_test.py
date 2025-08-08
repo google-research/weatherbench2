@@ -33,7 +33,7 @@ class RegridTest(parameterized.TestCase):
       dict(
           input_longitude_scheme=LongitudeScheme.CENTER_AT_ZERO,
           input_latitude_spacing=LatitudeSpacing.EQUIANGULAR_WITHOUT_POLES,
-          output_longitude_scheme=LongitudeScheme.START_AT_ZERO,
+          output_longitude_scheme=LongitudeScheme.START_AT_NEGATIVE_ONE_EIGHTY,
           output_latitude_spacing=LatitudeSpacing.EQUIANGULAR_WITH_POLES,
       ),
       dict(

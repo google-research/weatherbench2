@@ -100,6 +100,7 @@ import xarray as xr
 import xarray_beam as xbeam
 
 REALIZATION = 'realization'
+PREDICTION_TIMEDELTA = 'prediction_timedelta'
 
 
 # Paths
@@ -285,16 +286,27 @@ OUTPUT_CHUNKS = flag_utils.DEFINE_chunks(
         'Chunk sizes for output. Values here override input chunk values. This'
         ' could be useful if FORECAST_DURATION is very long or ENSEMBLE_SIZE is'
         ' large. The default is the input chunk sizes, and -1 for both the'
-        ' DELTA and REALIZATION dims.'
+        ' TIMEDELTA and REALIZATION dims.'
     ),
 )
+flags.declare_key_flag('output_chunks')  # So flag shows up in --help
 REALIZATION_NAME = flags.DEFINE_string(
     'realization_name',
     REALIZATION,
-    'Name of realization/member/number dimension.',
+    help='Name of realization/member/number dimension.',
+)
+TIMEDELTA_NAME = flags.DEFINE_string(
+    'timedelta_name',
+    PREDICTION_TIMEDELTA,
+    help='Name of the lead time dimension.',
 )
 
 # Computing choices.
+MAX_MEM = flags.DEFINE_integer(
+    'max_mem',
+    2**30,
+    help='Maximum memory (in bytes) during rechunking.',
+)
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads',
     None,
@@ -305,9 +317,6 @@ RUNNER = flags.DEFINE_string(
     None,
     help='beam.runners.Runner',
 )
-
-# Names for coordinates on output dataset.
-DELTA = 'prediction_timedelta'
 
 ONE_DAY = pd.Timedelta('1d')
 
@@ -756,6 +765,10 @@ def _emit_sampled_weather(
     values: dict[
         str, t.Union[list[tuple[xbeam.Key, xr.Dataset]], list[dict[str, t.Any]]]
     ],
+    add_source_time: bool | None = None,
+    time_dim: str | None = None,
+    realization_name: str | None = None,
+    timedelta_name: str | None = None,
 ) -> t.Iterable[tuple[xbeam.Key, xr.Dataset]]:
   """Scatters one dataset to multiple init times and timedeltas.
 
@@ -764,10 +777,17 @@ def _emit_sampled_weather(
       Dataset.
     values: Dictionary with keys "dataset_in_chunks" and
       "time_key_and_index_info"
+    add_source_time: Whether a variable with source_time will be added.
+    time_dim: Dimension in input indexing time.
+    realization_name: Dimension in output indexing realization.
+    timedelta_name: Dimension in output indexing lead time.
 
   Yields:
     Tuples of keys and Dataset chunks to use in an xbeam pipeline.
   """
+  if add_source_time is None or time_dim is None or realization_name is None:
+    raise ValueError('Must provide values for these inputs')
+
   # We should encounter one and only one (xbeam.key, Dataset) in values.
   if len(values['dataset_in_chunks']) != 1:
     raise AssertionError(
@@ -784,17 +804,17 @@ def _emit_sampled_weather(
     info = info.copy()
     output_ds = ds.copy()
     sampled_time_value = info.pop('sampled_time_value')
-    if ADD_SOURCE_TIME.value:
+    if add_source_time:
       output_ds[SOURCE_TIME] = xr.DataArray(
           # Insert as a DataArray, which lets us assign the proper dims.
           [sampled_time_value],
-          dims=TIME_DIM.value,
-          coords={TIME_DIM.value: ds[TIME_DIM.value]},
+          dims=time_dim,
+          coords={time_dim: ds[time_dim]},
       )
     output_ds = (
-        output_ds.expand_dims({DELTA: [info.pop('timedelta_value')]})
-        .assign_coords({TIME_DIM.value: [info.pop('output_init_time_value')]})
-        .expand_dims({REALIZATION_NAME.value: [info[REALIZATION_NAME.value]]})
+        output_ds.expand_dims({timedelta_name: [info.pop('timedelta_value')]})
+        .assign_coords({time_dim: [info.pop('output_init_time_value')]})
+        .expand_dims({realization_name: [info[realization_name]]})
     )
     assert isinstance(xbeam_key, xbeam.Key), xbeam_key  # To satisfy pytype.
     yield xbeam_key.with_offsets(**info), output_ds
@@ -830,8 +850,10 @@ def main(argv: abc.Sequence[str]) -> None:
       '0 days', FORECAST_DURATION.value, freq=TIMEDELTA_SPACING.value
   )
   assert isinstance(input_ds, xr.Dataset)  # To satisfy pytype.
-  if DELTA in input_ds.dims:
-    raise ValueError(f'INPUT_PATH data already had {DELTA} as a dimension')
+  if TIMEDELTA_NAME.value in input_ds.dims:
+    raise ValueError(
+        f'INPUT_PATH data already had {TIMEDELTA_NAME.value} as a dimension'
+    )
 
   sampled_init_times = _get_sampled_init_times(
       # _get_sampled_init_times returns shape [ensemble_size, n_times] array of
@@ -885,7 +907,7 @@ def main(argv: abc.Sequence[str]) -> None:
       xbeam.make_template(input_ds)
       .isel({TIME_DIM.value: 0}, drop=True)
       .expand_dims({TIME_DIM.value: output_init_times})
-      .expand_dims({DELTA: timedeltas})
+      .expand_dims({TIMEDELTA_NAME.value: timedeltas})
       .expand_dims({REALIZATION_NAME.value: np.arange(ensemble_size)})
   )
 
@@ -899,14 +921,20 @@ def main(argv: abc.Sequence[str]) -> None:
       axis=-1,
   ).reshape(-1, 2)
 
-  def make_index_info(timedelta: np.ndarray, timedelta_offset: int):
+  def make_index_info(
+      timedelta: np.ndarray,
+      timedelta_offset: int,
+      time_dim: str,
+      realization_name: str,
+      timedelta_name: str,
+  ):
     """Information about where a particular dataset should be scattered to."""
     return (
         {
             'timedelta_value': timedelta,
-            TIME_DIM.value: int(offset[0]),
-            REALIZATION_NAME.value: int(offset[1]),
-            DELTA: timedelta_offset,
+            time_dim: int(offset[0]),
+            realization_name: int(offset[1]),
+            timedelta_name: timedelta_offset,
         }
         for offset in init_time_offsets
     )
@@ -927,7 +955,7 @@ def main(argv: abc.Sequence[str]) -> None:
   done_working_chunks.update(
       {
           REALIZATION_NAME.value: 1,
-          DELTA: 1,
+          TIMEDELTA_NAME.value: 1,
       }
   )  # fmt: skip
 
@@ -935,7 +963,7 @@ def main(argv: abc.Sequence[str]) -> None:
   output_chunks.update(
       {
           REALIZATION_NAME.value: -1,
-          DELTA: -1,
+          TIMEDELTA_NAME.value: -1,
       }
   )  # fmt: skip
   output_chunks.update(OUTPUT_CHUNKS.value)
@@ -944,6 +972,11 @@ def main(argv: abc.Sequence[str]) -> None:
   }
 
   itemsize = max(var.dtype.itemsize for var in template.values())
+
+  # Extract flags here, to avoid accessing in a lambda in a DoFn.
+  time_dim = TIME_DIM.value
+  realization_name = REALIZATION_NAME.value
+  timedelta_name = TIMEDELTA_NAME.value
 
   # TODO(langmore) Consider writing this as a "gather" into destination chunks,
   # rather than "scatter" from source chunks. This is potentially much less
@@ -957,7 +990,13 @@ def main(argv: abc.Sequence[str]) -> None:
             lambda timedelta_offset, timedelta: zip(
                 sampled_times_for_timedelta(timedelta),
                 ensemble_of_output_init_times,
-                make_index_info(timedelta, timedelta_offset),
+                make_index_info(
+                    timedelta,
+                    timedelta_offset,
+                    time_dim,
+                    realization_name,
+                    timedelta_name,
+                ),
             )
         )
         | 'KeyBySampledTimeAndAssembleIndexInfo'
@@ -988,7 +1027,7 @@ def main(argv: abc.Sequence[str]) -> None:
         | 'KeyByInputTime'
         >> beam.MapTuple(
             lambda xbeam_key, ds: (
-                str(ds[TIME_DIM.value].data[0]),
+                str(ds[time_dim].data[0]),
                 (xbeam_key, ds),
             )
         )
@@ -1000,7 +1039,14 @@ def main(argv: abc.Sequence[str]) -> None:
             'time_key_and_index_info': time_key_and_index_info,
         }
         | beam.CoGroupByKey()
-        | 'ScatterInputDataset' >> beam.FlatMapTuple(_emit_sampled_weather)
+        | 'ScatterInputDataset'
+        >> beam.FlatMapTuple(
+            _emit_sampled_weather,
+            add_source_time=ADD_SOURCE_TIME.value,
+            time_dim=TIME_DIM.value,
+            realization_name=REALIZATION_NAME.value,
+            timedelta_name=TIMEDELTA_NAME.value,
+        )
         | 'RechunkToOutputChunks'
         >> xbeam.Rechunk(
             # Intermediate rechunk necessary since input/output chunks are
@@ -1009,6 +1055,7 @@ def main(argv: abc.Sequence[str]) -> None:
             done_working_chunks,
             output_chunks,
             itemsize=itemsize,
+            max_mem=MAX_MEM.value,
         )
         | xbeam.ChunksToZarr(
             OUTPUT_PATH.value,

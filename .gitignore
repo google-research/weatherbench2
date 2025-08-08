@@ -10,3 +10,6 @@ docs/*.zarr
 __pycache__
 .pytest_cache
 *swp
+.venv*
+.direnv
+.envrc
