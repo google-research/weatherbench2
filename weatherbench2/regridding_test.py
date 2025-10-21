@@ -17,8 +17,22 @@ import numpy as np
 from weatherbench2 import regridding
 import xarray as xr
 
-LatitudeSpacing = regridding.LatitudeSpacing
+
 LongitudeScheme = regridding.LongitudeScheme
+LatitudeSpacing = regridding.LatitudeSpacing
+
+
+def infer_longitude_scheme(
+    lon_in_degrees: np.ndarray,
+) -> LongitudeScheme:
+  """Determine longitude scheme."""
+  eq = lambda a, b: np.allclose(a, b, atol=1e-5)
+  if eq(lon_in_degrees[0], 0) and lon_in_degrees[-1] < 360:
+    return LongitudeScheme.START_AT_ZERO
+  elif lon_in_degrees[0] < 0 and eq(-lon_in_degrees[0], lon_in_degrees[-1]):
+    return LongitudeScheme.CENTER_AT_ZERO
+  else:
+    raise ValueError(f'Unknown longitude scheme for {lon_in_degrees=}')
 
 
 def _maybe_roll_longitude(
@@ -26,9 +40,7 @@ def _maybe_roll_longitude(
 ) -> xr.Dataset:
   """Rolls longitude to approximate longitude_scheme."""
   ds = ds.copy()
-  current = regridding._determine_longitude_scheme(
-      np.deg2rad(ds.longitude.data),
-  )
+  current = infer_longitude_scheme(ds.longitude.data)
   if current == longitude_scheme:
     return ds
 
@@ -112,6 +124,16 @@ class RegriddingTest(parameterized.TestCase):
           source_lat_spacing=LatitudeSpacing.EQUIANGULAR_WITHOUT_POLES,
           target_lat_spacing=LatitudeSpacing.EQUIANGULAR_WITH_POLES,
       ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lat_spacing=LatitudeSpacing.CUSTOM,
+          target_lat_spacing=LatitudeSpacing.CUSTOM,
+      ),
+      dict(
+          regridder_cls=regridding.ConservativeRegridder,
+          source_lat_spacing=LatitudeSpacing.EQUIANGULAR_WITHOUT_POLES,
+          target_lat_spacing=LatitudeSpacing.CUSTOM,
+      ),
   )
   def test_coarse_grid_interpolates(
       self,
@@ -128,6 +150,12 @@ class RegriddingTest(parameterized.TestCase):
     #  below.
     n_lats = 32
     n_lons = 64
+
+    if source_lat_spacing == LatitudeSpacing.CUSTOM:
+      source_latitude = np.linspace(-87.5, 87.5, n_lats)
+    else:
+      source_latitude = regridding.latitude_values(source_lat_spacing, n_lats)
+
     source = xr.Dataset(
         {
             'X': xr.DataArray(
@@ -138,7 +166,7 @@ class RegriddingTest(parameterized.TestCase):
         },
         coords=dict(
             time=[np.datetime64('2000-01-01T00')],
-            latitude=regridding.latitude_values(source_lat_spacing, n_lats),
+            latitude=source_latitude,
             longitude=regridding.longitude_values(source_lon_scheme, n_lons),
         ),
     )
@@ -146,23 +174,18 @@ class RegriddingTest(parameterized.TestCase):
     phi = 2 * np.pi * (source.latitude - 90) / 180
     source += np.sin(phi) * (np.cos(theta) ** 2 + np.sin(theta))
 
-    # Test the "determine" functions.
-    self.assertEqual(
-        regridding._determine_latitude_spacing(np.deg2rad(source.latitude)),
-        source_lat_spacing,
-    )
-    self.assertEqual(
-        regridding._determine_longitude_scheme(np.deg2rad(source.longitude)),
-        source_lon_scheme,
-    )
-
     reduce_factor = 2
 
     # Get approximate target values just by choosing nearest values in source.
-    regridded_latitude = regridding.latitude_values(
-        target_lat_spacing,
-        source.sizes['latitude'] // reduce_factor,
-    )
+    if target_lat_spacing == LatitudeSpacing.CUSTOM:
+      regridded_latitude = np.linspace(
+          -87.5, 87.5, source.sizes['latitude'] // reduce_factor
+      )
+    else:
+      regridded_latitude = regridding.latitude_values(
+          target_lat_spacing,
+          source.sizes['latitude'] // reduce_factor,
+      )
     regridded_longitude = regridding.longitude_values(
         target_lon_scheme,
         source.sizes['longitude'] // reduce_factor,
@@ -192,23 +215,26 @@ class RegriddingTest(parameterized.TestCase):
         .max()
     )
 
-    source_grid = regridding.Grid.from_degrees(
-        lon=source.longitude.data,
-        lat=source.latitude.data,
+    source_grid = regridding.Grid(
+        longitudes=source.longitude.data,
+        latitudes=source.latitude.data,
+        includes_poles=True,
+        periodic=True,
     )
-    target_grid = regridding.Grid.from_degrees(
-        lon=regridded_longitude,
-        lat=regridded_latitude,
+    target_grid = regridding.Grid(
+        longitudes=regridded_longitude,
+        latitudes=regridded_latitude,
+        includes_poles=True,
+        periodic=True,
     )
     regridder = regridder_cls(source_grid, target_grid)
 
     regridded_ds = regridder.regrid_dataset(source)
-
-    np.testing.assert_equal(regridded_latitude, regridded_ds.latitude)
-    np.testing.assert_equal(regridded_longitude, regridded_ds.longitude)
     self.assertTrue(np.all(np.isfinite(regridded_ds.X)))
 
-    if source_lon_scheme == target_lon_scheme:
+    if target_lat_spacing == LatitudeSpacing.CUSTOM:
+      min_frac_obeying_bounds = 0.97
+    elif source_lon_scheme == target_lon_scheme:
       min_frac_obeying_bounds = 0.99
     else:
       min_frac_obeying_bounds = 0.5
@@ -224,8 +250,8 @@ class RegriddingTest(parameterized.TestCase):
     )
 
   def test_conservative_latitude_weights(self):
-    source_lat = np.pi / 180 * np.array([-75, -45, -15, 15, 45, 75])
-    target_lat = np.pi / 180 * np.array([-45, 45])
+    source_lat = np.array([-75, -45, -15, 15, 45, 75])
+    target_lat = np.array([-45, 45])
     # from Wolfram alpha:
     # integral of cos(x) from 0*pi/6 to 1*pi/6 -> 0.5
     # integral of cos(x) from 1*pi/6 to 2*pi/6 -> (sqrt(3) - 1) / 2
@@ -236,7 +262,12 @@ class RegriddingTest(parameterized.TestCase):
             [0, 0, 0, 1 / 2, (np.sqrt(3) - 1) / 2, 1 - np.sqrt(3) / 2],
         ]
     )  # fmt: skip
-    actual = regridding._conservative_latitude_weights(source_lat, target_lat)
+    actual = regridding._conservative_latitude_weights(
+        source_lat,
+        target_lat,
+        source_includes_poles=True,
+        target_includes_poles=True,
+    )
     np.testing.assert_almost_equal(expected, actual)
 
   @parameterized.parameters(
@@ -252,8 +283,8 @@ class RegriddingTest(parameterized.TestCase):
     self.assertEqual(actual, expected)
 
   def test_conservative_longitude_weights_same_branch(self):
-    source_lon = np.pi / 180 * np.array([0, 60, 120, 180, 240, 300])
-    target_lon = np.pi / 180 * np.array([0, 90, 180, 270])
+    source_lon = np.array([0, 60, 120, 180, 240, 300])
+    target_lon = np.array([0, 90, 180, 270])
     expected = (
         np.array(
             [
@@ -265,15 +296,120 @@ class RegriddingTest(parameterized.TestCase):
         )
         / 6
     )  # fmt: skip
-    actual = regridding._conservative_longitude_weights(source_lon, target_lon)
+    actual = regridding._conservative_longitude_weights(
+        source_lon, target_lon, source_periodic=True, target_periodic=True
+    )
     np.testing.assert_allclose(expected, actual, atol=1e-5)
 
   def test_conservative_longitude_weights_different_branch(self):
-    source_lon = np.pi / 180 * np.array([90, 180, 270, 360])
-    target_lon = np.pi / 180 * np.array([-270, -180, -90, 0])
+    source_lon = np.array([90, 180, 270, 360])
+    target_lon = np.array([-270, -180, -90, 0])
     expected = np.eye(4)
-    actual = regridding._conservative_longitude_weights(source_lon, target_lon)
+    actual = regridding._conservative_longitude_weights(
+        source_lon, target_lon, source_periodic=True, target_periodic=True
+    )
     np.testing.assert_allclose(expected, actual, atol=1e-5)
+
+  def test_conservative_regridding_extrapolation(self):
+    source_grid = regridding.Grid(
+        longitudes=np.array([1, 3, 5]),
+        latitudes=np.array([1, 3]),
+        includes_poles=False,
+        periodic=False,
+    )
+    target_grid = regridding.Grid(
+        longitudes=np.array([0, 2, 4]),
+        latitudes=np.array([0, 2]),
+        includes_poles=False,
+        periodic=False,
+    )
+    regridder = regridding.ConservativeRegridder(source_grid, target_grid)
+    field = np.array([[1, 1], [2, 2], [3, 3]])
+    actual = regridder.regrid_array(field)
+    expected = np.array([[np.nan, np.nan], [np.nan, 1.5], [np.nan, 2.5]])
+    np.testing.assert_allclose(actual, expected, atol=1e-6)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='global',
+          source_poles=True,
+          target_poles=True,
+          source_periodic=True,
+          target_periodic=True,
+          expect_nans=False,
+      ),
+      dict(
+          testcase_name='no_poles',
+          source_poles=False,
+          target_poles=False,
+          source_periodic=True,
+          target_periodic=True,
+          expect_nans=True,
+      ),
+      dict(
+          testcase_name='no_poles_source',
+          source_poles=False,
+          target_poles=True,
+          source_periodic=True,
+          target_periodic=True,
+          expect_nans=True,
+      ),
+      dict(
+          testcase_name='no_poles_target',
+          source_poles=True,
+          target_poles=False,
+          source_periodic=True,
+          target_periodic=True,
+          expect_nans=False,
+      ),
+      dict(
+          testcase_name='non_periodic',
+          source_poles=True,
+          target_poles=True,
+          source_periodic=False,
+          target_periodic=False,
+          expect_nans=True,
+      ),
+  )
+  def test_conservative_regridder_has_expected_nans(
+      self,
+      source_poles,
+      target_poles,
+      source_periodic,
+      target_periodic,
+      expect_nans,
+  ):
+    def make_lats(includes_poles, num):
+      return (
+          np.linspace(-90, 90, num)
+          if includes_poles
+          else np.linspace(-80, 80, num)
+      )
+
+    def make_lons(periodic, num):
+      return (
+          np.linspace(0, 360, num, endpoint=False)
+          if periodic
+          else np.linspace(0, 180, num)
+      )
+
+    source_grid = regridding.Grid(
+        longitudes=make_lons(source_periodic, 20),
+        latitudes=make_lats(source_poles, 10),
+        includes_poles=source_poles,
+        periodic=source_periodic,
+    )
+    target_grid = regridding.Grid(
+        longitudes=make_lons(target_periodic, 15),
+        latitudes=make_lats(target_poles, 8),
+        includes_poles=target_poles,
+        periodic=target_periodic,
+    )
+    regridder = regridding.ConservativeRegridder(source_grid, target_grid)
+    field = np.ones(source_grid.shape)
+    actual = regridder.regrid_array(field)
+    self.assertEqual(np.isnan(actual).any(), expect_nans)
+    np.testing.assert_allclose(actual[~np.isnan(actual)], 1.0, atol=1e-6)
 
   @parameterized.named_parameters(
       {
@@ -290,13 +426,17 @@ class RegriddingTest(parameterized.TestCase):
       },
   )
   def test_regridding_shape(self, regridder_cls):
-    source_grid = regridding.Grid.from_degrees(
-        lon=np.linspace(0, 360, num=128, endpoint=False),
-        lat=np.linspace(-90, 90, num=65, endpoint=True),
+    source_grid = regridding.Grid(
+        longitudes=np.linspace(0, 360, num=128, endpoint=False),
+        latitudes=np.linspace(-90, 90, num=65, endpoint=True),
+        includes_poles=True,
+        periodic=True,
     )
-    target_grid = regridding.Grid.from_degrees(
-        lon=np.linspace(0, 360, num=100, endpoint=False),
-        lat=np.linspace(-90, 90, num=50, endpoint=True),
+    target_grid = regridding.Grid(
+        longitudes=np.linspace(0, 360, num=100, endpoint=False),
+        latitudes=np.linspace(-90, 90, num=50, endpoint=True),
+        includes_poles=True,
+        periodic=True,
     )
     regridder = regridder_cls(source_grid, target_grid)
 
@@ -323,20 +463,26 @@ class RegriddingTest(parameterized.TestCase):
       },
   )
   def test_regridding_nans(self, regridder_cls):
-    source_grid = regridding.Grid.from_degrees(
-        lon=np.linspace(0, 360, num=512, endpoint=False),
-        lat=np.linspace(-90, 90, num=256, endpoint=True),
+    source_grid = regridding.Grid(
+        longitudes=np.linspace(0, 360, num=512, endpoint=False),
+        latitudes=np.linspace(-90, 90, num=256, endpoint=True),
+        includes_poles=True,
+        periodic=True,
     )
-    target_grid = regridding.Grid.from_degrees(
-        lon=np.linspace(0, 360, num=360, endpoint=False),
-        lat=np.linspace(-90, 90, num=181, endpoint=True),
+    target_grid = regridding.Grid(
+        longitudes=np.linspace(0, 360, num=360, endpoint=False),
+        latitudes=np.linspace(-90, 90, num=181, endpoint=True),
+        includes_poles=True,
+        periodic=True,
     )
     regridder = regridder_cls(source_grid, target_grid)
 
     inputs = np.ones(source_grid.shape)
+    source_lat_rad = np.deg2rad(source_grid.latitudes)
+    source_lon_rad = np.deg2rad(source_grid.longitudes)
     in_valid = (
-        source_grid.lat[np.newaxis, :] ** 2
-        + (source_grid.lon[:, np.newaxis] - np.pi) ** 2
+        source_lat_rad[np.newaxis, :] ** 2
+        + (source_lon_rad[:, np.newaxis] - np.pi) ** 2
         < (np.pi / 2) ** 2
     )
     inputs = np.where(in_valid, inputs, np.nan)
@@ -345,6 +491,97 @@ class RegriddingTest(parameterized.TestCase):
     out_valid = ~np.isnan(outputs)
     np.testing.assert_allclose(out_valid.mean(), in_valid.mean(), atol=0.01)
     np.testing.assert_allclose(outputs[out_valid], 1.0)
+
+  @parameterized.parameters(
+      dict(
+          periodic=True,
+          field=np.array([[0.0], [1.0], [2.0], [3.0]]),
+          expected=np.array([[0.5], [1.5], [2.5], [1.5]]),
+      ),
+      dict(
+          periodic=False,
+          field=np.array([[0.0], [1.0], [2.0], [3.0]]),
+          expected=np.array([[0.5], [1.5], [2.5], [np.nan]]),
+      ),
+  )
+  def test_bilinear_regridder_longitude_periodicity(
+      self, periodic, field, expected
+  ):
+    source_grid = regridding.Grid(
+        longitudes=np.array([0.0, 90.0, 180.0, 270.0]),
+        latitudes=np.array([0]),
+        includes_poles=True,
+        periodic=periodic,
+    )
+    target_grid = regridding.Grid(
+        longitudes=np.array([45.0, 135.0, 225.0, 315.0]),
+        latitudes=np.array([0]),
+        includes_poles=True,
+        periodic=periodic,
+    )
+    regridder = regridding.BilinearRegridder(source_grid, target_grid)
+    actual = regridder.regrid_array(field)
+    np.testing.assert_allclose(expected, actual, atol=1e-6)
+
+  @parameterized.parameters(
+      dict(
+          include_poles=True,
+          source_latitudes=np.array([-90.0, -30.0, 30.0, 90.0]),
+          target_latitudes=np.array([-60.0, 0.0, 60.0]),
+          field_values=np.array([0.0, 1.0, 2.0, 3.0]),
+          expected=np.array([[0.5, 1.5, 2.5]]),
+      ),
+      dict(
+          include_poles=False,
+          source_latitudes=np.array([-60.0, -20.0, 20.0, 60.0]),
+          target_latitudes=np.array([-70.0, 0.0, 70.0]),
+          field_values=np.array([0.0, 1.0, 2.0, 3.0]),
+          expected=np.array([[np.nan, 1.5, np.nan]]),
+      ),
+  )
+  def test_bilinear_regridder_latitude_poles(
+      self,
+      include_poles,
+      source_latitudes,
+      target_latitudes,
+      field_values,
+      expected,
+  ):
+    source_grid = regridding.Grid(
+        longitudes=np.array([0.0]),
+        latitudes=source_latitudes,
+        includes_poles=include_poles,
+        periodic=True,
+    )
+    target_grid = regridding.Grid(
+        longitudes=np.array([0.0]),
+        latitudes=target_latitudes,
+        includes_poles=include_poles,
+        periodic=True,
+    )
+    regridder = regridding.BilinearRegridder(source_grid, target_grid)
+    field = field_values[np.newaxis, :]
+    actual = regridder.regrid_array(field)
+    np.testing.assert_allclose(expected, actual, atol=1e-6)
+
+  def test_nearest_regridder_exact(self):
+    source_grid = regridding.Grid(
+        longitudes=np.array([0, 90, 180, 270]),
+        latitudes=np.array([-30, 0, 30]),
+        includes_poles=True,
+        periodic=True,
+    )
+    target_grid = regridding.Grid(
+        longitudes=np.array([0, 180]),
+        latitudes=np.array([-30, 0, 30]),
+        includes_poles=True,
+        periodic=True,
+    )
+    regridder = regridding.NearestRegridder(source_grid, target_grid)
+    field = np.array([[0, 1, 2], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
+    expected = np.array([[0, 1, 2], [7, 8, 9]])
+    actual = regridder.regrid_array(field)
+    np.testing.assert_allclose(expected, actual, atol=1e-6)
 
 
 if __name__ == '__main__':
