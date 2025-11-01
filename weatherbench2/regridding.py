@@ -245,32 +245,40 @@ class NearestRegridder(Regridder):
     return interp(field)
 
 
+_interp_without_extrapolation = functools.partial(
+    jnp.interp, left=jnp.nan, right=jnp.nan
+)
+
+
 class BilinearRegridder(Regridder):
   """Regrid with bilinear interpolation."""
 
   @functools.partial(jax.jit, static_argnums=0)
   def regrid_array(self, field: Array) -> jax.Array:
 
-    interp_without_extrapolation = functools.partial(
-        jnp.interp, left=jnp.nan, right=jnp.nan
-    )
     # interpolate latitude
     lat_source = self.source.latitudes
     lat_target = self.target.latitudes
-    lat_interp = jnp.vectorize(
-        jax.vmap(interp_without_extrapolation, in_axes=(0, None, None)),
+    lat_interp = (
+        jnp.interp
+        if self.source.includes_poles
+        else _interp_without_extrapolation
+    )
+    vec_lat_interp = jnp.vectorize(
+        jax.vmap(lat_interp, in_axes=(0, None, None)),
         signature='(a),(b),(b)->(a)',
     )
-    field = lat_interp(lat_target, lat_source, field)
+    field = vec_lat_interp(lat_target, lat_source, field)
 
     # interpolation longitude
     lon_source = self.source.longitudes
     lon_target = self.target.longitudes
-    if self.source.periodic:
-      lon_interp = functools.partial(jnp.interp, period=360)
-    else:
-      lon_interp = interp_without_extrapolation
-    lon_interp = jnp.vectorize(
+    lon_interp = (
+        functools.partial(jnp.interp, period=360)
+        if self.source.periodic
+        else _interp_without_extrapolation
+    )
+    vec_lon_interp = jnp.vectorize(
         jax.vmap(
             jax.vmap(lon_interp, in_axes=(0, None, None)),
             in_axes=(None, None, -1),
@@ -278,7 +286,7 @@ class BilinearRegridder(Regridder):
         ),
         signature='(a),(b),(b,y)->(a,y)',
     )
-    field = lon_interp(lon_target, lon_source, field)
+    field = vec_lon_interp(lon_target, lon_source, field)
 
     return field
 

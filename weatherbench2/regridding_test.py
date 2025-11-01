@@ -532,6 +532,13 @@ class RegriddingTest(parameterized.TestCase):
           expected=np.array([[0.5, 1.5, 2.5]]),
       ),
       dict(
+          include_poles=True,
+          source_latitudes=np.array([-60.0, 0.0, 60.0]),
+          target_latitudes=np.array([-90.0, -30.0, 30.0, 90.0]),
+          field_values=np.array([0.0, 1.0, 2.0]),
+          expected=np.array([[0.0, 0.5, 1.5, 2.0]]),
+      ),
+      dict(
           include_poles=False,
           source_latitudes=np.array([-60.0, -20.0, 20.0, 60.0]),
           target_latitudes=np.array([-70.0, 0.0, 70.0]),
