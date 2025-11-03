@@ -16,7 +16,6 @@ from absl.testing import parameterized
 import numpy as np
 from weatherbench2 import regridding
 import xarray as xr
-import pudb
 
 
 LongitudeScheme = regridding.LongitudeScheme

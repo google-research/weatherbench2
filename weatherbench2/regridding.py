@@ -19,7 +19,7 @@ This module supports three types of regridding:
 - Bilinear interpolation: most suitable for regridding to finer grids.
 - Linear conservative regridding: most suitable for regridding to coarser grids.
 
-Only rectalinear grids (one dimensional lat/lon coordinates) are supported, but
+Only rectilinear grids (one dimensional lat/lon coordinates) are supported, but
 irregular spacing is OK.
 
 Conservative regridding schemes are adapted from:
