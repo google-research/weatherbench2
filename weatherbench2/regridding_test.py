@@ -16,6 +16,7 @@ from absl.testing import parameterized
 import numpy as np
 from weatherbench2 import regridding
 import xarray as xr
+import pudb
 
 
 LongitudeScheme = regridding.LongitudeScheme
@@ -589,6 +590,33 @@ class RegriddingTest(parameterized.TestCase):
     expected = np.array([[0, 1, 2], [7, 8, 9]])
     actual = regridder.regrid_array(field)
     np.testing.assert_allclose(expected, actual, atol=1e-6)
+
+  def test_problematic_grid(self):
+    # This 1/4 deg grid region caused issues whereby the
+    # is_covered = np.isclose(coverage, target_lengths, rtol=1e-5)
+    # statement in _conservative_latitude_weights determined the last point
+    # was not covered. This only happened when _conservative_latitude_weights
+    # was jit-compiled (due to being inside of ConservativeRegridder._mean).
+    # The 1e-5 rtol was too sensitive for jitted operations.
+    lats = np.array([31., 31.25, 31.5])
+    lons = np.array([0.0, 1.0])
+
+    source_grid = regridding.Grid(
+      longitudes=lons,
+      latitudes=lats,
+      includes_poles=False,
+      periodic=False,
+    )
+    target_grid = regridding.Grid(
+      longitudes=lons,
+      latitudes=lats,
+      includes_poles=False,
+      periodic=False,
+    )
+    regridder = regridding.ConservativeRegridder(source_grid, target_grid)
+    field = np.ones((source_grid.longitudes.size, source_grid.latitudes.size))
+    actual = regridder.regrid_array(field)
+    np.testing.assert_array_equal(True, np.isfinite(actual))
 
 
 if __name__ == '__main__':

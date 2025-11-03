@@ -364,7 +364,7 @@ def _conservative_latitude_weights(
   if not source_includes_poles:
     target_areas = _latitude_area(target_points, target_includes_poles)
     target_areas = target_areas[:, jnp.newaxis]
-    is_covered = jnp.isclose(coverage, target_areas, rtol=1e-5)
+    is_covered = jnp.isclose(coverage, target_areas, rtol=1e-3)
     weights = jnp.where(is_covered, weights, jnp.nan)
   assert weights.shape == (target_points.size, source_points.size)
   return weights
@@ -490,7 +490,7 @@ def _conservative_longitude_weights(
   if not source_periodic:
     target_lengths = _longitude_length(target_points, target_periodic)
     target_lengths = target_lengths[:, jnp.newaxis]
-    is_covered = jnp.isclose(coverage, target_lengths, rtol=1e-5)
+    is_covered = jnp.isclose(coverage, target_lengths, rtol=1e-3)
     weights = jnp.where(is_covered, weights, jnp.nan)
   assert weights.shape == (target_points.size, source_points.size)
   return weights
