@@ -116,7 +116,7 @@ def _check_global_coverage(
 
 @dataclasses.dataclass(frozen=True)
 class Grid:
-  """Representation of a rectalinear grid.
+  """Representation of a rectilinear grid.
 
   Attributes:
     longitudes: 1D array of longitude coordinates in degrees, from roughly 0 to
