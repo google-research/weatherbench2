@@ -597,20 +597,20 @@ class RegriddingTest(parameterized.TestCase):
     # was not covered. This only happened when _conservative_latitude_weights
     # was jit-compiled (due to being inside of ConservativeRegridder._mean).
     # The 1e-5 rtol was too sensitive for jitted operations.
-    lats = np.array([31., 31.25, 31.5])
+    lats = np.array([31.0, 31.25, 31.5])
     lons = np.array([0.0, 1.0])
 
     source_grid = regridding.Grid(
-      longitudes=lons,
-      latitudes=lats,
-      includes_poles=False,
-      periodic=False,
+        longitudes=lons,
+        latitudes=lats,
+        includes_poles=False,
+        periodic=False,
     )
     target_grid = regridding.Grid(
-      longitudes=lons,
-      latitudes=lats,
-      includes_poles=False,
-      periodic=False,
+        longitudes=lons,
+        latitudes=lats,
+        includes_poles=False,
+        periodic=False,
     )
     regridder = regridding.ConservativeRegridder(source_grid, target_grid)
     field = np.ones((source_grid.longitudes.size, source_grid.latitudes.size))
