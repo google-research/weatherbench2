@@ -19,7 +19,7 @@ This module supports three types of regridding:
 - Bilinear interpolation: most suitable for regridding to finer grids.
 - Linear conservative regridding: most suitable for regridding to coarser grids.
 
-Only rectalinear grids (one dimensional lat/lon coordinates) are supported, but
+Only rectilinear grids (one dimensional lat/lon coordinates) are supported, but
 irregular spacing is OK.
 
 Conservative regridding schemes are adapted from:
@@ -116,7 +116,7 @@ def _check_global_coverage(
 
 @dataclasses.dataclass(frozen=True)
 class Grid:
-  """Representation of a rectalinear grid.
+  """Representation of a rectilinear grid.
 
   Attributes:
     longitudes: 1D array of longitude coordinates in degrees, from roughly 0 to
@@ -133,6 +133,9 @@ class Grid:
   latitudes: np.ndarray = dataclasses.field(kw_only=True)
   periodic: bool = dataclasses.field(kw_only=True)
   includes_poles: bool = dataclasses.field(kw_only=True)
+
+  def __post_init__(self):
+    _assert_increasing(self.latitudes)
 
   @property
   def lat(self):
@@ -364,7 +367,7 @@ def _conservative_latitude_weights(
   if not source_includes_poles:
     target_areas = _latitude_area(target_points, target_includes_poles)
     target_areas = target_areas[:, jnp.newaxis]
-    is_covered = jnp.isclose(coverage, target_areas, rtol=1e-5)
+    is_covered = jnp.isclose(coverage, target_areas, rtol=1e-3)
     weights = jnp.where(is_covered, weights, jnp.nan)
   assert weights.shape == (target_points.size, source_points.size)
   return weights
@@ -490,7 +493,7 @@ def _conservative_longitude_weights(
   if not source_periodic:
     target_lengths = _longitude_length(target_points, target_periodic)
     target_lengths = target_lengths[:, jnp.newaxis]
-    is_covered = jnp.isclose(coverage, target_lengths, rtol=1e-5)
+    is_covered = jnp.isclose(coverage, target_lengths, rtol=1e-3)
     weights = jnp.where(is_covered, weights, jnp.nan)
   assert weights.shape == (target_points.size, source_points.size)
   return weights

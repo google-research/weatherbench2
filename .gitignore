@@ -10,3 +10,5 @@ docs/*.zarr
 __pycache__
 .pytest_cache
 *swp
+.direnv
+.envrc
