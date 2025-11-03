@@ -591,7 +591,7 @@ class RegriddingTest(parameterized.TestCase):
     actual = regridder.regrid_array(field)
     np.testing.assert_allclose(expected, actual, atol=1e-6)
 
-  def test_problematic_grid(self):
+  def test_quarter_degree_grid_doesnt_lead_to_nan(self):
     # This 1/4 deg grid region caused issues whereby the
     # is_covered = np.isclose(coverage, target_lengths, rtol=1e-5)
     # statement in _conservative_latitude_weights determined the last point

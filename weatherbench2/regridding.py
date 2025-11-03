@@ -134,6 +134,9 @@ class Grid:
   periodic: bool = dataclasses.field(kw_only=True)
   includes_poles: bool = dataclasses.field(kw_only=True)
 
+  def __post_init__(self):
+    _assert_increasing(self.latitudes)
+
   @property
   def lat(self):
     raise AttributeError(
