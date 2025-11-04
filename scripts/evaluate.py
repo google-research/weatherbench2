@@ -354,6 +354,10 @@ def main(argv: list[str]) -> None:
           lat_slice=slice(35, 75),
           lon_slice=[slice(360 - 12.5, None), slice(0, 42.5)],
       ),
+      'africa': SliceRegion(
+        lat_slice=slice(-34.8, 37),
+        lon_slice=slice(-17.5, 51.4),
+      ),
       'north-america': SliceRegion(
           lat_slice=slice(25, 60), lon_slice=slice(360 - 120, 360 - 75)
       ),
