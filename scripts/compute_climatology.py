@@ -270,7 +270,11 @@ def compute_stat_chunk(
 
 
 def main(argv: list[str]) -> None:
-  obs, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
+  obs, input_chunks_ = xbeam.open_zarr(INPUT_PATH.value)
+
+  input_chunks = {}
+  for key, key_chunk in input_chunks_.items():
+    input_chunks[key] = min(obs.sizes[key], key_chunk)
 
   # Convert object-type coordinates to string.
   # Required to avoid: https://github.com/pydata/xarray/issues/3476
