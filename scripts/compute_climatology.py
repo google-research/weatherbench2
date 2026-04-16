@@ -120,6 +120,11 @@ SEEPS_DRY_THRESHOLD_MM = flags.DEFINE_string(
         'precipitation variable. In mm.'
     ),
 )
+VARIABLES = flags.DEFINE_list(
+    'variables',
+    [],
+    help='Comma delimited list of data variables to include in output.',
+)
 NUM_THREADS = flags.DEFINE_integer(
     'num_threads',
     None,
@@ -277,6 +282,13 @@ def main(argv: list[str]) -> None:
   for coord_name, coord in obs.coords.items():
     if coord.dtype == 'object':
       obs[coord_name] = coord.astype(str)
+
+  if VARIABLES.value:
+    obs = obs[VARIABLES.value]
+    # Filter input_chunks to only dims present in obs after variable selection.
+    # Needed for surface-only variables (e.g. 2m_temperature) selected from a
+    # zarr that also contains pressure-level variables with a 'level' dim.
+    input_chunks = {k: v for k, v in input_chunks.items() if k in obs.dims}
 
   # TODO(shoyer): slice obs in time using START_YEAR and END_YEAR. This would
   # require some care in order to ensure input_chunks['time'] remains valid.
