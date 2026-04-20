@@ -22,9 +22,9 @@ Example Usage:
   export PROJECT=my-project
   export REGION=us-central1
 
-  python scripts/resample_in_time.py \
-    --input_path=gs://weatherbench2/datasets/era5/1959-2022-6h-64x32_equiangular_with_poles_conservative.zarr \
-    --output_path=gs://$BUCKET/datasets/era5/$USER/2020-2021-weekly-average-temperature.zarr \
+  python scripts/slice_dataset.py \
+    --input_path=gs://weatherbench2/datasets/ens/2018-64x32_equiangular_with_poles_conservative.zarr \
+    --output_path=gs://$BUCKET/datasets/ens/$USER/ens-sliced.zarr \
     --runner=DataflowRunner \
     --sel="prediction_timedelta_stop=15 days,latitude_start=-33.33,latitude_stop=33.33" \
     --isel="longitude_start=0,longitude_stop=180,longitude_step=40" \
