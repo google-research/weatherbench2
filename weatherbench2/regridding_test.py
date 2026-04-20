@@ -17,7 +17,6 @@ import numpy as np
 from weatherbench2 import regridding
 import xarray as xr
 
-
 LongitudeScheme = regridding.LongitudeScheme
 LatitudeSpacing = regridding.LatitudeSpacing
 

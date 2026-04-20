@@ -506,6 +506,7 @@ class MainTest(parameterized.TestCase):
     )
     # Now, ds grows by 1 every timedelta step.
     ds *= pd.Timedelta(input_time_resolution) / pd.Timedelta(timedelta_spacing)
+    ds = ds.assign_coords(time=ds.time.astype('datetime64[ns]'))
     return ds
 
   @parameterized.named_parameters(
@@ -680,15 +681,24 @@ class MainTest(parameterized.TestCase):
     self.assertEqual(expected_ensemble_size, output_ds.sizes['realization'])
 
     # Check dimension values
-    pd.testing.assert_index_equal(
-        pd.date_range(
-            initial_time_start, initial_time_end, freq=initial_time_spacing
-        ),
-        pd.to_datetime(output_ds[time_dim].data),
+    expected_time = pd.date_range(
+        initial_time_start, initial_time_end, freq=initial_time_spacing
+    ).astype('datetime64[ns]')
+    actual_time = pd.to_datetime(output_ds[time_dim].data).astype(
+        'datetime64[ns]'
     )
-    pd.testing.assert_index_equal(
-        pd.timedelta_range('0h', forecast_duration, freq=timedelta_spacing),
-        pd.to_timedelta(output_ds.prediction_timedelta.data),
+    np.testing.assert_array_equal(
+        expected_time.to_numpy(), actual_time.to_numpy()
+    )
+
+    expected_timedelta = pd.timedelta_range(
+        '0h', forecast_duration, freq=timedelta_spacing
+    ).astype('timedelta64[ns]')
+    actual_timedelta = pd.to_timedelta(
+        output_ds.prediction_timedelta.data
+    ).astype('timedelta64[ns]')
+    np.testing.assert_array_equal(
+        expected_timedelta.to_numpy(), actual_timedelta.to_numpy()
     )
 
     # Check variables (this is the exciting part!)

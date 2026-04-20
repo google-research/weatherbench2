@@ -51,7 +51,6 @@ from weatherbench2 import flag_utils
 import xarray as xr
 import xarray_beam as xbeam
 
-
 # Command line arguments
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='Input Zarr path.')
 OUTPUT_PATH = flags.DEFINE_string('output_path', None, help='Output Zarr path.')

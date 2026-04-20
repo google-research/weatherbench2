@@ -16,6 +16,7 @@
 
 Contains classes for all evaluation metrics used for WB2.
 """
+
 from collections.abc import Sequence
 import dataclasses
 import functools

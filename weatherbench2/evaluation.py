@@ -17,6 +17,7 @@
 Evaluation functions, including reading data, computing metrics and
 saving results for a given config file.
 """
+
 from __future__ import annotations
 
 from collections import abc

@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Utility function for WeatherBench2."""
+
 import functools
 from typing import Callable, Union
 

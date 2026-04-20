@@ -41,6 +41,7 @@ Example Usage:
     --job_name=regrid-$USER
   ```
 """
+
 from absl import app
 from absl import flags
 import apache_beam as beam

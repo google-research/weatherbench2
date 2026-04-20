@@ -33,6 +33,7 @@ Example of getting the (average) vertical profile of temperature, by latitude.
     --job_name=compute-vertical-profile-$USER
   ```
 """
+
 import typing as t
 
 from absl import app

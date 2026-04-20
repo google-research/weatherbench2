@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 r"""CLI to compute raw statistical moments of a dataset."""
+
 import functools
 from typing import Any, Optional
 
@@ -22,7 +23,6 @@ import apache_beam as beam
 import numpy as np
 import xarray as xr
 import xarray_beam as xbeam
-
 
 # Command line arguments
 INPUT_PATH = flags.DEFINE_string('input_path', None, help='Input Zarr path')

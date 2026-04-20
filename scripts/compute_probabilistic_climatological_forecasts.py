@@ -435,9 +435,8 @@ def _get_sampled_init_times(
     initial_time_edge_behavior: How to deal with perturbations that move the
       sampled day outside of sampled year.
     leave_out_if_in_climatology: If True, and initial_time's year is within
-     climatology, exclude its year and subsequent num_years_to_exclude years.
-    num_years_to_exclude: Number of years after initial_time's year to
-      exclude.
+      climatology, exclude its year and subsequent num_years_to_exclude years.
+    num_years_to_exclude: Number of years after initial_time's year to exclude.
     seed: Integer seed for the RNG.
 
   Returns:
@@ -803,6 +802,9 @@ def _emit_sampled_weather(
 def main(argv: abc.Sequence[str]) -> None:
 
   input_ds, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
+  input_ds = input_ds.assign_coords(
+      {TIME_DIM.value: input_ds[TIME_DIM.value].astype('datetime64[ns]')}
+  )
 
   if VARIABLES.value:
     input_ds = input_ds[VARIABLES.value]
@@ -825,10 +827,10 @@ def main(argv: abc.Sequence[str]) -> None:
       INITIAL_TIME_START.value,
       INITIAL_TIME_END.value,
       freq=INITIAL_TIME_SPACING.value,
-  )
+  ).astype('datetime64[ns]')
   timedeltas = pd.timedelta_range(
       '0 days', FORECAST_DURATION.value, freq=TIMEDELTA_SPACING.value
-  )
+  ).astype('timedelta64[ns]')
   assert isinstance(input_ds, xr.Dataset)  # To satisfy pytype.
   if DELTA in input_ds.dims:
     raise ValueError(f'INPUT_PATH data already had {DELTA} as a dimension')

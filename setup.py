@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Setup Weatherbench2."""
+
 import setuptools
 
 base_requires = [

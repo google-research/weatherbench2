@@ -14,6 +14,7 @@
 # ==============================================================================
 # pyformat: mode=pyink
 """Classes for computing derived variables dynamically for evaluation."""
+
 import dataclasses
 import typing as t
 
@@ -21,7 +22,6 @@ import numpy as np
 import scipy.integrate
 from weatherbench2 import schema
 import xarray as xr
-
 
 # pylint: disable=invalid-name
 

@@ -22,7 +22,6 @@ import xarray_beam as xbeam
 
 from . import regrid
 
-
 LatitudeSpacing = regridding.LatitudeSpacing
 LongitudeScheme = regridding.LongitudeScheme
 
