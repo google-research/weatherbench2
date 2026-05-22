@@ -47,6 +47,7 @@ Example Usage:
 from collections import abc
 import functools
 import typing as t
+from typing import Optional
 
 from absl import app
 from absl import flags
@@ -161,6 +162,15 @@ TIME_STOP = flags.DEFINE_string(
         ' use the last time in --input_path.'
     ),
 )
+INPUT_SELECT_HOURS = flags.DEFINE_list(
+    'input_select_hours',
+    [],
+    help=(
+        'Comma-delimited list of hours to select from time dimension before'
+        'resampling (e.g. to filter input data to specific times of day before'
+        'computing statistics). E.g., --input_select_hours=0,6,12,18.'
+    ),
+)
 SKIPNA = flags.DEFINE_boolean(
     'skipna',
     False,
@@ -178,6 +188,14 @@ WORKING_CHUNKS = flag_utils.DEFINE_chunks(
         ' words, the entire time series for each chunk is loaded into memory at'
         ' once. So if there are many times, --working_chunks should be small in'
         ' other dimensions.'
+    ),
+)
+OUTPUT_SELECT_HOURS = flags.DEFINE_list(
+    'output_select_hours',
+    [],
+    help=(
+        'Comma-delimited list of hours to select from time dimension after'
+        ' resampling. E.g., --output_select_hours=0.'
     ),
 )
 
@@ -211,6 +229,7 @@ def resample_in_time_chunk(
     sum_vars: list[str],
     add_mean_suffix: bool,
     skipna: bool = False,
+    output_select_hours: Optional[list[int]] = None,
 ) -> tuple[xbeam.Key, xr.Dataset]:
   """Resample a data chunk in time and return a requested time statistic.
 
@@ -228,6 +247,8 @@ def resample_in_time_chunk(
       computing the mean.
     skipna: Whether to skip NaN values in both forecasts and observations during
       evaluation.
+    output_select_hours: List of hours to select from time dimension after
+      resampling.
 
   Returns:
     The resampled data chunk and its key.
@@ -264,7 +285,13 @@ def resample_in_time_chunk(
           ).rename({chunk_var: f'{chunk_var}_sum'})
       )
 
-  return rsmp_key, xr.merge(rsmp_chunks)
+  merged_chunk = xr.merge(rsmp_chunks)
+  if output_select_hours:
+    merged_chunk = merged_chunk.sel(
+        {time_dim: merged_chunk[time_dim].dt.hour.isin(output_select_hours)}
+    )
+
+  return rsmp_key, merged_chunk
 
 
 def resample_in_time_core(
@@ -317,6 +344,14 @@ def main(argv: abc.Sequence[str]) -> None:
   if TIME_START.value is not None or TIME_STOP.value is not None:
     ds = ds.sel({TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value)})
 
+  if INPUT_SELECT_HOURS.value:
+    input_select_hours = [int(h) for h in INPUT_SELECT_HOURS.value]
+    ds = ds.sel(
+        {TIME_DIM.value: ds[TIME_DIM.value].dt.hour.isin(input_select_hours)}
+    )
+
+  output_select_hours = [int(h) for h in OUTPUT_SELECT_HOURS.value]
+
   # Select the variables needed for statistics.
   time_dependent_vars = [k for k, v in ds.items() if TIME_DIM.value in v.dims]
   nontime_vars = set(ds).difference(time_dependent_vars)
@@ -364,6 +399,12 @@ def main(argv: abc.Sequence[str]) -> None:
     )[TIME_DIM.value]
   else:
     rsmp_times = ds[TIME_DIM.value]
+
+  if output_select_hours:
+    rsmp_times = rsmp_times.sel(
+        {TIME_DIM.value: rsmp_times.dt.hour.isin(output_select_hours)}
+    )
+
   assert isinstance(ds, xr.Dataset)  # To satisfy pytype.
   rsmp_template = (
       xbeam.make_template(ds)
@@ -433,6 +474,7 @@ def main(argv: abc.Sequence[str]) -> None:
                 sum_vars=sum_vars,
                 add_mean_suffix=ADD_MEAN_SUFFIX.value,
                 skipna=SKIPNA.value,
+                output_select_hours=output_select_hours,
             )
         )
         | 'RechunkToOutputChunks'
