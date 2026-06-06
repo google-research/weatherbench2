@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 import collections
+import sys
 
 from absl.testing import absltest
 from absl.testing import flagsaver
@@ -657,7 +658,14 @@ class MainTest(parameterized.TestCase):
         output_chunks=output_chunks_flag,
         runner='DirectRunner',
     ):
-      cpcf.main([])
+      # Use cloudpickle on Python 3.14+ since dill 0.3.2 is incompatible
+      # with Python 3.14's pickle internals. See b/512415933.
+      beam_argv = (
+          ['--pickle_library=cloudpickle']
+          if sys.version_info >= (3, 14)
+          else []
+      )
+      cpcf.main(beam_argv)
 
     output_ds, output_chunks = xarray_beam.open_zarr(output_path)
 
