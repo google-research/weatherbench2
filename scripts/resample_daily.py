@@ -133,7 +133,7 @@ def resample_in_time_chunk(
     for var in rsmp_chunk:
       rsmp_chunk = rsmp_chunk.rename({var: f'{var}_{statistic}'})
     rsmp_key = rsmp_key.replace(
-        vars={f'{var}_{statistic}' for var in rsmp_key.vars}
+        vars={f'{var}_{statistic}' for var in rsmp_key.vars}  # pyrefly: ignore[not-iterable]
     )
   return rsmp_key, rsmp_chunk
 
@@ -227,8 +227,8 @@ def main(argv: abc.Sequence[str]) -> None:
 
   def _is_not_duplicated(kv: tuple[xbeam.Key, xr.Dataset], stat: str) -> bool:
     key, _ = kv
-    assert len(key.vars) == 1, key
-    (var,) = key.vars
+    assert len(key.vars) == 1, key  # pyrefly: ignore[bad-argument-type]
+    (var,) = key.vars  # pyrefly: ignore[not-iterable]
     if stat in duplicate_stat_set and var in DAILY_ACCUMULATIVE_VARS:
       return False
     return True
@@ -258,7 +258,7 @@ def main(argv: abc.Sequence[str]) -> None:
         )
         | 'RechunkIn'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-            obs.sizes, input_chunks, in_working_chunks, itemsize=itemsize
+            obs.sizes, input_chunks, in_working_chunks, itemsize=itemsize  # pyrefly: ignore[bad-argument-type]
         )
     )
 
@@ -288,7 +288,7 @@ def main(argv: abc.Sequence[str]) -> None:
         | beam.Flatten()
         | 'RechunkOut'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-            rsmp_template.sizes,
+            rsmp_template.sizes,  # pyrefly: ignore[bad-argument-type]
             out_working_chunks,
             output_chunks,
             itemsize=itemsize,

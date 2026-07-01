@@ -68,7 +68,7 @@ def make_probabilistic_climatology(
     )
     out.append(ds_per_hour)
   out = xr.concat(out, dim=xr.DataArray(hours, dims=['hour']))
-  return out
+  return out  # pyrefly: ignore[bad-return]
 
 
 def create_window_weights(window_size: int) -> xr.DataArray:
@@ -115,7 +115,7 @@ def compute_rolling_stat(
   elif stat_fn == 'std':
     rolling_stat = stacked.weighted(window_weights).std(dim=('window', 'year'))
   else:
-    rolling_stat = stat_fn(
+    rolling_stat = stat_fn(  # pyrefly: ignore[not-callable]
         stacked, weights=window_weights, dim=('window', 'year')
     )
   # Remove edges

@@ -195,8 +195,8 @@ def index_on_valid_time(
     time_offset = key.offsets[INIT] + key.offsets[DELTA]
   else:
     # In this case, we kept all timedeltas.
-    time_offset = key.offsets[INIT] * forecast_spacing + key.offsets[DELTA]
-  new_key = key.with_offsets(**{TIME: time_offset, dropped_dim: None})
+    time_offset = key.offsets[INIT] * forecast_spacing + key.offsets[DELTA]  # pyrefly: ignore[unsupported-operation]
+  new_key = key.with_offsets(**{TIME: time_offset, dropped_dim: None})  # pyrefly: ignore[bad-unpacking]
 
   assert chunk.sizes[INIT] == 1 and chunk.sizes[DELTA] == 1
   squeezed = chunk.squeeze(dropped_dim, drop=True)

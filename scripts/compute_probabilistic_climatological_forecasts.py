@@ -337,7 +337,7 @@ def _independent_choice(x: np.ndarray, axis: int, n=None, seed=None):
           f'n must be None or in [1, x.shape[axis]] = [1, {x.shape[axis]}],'
           f' found {n=}'
       )
-    indices = np.take(indices, np.arange(n), axis=axis)
+    indices = np.take(indices, np.arange(n), axis=axis)  # pyrefly: ignore[no-matching-overload]
   return np.take_along_axis(x, indices, axis=axis)
 
 
@@ -606,7 +606,7 @@ def _get_sampled_init_times(
       )
     # End of get sampled years and day_perturbations.
 
-  dayofyears = output_times.dayofyear.values + day_perturbations
+  dayofyears = output_times.dayofyear.values + day_perturbations  # pyrefly: ignore[missing-attribute, unbound-name]
 
   if initial_time_edge_behavior == WRAP_YEAR:
     for year_in_sample in np.unique(years):
@@ -651,7 +651,7 @@ def _get_sampled_init_times(
       # Add daysofyears - 1 to year, since e.g. if dayofyear = 1, then we will
       # add 0 to the year, which results in the first day of the year.
       + np.array(dayofyears - 1, dtype='timedelta64[D]')
-      + np.array(output_times.hour, dtype='timedelta64[h]')
+      + np.array(output_times.hour, dtype='timedelta64[h]')  # pyrefly: ignore[missing-attribute]
   ).astype('datetime64[ns]')
 
   if sample_hold_days:
@@ -680,7 +680,7 @@ def _get_sampled_init_times(
         dtype=np.int64,
     ).reshape(sampled_times.shape)
 
-    delta_days = np.take(delta_days, hold_idx, axis=1)
+    delta_days = np.take(delta_days, hold_idx, axis=1)  # pyrefly: ignore[no-matching-overload]
     sampled_times = output_times.values + np.array(
         delta_days, dtype='timedelta64[D]'
     )
@@ -780,7 +780,7 @@ def _emit_sampled_weather(
   # If output_index_info is empty, it just means we have a Dataset chunk and no
   # output times to scatter it to. That's okay, we will Yield nothing.
   for info in values['time_key_and_index_info']:
-    info = info.copy()
+    info = info.copy()  # pyrefly: ignore[missing-attribute]
     output_ds = ds.copy()
     sampled_time_value = info.pop('sampled_time_value')
     if ADD_SOURCE_TIME.value:
@@ -1007,7 +1007,7 @@ def main(argv: abc.Sequence[str]) -> None:
         >> xbeam.Rechunk(
             # Intermediate rechunk necessary since input/output chunks are
             # different.
-            template.sizes,
+            template.sizes,  # pyrefly: ignore[bad-argument-type]
             done_working_chunks,
             output_chunks,
             itemsize=itemsize,

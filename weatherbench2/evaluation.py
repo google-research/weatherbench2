@@ -316,10 +316,10 @@ def open_forecast_and_truth_datasets(
   forecast, obs = open_source_files(
       forecast_path=data_config.paths.forecast,
       obs_path=data_config.paths.obs,
-      by_init=data_config.by_init,
+      by_init=data_config.by_init,  # pyrefly: ignore[bad-argument-type]
       use_dask=use_dask,
       rename_variables=data_config.rename_variables,
-      pressure_level_suffixes=data_config.pressure_level_suffixes,
+      pressure_level_suffixes=data_config.pressure_level_suffixes,  # pyrefly: ignore[bad-argument-type]
   )
 
   obs_all_times = _impose_data_selection(
@@ -354,7 +354,7 @@ def open_forecast_and_truth_datasets(
 
   if not data_config.by_init:
     eval_truth, forecast = _ensure_consistent_time_step_sizes(
-        eval_truth, forecast
+        eval_truth, forecast  # pyrefly: ignore[bad-argument-type]
     )
 
   if eval_config.evaluate_climatology:
@@ -452,16 +452,16 @@ def _evaluate_all_metrics(
 
   if eval_config.evaluate_climatology:
     time_dim = 'valid_time' if data_config.by_init else 'time'
-    forecast = climatology[list(forecast.keys())].sel(
+    forecast = climatology[list(forecast.keys())].sel(  # pyrefly: ignore[unsupported-operation]
         dayofyear=forecast[time_dim].dt.dayofyear,
         hour=forecast[time_dim].dt.hour,
     )
   if eval_config.evaluate_probabilistic_climatology:
     probabilistic_climatology = utils.make_probabilistic_climatology(
         truth,
-        eval_config.probabilistic_climatology_start_year,
-        eval_config.probabilistic_climatology_end_year,
-        eval_config.probabilistic_climatology_hour_interval,
+        eval_config.probabilistic_climatology_start_year,  # pyrefly: ignore[bad-argument-type]
+        eval_config.probabilistic_climatology_end_year,  # pyrefly: ignore[bad-argument-type]
+        eval_config.probabilistic_climatology_hour_interval,  # pyrefly: ignore[bad-argument-type]
     )
     time_dim = 'valid_time' if data_config.by_init else 'time'
     forecast = probabilistic_climatology[list(forecast.keys())].sel(
@@ -527,7 +527,7 @@ class _SaveOutputs(beam.PTransform):
   output_format: str
   num_threads: Optional[int] = None
 
-  def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:
+  def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:  # pyrefly: ignore[bad-return]
     combined = xr.combine_by_coords(datasets)
     output_path = _get_output_path(
         self.data_config, self.eval_name, self.output_format
@@ -715,9 +715,9 @@ class _EvaluateAllMetrics(beam.PTransform):
     if self.eval_config.evaluate_probabilistic_climatology:
       probabilistic_climatology = utils.make_probabilistic_climatology(
           truth,
-          self.eval_config.probabilistic_climatology_start_year,
-          self.eval_config.probabilistic_climatology_end_year,
-          self.eval_config.probabilistic_climatology_hour_interval,
+          self.eval_config.probabilistic_climatology_start_year,  # pyrefly: ignore[bad-argument-type]
+          self.eval_config.probabilistic_climatology_end_year,  # pyrefly: ignore[bad-argument-type]
+          self.eval_config.probabilistic_climatology_hour_interval,  # pyrefly: ignore[bad-argument-type]
       )
       forecast_pipeline |= beam.MapTuple(
           self._climatology_like_forecast_chunk,
@@ -753,7 +753,7 @@ class _EvaluateAllMetrics(beam.PTransform):
     logging.info(
         f'forecast={forecast}, truth={truth}, climatology={climatology}'
     )
-    return pcoll | self._evaluate(forecast, truth, climatology)
+    return pcoll | self._evaluate(forecast, truth, climatology)  # pyrefly: ignore[bad-argument-type]
 
 
 def evaluate_with_beam(

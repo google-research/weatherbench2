@@ -214,7 +214,7 @@ def _get_vars(
     raise ValueError(
         f'Cannot specify both {_ALL} and other variables. Found {list_of_vars}'
     )
-  return list_of_vars
+  return list_of_vars  # pyrefly: ignore[bad-return]
 
 
 def resample_in_time_chunk(
@@ -456,7 +456,7 @@ def main(argv: abc.Sequence[str]) -> None:
         )
         | 'RechunkToWorkingChunks'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-            ds.sizes,
+            ds.sizes,  # pyrefly: ignore[bad-argument-type]
             ds_chunks,
             working_chunks,
             itemsize=itemsize,
@@ -479,7 +479,7 @@ def main(argv: abc.Sequence[str]) -> None:
         )
         | 'RechunkToOutputChunks'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-            rsmp_template.sizes,
+            rsmp_template.sizes,  # pyrefly: ignore[bad-argument-type]
             working_chunks,
             output_chunks,
             itemsize=itemsize,

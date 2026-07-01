@@ -96,7 +96,7 @@ class WindSpeed(_WindVariable):
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
     u = dataset[self.u_name]
     v = dataset[self.v_name]
-    return np.sqrt(u**2 + v**2)
+    return np.sqrt(u**2 + v**2)  # pyrefly: ignore[bad-return]
 
 
 def _zero_poles(field: xr.Dataset, epsilon: float = 1e-6):
@@ -273,7 +273,7 @@ class GeostrophicWindSpeed(_GeostrophicWindVariable):
 
   def compute(self, dataset: xr.Dataset) -> xr.DataArray:
     u, v = _geostrophic_wind(dataset[self.geopotential_name])
-    return np.sqrt(u**2 + v**2)
+    return np.sqrt(u**2 + v**2)  # pyrefly: ignore[bad-return]
 
 
 class UComponentOfGeostrophicWind(_GeostrophicWindVariable):
@@ -317,7 +317,7 @@ class AgeostrophicWindSpeed(_AgeostrophicWindVariable):
     u = dataset[self.u_name]
     v = dataset[self.v_name]
     u_geo, v_geo = _geostrophic_wind(dataset[self.geopotential_name])
-    return np.sqrt((u - u_geo) ** 2 + (v - v_geo) ** 2)
+    return np.sqrt((u - u_geo) ** 2 + (v - v_geo) ** 2)  # pyrefly: ignore[bad-return]
 
 
 class UComponentOfAgeostrophicWind(_AgeostrophicWindVariable):
@@ -427,7 +427,7 @@ class IntegratedWaterTransport(DerivedVariable):
         .sel(level=slice(self.level_min, self.level_max))
         .integrate('level')
     )
-    return (1 / g) * np.sqrt(u_integral**2 + v_integral**2)
+    return (1 / g) * np.sqrt(u_integral**2 + v_integral**2)  # pyrefly: ignore[bad-return]
 
 
 @dataclasses.dataclass
@@ -658,10 +658,10 @@ def interpolate_spectral_frequencies(
   if frequencies is None:
     freq_min = spectrum.frequency.max('latitude').min(wavenumber_dim).data
     freq_max = spectrum.frequency.min('latitude').max(wavenumber_dim).data
-    frequencies = np.linspace(
+    frequencies = np.linspace(  # pyrefly: ignore[bad-assignment]
         freq_min, freq_max, num=spectrum.sizes[wavenumber_dim]
     )
-  frequencies = np.asarray(frequencies)
+  frequencies = np.asarray(frequencies)  # pyrefly: ignore[bad-assignment]
   if frequencies.ndim != 1:
     raise ValueError(f'Expected 1-D frequencies, found {frequencies.shape=}')
 
@@ -672,7 +672,7 @@ def interpolate_spectral_frequencies(
             {wavenumber_dim: 'frequency'}
         )  # pytype: disable=wrong-arg-types
         .drop_vars(wavenumber_dim)
-        .interp(frequency=frequencies, method=method, **interp_kwargs)
+        .interp(frequency=frequencies, method=method, **interp_kwargs)  # pyrefly: ignore[bad-argument-type]
     )
     # Interp didn't deal well with the infinite wavelength, so just reset λ as..
     da['wavelength'] = 1 / da.frequency

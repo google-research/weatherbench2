@@ -233,14 +233,14 @@ def main(argv: list[str]) -> None:
 
   def _is_precip(kv: tuple[xbeam.Key, xr.Dataset]) -> bool:
     key, _ = kv
-    assert len(key.vars) == 1, key
-    (var,) = key.vars
+    assert len(key.vars) == 1, key  # pyrefly: ignore[bad-argument-type]
+    (var,) = key.vars  # pyrefly: ignore[not-iterable]
     return var in rechunk_variables
 
   def _is_not_precip(kv: tuple[xbeam.Key, xr.Dataset]) -> bool:
     key, _ = kv
-    assert len(key.vars) == 1, key
-    (var,) = key.vars
+    assert len(key.vars) == 1, key  # pyrefly: ignore[bad-argument-type]
+    (var,) = key.vars  # pyrefly: ignore[not-iterable]
     return var not in rechunk_variables
 
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
@@ -274,7 +274,7 @@ def main(argv: list[str]) -> None:
           | beam.Filter(_is_precip)
           | 'RechunkIn'
           >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-              source_dataset.sizes,
+              source_dataset.sizes,  # pyrefly: ignore[bad-argument-type]
               source_chunks,
               working_chunks,
               itemsize=RECHUNK_ITEMSIZE.value,
@@ -288,7 +288,7 @@ def main(argv: list[str]) -> None:
           )
           | 'RechunkOut'
           >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-              source_dataset.sizes,
+              source_dataset.sizes,  # pyrefly: ignore[bad-argument-type]
               working_chunks,
               source_chunks,
               itemsize=RECHUNK_ITEMSIZE.value,
