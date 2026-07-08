@@ -322,10 +322,10 @@ def main(argv: list[str]) -> None:
   )
 
   paths = config.Paths(
-      forecast=FORECAST_PATH.value,
-      obs=OBS_PATH.value,
+      forecast=FORECAST_PATH.value,  # pyrefly: ignore[bad-argument-type]
+      obs=OBS_PATH.value,  # pyrefly: ignore[bad-argument-type]
       climatology=CLIMATOLOGY_PATH.value,
-      output_dir=OUTPUT_DIR.value,
+      output_dir=OUTPUT_DIR.value,  # pyrefly: ignore[bad-argument-type]
       output_file_prefix=OUTPUT_FILE_PREFIX.value,
   )
 
@@ -435,22 +435,22 @@ def main(argv: list[str]) -> None:
       'mae': metrics.SpatialMAE(),
   }
   if COMPUTE_SEEPS.value:
-    deterministic_metrics['seeps_24hr'] = metrics.SEEPS(
+    deterministic_metrics['seeps_24hr'] = metrics.SEEPS(  # pyrefly: ignore[bad-assignment]
         climatology=climatology,
         precip_name='total_precipitation_24hr',
         dry_threshold_mm=0.25,
     )
-    deterministic_metrics['seeps_6hr'] = metrics.SEEPS(
+    deterministic_metrics['seeps_6hr'] = metrics.SEEPS(  # pyrefly: ignore[bad-assignment]
         climatology=climatology,
         precip_name='total_precipitation_6hr',
         dry_threshold_mm=0.1,
     )
-    spatial_metrics['seeps_24hr'] = metrics.SpatialSEEPS(
+    spatial_metrics['seeps_24hr'] = metrics.SpatialSEEPS(  # pyrefly: ignore[bad-assignment]
         climatology=climatology,
         precip_name='total_precipitation_24hr',
         dry_threshold_mm=0.25,
     )
-    spatial_metrics['seels_6hr'] = metrics.SpatialSEEPS(
+    spatial_metrics['seels_6hr'] = metrics.SpatialSEEPS(  # pyrefly: ignore[bad-assignment]
         climatology=climatology,
         precip_name='total_precipitation_6hr',
         dry_threshold_mm=0.1,
@@ -462,26 +462,26 @@ def main(argv: list[str]) -> None:
 
   eval_configs = {
       'deterministic': config.Eval(
-          metrics=deterministic_metrics,
+          metrics=deterministic_metrics,  # pyrefly: ignore[bad-argument-type]
           against_analysis=False,
-          regions=regions,
-          derived_variables=derived_variables,
+          regions=regions,  # pyrefly: ignore[bad-argument-type]
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
           evaluate_persistence=EVALUATE_PERSISTENCE.value,
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
       ),
       'deterministic_spatial': config.Eval(
-          metrics=spatial_metrics,
+          metrics=spatial_metrics,  # pyrefly: ignore[bad-argument-type]
           against_analysis=False,
-          derived_variables=derived_variables,
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
           evaluate_persistence=EVALUATE_PERSISTENCE.value,
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
           output_format='zarr',
       ),
       'deterministic_temporal': config.Eval(
-          metrics=deterministic_metrics | rmse_metrics,
+          metrics=deterministic_metrics | rmse_metrics,  # pyrefly: ignore[bad-argument-type]
           against_analysis=False,
-          regions=regions,
-          derived_variables=derived_variables,
+          regions=regions,  # pyrefly: ignore[bad-argument-type]
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
           evaluate_persistence=EVALUATE_PERSISTENCE.value,
           evaluate_climatology=EVALUATE_CLIMATOLOGY.value,
           temporal_mean=False,
@@ -489,10 +489,10 @@ def main(argv: list[str]) -> None:
       # Against analysis is deprecated for by_init, since the time intervals are
       # not compatible. Still functional for by_valid
       'deterministic_vs_analysis': config.Eval(
-          metrics=deterministic_metrics,
+          metrics=deterministic_metrics,  # pyrefly: ignore[bad-argument-type]
           against_analysis=True,
-          regions=regions,
-          derived_variables=derived_variables,
+          regions=regions,  # pyrefly: ignore[bad-argument-type]
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
       ),
       'probabilistic': config.Eval(
           metrics={
@@ -511,9 +511,9 @@ def main(argv: list[str]) -> None:
                   ensemble_dim=ENSEMBLE_DIM.value
               ),
           },
-          regions=regions,
+          regions=regions,  # pyrefly: ignore[bad-argument-type]
           against_analysis=False,
-          derived_variables=derived_variables,
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
           evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
           probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
@@ -531,9 +531,9 @@ def main(argv: list[str]) -> None:
                   ensemble_dim=ENSEMBLE_DIM.value, thresholds=threshold_list
               ),
           },
-          regions=regions,
+          regions=regions,  # pyrefly: ignore[bad-argument-type]
           against_analysis=False,
-          derived_variables=derived_variables,
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
           evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
           probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
@@ -562,7 +562,7 @@ def main(argv: list[str]) -> None:
               ),
           },
           against_analysis=False,
-          derived_variables=derived_variables,
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
       ),
       'probabilistic_spatial': config.Eval(
           metrics={
@@ -586,7 +586,7 @@ def main(argv: list[str]) -> None:
               ),
           },
           against_analysis=False,
-          derived_variables=derived_variables,
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
           evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
           probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
@@ -606,7 +606,7 @@ def main(argv: list[str]) -> None:
               ),
           },
           against_analysis=False,
-          derived_variables=derived_variables,
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
           evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
           probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
@@ -620,7 +620,7 @@ def main(argv: list[str]) -> None:
               ),
           },
           against_analysis=False,
-          derived_variables=derived_variables,
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
           evaluate_probabilistic_climatology=EVALUATE_PROBABILISTIC_CLIMATOLOGY.value,
           probabilistic_climatology_start_year=PROBABILISTIC_CLIMATOLOGY_START_YEAR.value,
           probabilistic_climatology_end_year=PROBABILISTIC_CLIMATOLOGY_END_YEAR.value,
@@ -633,8 +633,8 @@ def main(argv: list[str]) -> None:
               'ensemble_variance': metrics.GaussianVariance(),
           },
           against_analysis=False,
-          regions=regions,
-          derived_variables=derived_variables,
+          regions=regions,  # pyrefly: ignore[bad-argument-type]
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
       ),
       'gaussian_binary': config.Eval(
           metrics={
@@ -646,8 +646,8 @@ def main(argv: list[str]) -> None:
               ),
           },
           against_analysis=False,
-          regions=regions,
-          derived_variables=derived_variables,
+          regions=regions,  # pyrefly: ignore[bad-argument-type]
+          derived_variables=derived_variables,  # pyrefly: ignore[bad-argument-type]
       ),
   }
   if not set(EVAL_CONFIGS.value.split(',')).issubset(eval_configs):
@@ -666,7 +666,7 @@ def main(argv: list[str]) -> None:
     evaluation.evaluate_with_beam(
         data_config,
         eval_configs,
-        runner=RUNNER.value,
+        runner=RUNNER.value,  # pyrefly: ignore[bad-argument-type]
         input_chunks=INPUT_CHUNKS.value,
         skipna=SKIPNA.value,
         fanout=FANOUT.value,

@@ -87,7 +87,7 @@ def moment_reduce_spatial_chunk(
 ) -> tuple[xbeam.Key, xr.Dataset]:
   """Reduce a chunk by computing a statistical moment in space."""
   stat_key = obs_key.with_offsets(longitude=None, latitude=None)
-  stat_key = stat_key.replace(vars={f'{var}_{order}' for var in stat_key.vars})
+  stat_key = stat_key.replace(vars={f'{var}_{order}' for var in stat_key.vars})  # pyrefly: ignore[not-iterable]
   for var in obs_chunk:
     obs_chunk = obs_chunk.rename({var: f'{var}_{order}'})
   stat_chunk = moment_reduce(obs_chunk, order=order)

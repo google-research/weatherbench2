@@ -222,7 +222,7 @@ def _get_selections(
           maybe_tostr(flag_utils.get_dim_value(v_i)) for v_i in v.split('+')
       ]
     else:  # Else handle non-list types
-      v = flag_utils.get_dim_value(v)
+      v = flag_utils.get_dim_value(v)  # pyrefly: ignore[bad-argument-type]
       if dim not in value_selectors:
         value_selectors[dim] = [None, None, None]
       if placement == 'start':
@@ -289,7 +289,7 @@ def main(argv: abc.Sequence[str]) -> None:
             ds, input_chunks, split_vars=True, num_threads=NUM_THREADS.value
         )
         | xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-            ds.sizes,
+            ds.sizes,  # pyrefly: ignore[bad-argument-type]
             input_chunks,
             output_chunks,
             itemsize=itemsize,

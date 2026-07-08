@@ -117,11 +117,11 @@ def main(argv):
 
   new_lon = regridding.longitude_values(
       LONGITUDE_SCHEME.value,
-      LONGITUDE_NODES.value,
+      LONGITUDE_NODES.value,  # pyrefly: ignore[bad-argument-type]
   )
   new_lat = regridding.latitude_values(
       LATITUDE_SPACING.value,
-      LATITUDE_NODES.value,
+      LATITUDE_NODES.value,  # pyrefly: ignore[bad-argument-type]
   )
 
   regridder_cls = {
@@ -158,7 +158,7 @@ def main(argv):
         | 'Regrid'
         >> beam.MapTuple(lambda k, v: (k, regridder.regrid_dataset(v)))
         | xarray_beam.Rechunk(
-            template.sizes,
+            template.sizes,  # pyrefly: ignore[bad-argument-type]
             input_chunks,
             output_chunks,
             itemsize=itemsize,

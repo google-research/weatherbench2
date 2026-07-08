@@ -164,14 +164,14 @@ class SEEPSThreshold:
       weights: Optional[xr.Dataset] = None,
   ):
     """Compute SEEPS thresholds and fraction of dry grid points."""
-    ds = ds[self.var]
+    ds = ds[self.var]  # pyrefly: ignore[bad-assignment]
     is_dry = ds < self.dry_threshold_m
     dry_fraction = is_dry.mean(dim=dim)
     not_dry = ds.where(~is_dry)
     heavy_threshold = not_dry
     if weights is not None:
       heavy_threshold = heavy_threshold.weighted(
-          weights
+          weights  # pyrefly: ignore[bad-argument-type]
       )  # pytype: disable=wrong-arg-types
     heavy_threshold = heavy_threshold.quantile(2 / 3, dim=dim)
     out = xr.Dataset(
@@ -197,11 +197,11 @@ def compute_seeps_chunk(
   clim_key = obs_key.with_offsets(time=None, hour=0, dayofyear=0)
   if METHOD.value != 'explicit':
     raise NotImplementedError('SEEPS only tested for explicit.')
-  (var,) = clim_key.vars
+  (var,) = clim_key.vars  # pyrefly: ignore[not-iterable]
   clim_key = clim_key.replace(
       vars={f'{var}_seeps_threshold', f'{var}_seeps_dry_fraction'}
   )
-  stat_fn = SEEPSThreshold(seeps_threshold_mm[var], var=var).compute
+  stat_fn = SEEPSThreshold(seeps_threshold_mm[var], var=var).compute  # pyrefly: ignore[unsupported-operation]
   if frequency == 'hourly':
     clim_chunk = utils.compute_hourly_stat(
         obs=obs_chunk,
@@ -242,12 +242,12 @@ def compute_stat_chunk(
   clim_key = obs_key.with_offsets(time=None, **offsets)
   if statistic != 'mean':
     clim_key = clim_key.replace(
-        vars={f'{var}_{statistic}' for var in clim_key.vars}
+        vars={f'{var}_{statistic}' for var in clim_key.vars}  # pyrefly: ignore[not-iterable]
     )
     for var in obs_chunk:
       obs_chunk = obs_chunk.rename({var: f'{var}_{statistic}'})
   if statistic == 'quantile':
-    statistic = Quantile(quantiles).compute
+    statistic = Quantile(quantiles).compute  # pyrefly: ignore[bad-argument-type]
   compute_kwargs = {
       'obs': obs_chunk,
       'window_size': window_size,
@@ -257,16 +257,16 @@ def compute_stat_chunk(
 
   if frequency == 'hourly' and METHOD.value == 'explicit':
     clim_chunk = utils.compute_hourly_stat(
-        **compute_kwargs, hour_interval=hour_interval
+        **compute_kwargs, hour_interval=hour_interval  # pyrefly: ignore[bad-argument-type]
     )
   elif frequency == 'hourly' and METHOD.value == 'fast':
     clim_chunk = utils.compute_hourly_stat_fast(
-        **compute_kwargs, hour_interval=hour_interval
+        **compute_kwargs, hour_interval=hour_interval  # pyrefly: ignore[bad-argument-type]
     )
   elif frequency == 'daily' and METHOD.value == 'explicit':
     clim_chunk = utils.compute_daily_stat(**compute_kwargs)
   elif frequency == 'daily' and METHOD.value == 'fast':
-    clim_chunk = utils.compute_daily_stat_fast(**compute_kwargs)
+    clim_chunk = utils.compute_daily_stat_fast(**compute_kwargs)  # pyrefly: ignore[bad-argument-type]
   else:
     raise NotImplementedError(
         f'method {METHOD.value} for climatological frequency {frequency}'
@@ -384,7 +384,7 @@ def main(argv: list[str]) -> None:
         )
         | 'RechunkIn'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-            obs.sizes,
+            obs.sizes,  # pyrefly: ignore[bad-argument-type]
             input_chunks,
             in_working_chunks,
             itemsize=RECHUNK_ITEMSIZE.value,
@@ -434,7 +434,7 @@ def main(argv: list[str]) -> None:
         | beam.Flatten()
         | 'RechunkOut'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-            clim_template.sizes,
+            clim_template.sizes,  # pyrefly: ignore[bad-argument-type]
             out_working_chunks,
             output_chunks,
             itemsize=RECHUNK_ITEMSIZE.value,

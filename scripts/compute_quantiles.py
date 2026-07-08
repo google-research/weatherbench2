@@ -148,7 +148,7 @@ def _impose_data_selection(
       TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value),
   }
   if LEVELS.value:
-    selection['level'] = [float(l) for l in LEVELS.value]
+    selection['level'] = [float(l) for l in LEVELS.value]  # pyrefly: ignore[unsupported-operation]
   ds = ds.sel({k: v for k, v in selection.items() if k in ds.dims})
   chunks = {k: v for k, v in chunks.items() if k in ds.dims}
   return ds, chunks
@@ -173,13 +173,13 @@ def _evaluate_chunk_core(chunk: xr.Dataset) -> xr.Dataset:
         f' {preserve_dims} , not being a subset of {set(chunk.dims)=}'
     )
 
-  quantiles = [float(q) for q in QUANTILES.value]
+  quantiles = [float(q) for q in QUANTILES.value]  # pyrefly: ignore[not-iterable]
   if any(q < 0 or q > 1 for q in quantiles):
     raise ValueError(
         f'Expected all quantiles to be in [0, 1]. Found {quantiles=}'
     )
   values = chunk.quantile(quantiles, dim=DIM.value, skipna=SKIPNA.value)
-  return values.rename_vars({v: v + NAME_SUFFIX.value for v in values})
+  return values.rename_vars({v: v + NAME_SUFFIX.value for v in values})  # pyrefly: ignore[unsupported-operation]
 
 
 def main(argv: list[str]) -> None:
@@ -202,7 +202,7 @@ def main(argv: list[str]) -> None:
     else:
       working_chunks[k] = -1
   output_chunks = {
-      k: OUTPUT_CHUNKS.value.get(k, source_chunks[k])
+      k: OUTPUT_CHUNKS.value.get(k, source_chunks[k])  # pyrefly: ignore[bad-index]
       for k in preserve_dims.intersection(source_chunks)
   }
   output_chunks.setdefault('quantile', -1)
@@ -232,7 +232,7 @@ def main(argv: list[str]) -> None:
         # rechunking.
         | 'RechunkToWorkingChunks'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-            source_ds.sizes,
+            source_ds.sizes,  # pyrefly: ignore[bad-argument-type]
             source_chunks,
             working_chunks,
             itemsize=itemsize,
@@ -240,16 +240,16 @@ def main(argv: list[str]) -> None:
         | 'Compute_nan_fraction' >> beam.MapTuple(evaluate_chunk)
         | 'RechunkToOutputChunks'
         >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
-            template.sizes,
+            template.sizes,  # pyrefly: ignore[bad-argument-type]
             # Want to inject -1 for new dims
-            {k: working_chunks.get(k, -1) for k in output_chunks},
-            output_chunks,
+            {k: working_chunks.get(k, -1) for k in output_chunks},  # pyrefly: ignore[bad-argument-type]
+            output_chunks,  # pyrefly: ignore[bad-argument-type]
             itemsize=itemsize,
         )
         | xbeam.ChunksToZarr(
             OUTPUT_PATH.value,
             template,
-            output_chunks,
+            output_chunks,  # pyrefly: ignore[bad-argument-type]
             num_threads=NUM_THREADS.value,
         )
     )

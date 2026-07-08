@@ -358,8 +358,8 @@ def _conservative_latitude_weights(
   Returns:
     NumPy array with shape (target, source). Rows sum to 1.
   """
-  _assert_increasing(source_points)
-  _assert_increasing(target_points)
+  _assert_increasing(source_points)  # pyrefly: ignore[bad-argument-type]
+  _assert_increasing(target_points)  # pyrefly: ignore[bad-argument-type]
   overlap = _latitude_overlap(
       source_points, target_points, source_includes_poles, target_includes_poles
   )
