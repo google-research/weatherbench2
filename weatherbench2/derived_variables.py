@@ -662,8 +662,8 @@ def interpolate_spectral_frequencies(
         freq_min, freq_max, num=spectrum.sizes[wavenumber_dim]
     )
   frequencies = np.asarray(frequencies)  # pyrefly: ignore[bad-assignment]
-  if frequencies.ndim != 1:
-    raise ValueError(f'Expected 1-D frequencies, found {frequencies.shape=}')
+  if frequencies.ndim != 1:  # pyrefly: ignore[missing-attribute]
+    raise ValueError(f'Expected 1-D frequencies, found {frequencies.shape=}')  # pyrefly: ignore[missing-attribute]
 
   def interp_at_one_lat(da: xr.DataArray) -> xr.DataArray:
     da = (

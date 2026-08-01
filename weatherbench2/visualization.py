@@ -108,8 +108,8 @@ def datetime_to_xticks(
     mx = lead_time.values.max()
   ns = np.arange(lead_time.values.min(), mx + 1, np.timedelta64(1, 'D'))
   days = ns.astype('timedelta64[D]')
-  ax.set_xticks(ns.astype(int))
-  ax.set_xticklabels(days.astype(int))
+  ax.set_xticks(ns.astype(int))  # pyrefly: ignore[not-callable]
+  ax.set_xticklabels(days.astype(int))  # pyrefly: ignore[not-callable]
   ax.set_xlim(lead_time.values.min(), lead_time.values.max())
 
 
@@ -233,7 +233,7 @@ def plot_timeseries(
             marker=marker,
             markersize=markersize,
         )
-      datetime_to_xticks(da.lead_time, ax, xlim=xlim)
+      datetime_to_xticks(da.lead_time, ax, xlim=xlim)  # pyrefly: ignore[bad-argument-type]
     else:
       ax.axhline(da, label=label, color=colors[name] if colors else None)
   if add_legend:
@@ -274,7 +274,7 @@ def visualize_timeseries(
         level=panel_config.level,
         region=panel_config.region,
         colors=viz_config.colors,
-        linestyles=viz_config.linestyles,
+        linestyles=viz_config.linestyles,  # pyrefly: ignore[bad-argument-type]
         marker=viz_config.marker,
         markersize=viz_config.markersize,
         ax=ax,
@@ -314,7 +314,7 @@ def visualize_scorecard(
     cmap_scale: float = 100,
 ) -> None:
   """Plot relative scorecard."""
-  matplotlib.rcParams.update(matplotlib.rcParamsDefault)
+  matplotlib.rcParams.update(matplotlib.rcParamsDefault)  # pyrefly: ignore[missing-attribute]
 
   # Compute relative
   results = load_results(viz_config.results)
@@ -324,9 +324,9 @@ def visualize_scorecard(
     relative = relative.sel(region=region)
 
   if vars_3d is None:
-    vars_3d = [var for var in relative if hasattr(relative[var], 'level')]
+    vars_3d = [var for var in relative if hasattr(relative[var], 'level')]  # pyrefly: ignore[bad-assignment]
   if vars_2d is None:
-    vars_2d = [var for var in relative if not hasattr(relative[var], 'level')]
+    vars_2d = [var for var in relative if not hasattr(relative[var], 'level')]  # pyrefly: ignore[bad-assignment]
 
   def set_x_labels(ax, dataset):
     lead_time_h = int(dataset.lead_time[1] / np.timedelta64(1, 'h'))
@@ -369,8 +369,8 @@ def visualize_scorecard(
         )
         ax.add_patch(rect)
 
-  nvar_3d = len(vars_3d)
-  nvar_2d = len(vars_2d)
+  nvar_3d = len(vars_3d)  # pyrefly: ignore[bad-argument-type]
+  nvar_2d = len(vars_2d)  # pyrefly: ignore[bad-argument-type]
   nlev = len(relative.level)
 
   ratio = (nvar_3d * nlev + nvar_2d) / len(relative.lead_time)
@@ -388,7 +388,7 @@ def visualize_scorecard(
       bottom=0.1,
   )
   row_counter = 0
-  for var in vars_3d:
+  for var in vars_3d:  # pyrefly: ignore[not-iterable]
     data = relative[var].transpose('level', 'lead_time')
     ax = fig.add_subplot(gs[row_counter : row_counter + nlev, :-1])
     if row_counter == 0:
@@ -399,7 +399,7 @@ def visualize_scorecard(
     set_y_labels(ax, relative, levels=True)
     row_counter += nlev
 
-  for var in vars_2d:
+  for var in vars_2d:  # pyrefly: ignore[not-iterable]
     data = relative[var].expand_dims({'dummy': 1})
     ax = fig.add_subplot(gs[row_counter, :-1])
     img = ax.imshow(data, vmin=-cmap_scale, vmax=cmap_scale, cmap=cmap)
@@ -407,16 +407,17 @@ def visualize_scorecard(
     set_y_labels(ax, relative, levels=False)
     ax.set_ylabel(long2short[var], rotation='horizontal', labelpad=20)
     row_counter += 1
-  set_x_labels(ax, relative)
+  set_x_labels(ax, relative)  # pyrefly: ignore[unbound-name]
   ax.set_xlabel('Lead time (days)')
 
-  ax0.set_title(
+  ax0.set_title(  # pyrefly: ignore[unbound-name]
+      # pyrefly: ignore[unsupported-operation]
       f'{viz_config.labels[forecast]} RMSE relative to'
       f' {viz_config.labels[baseline]}'
   )
 
   cax = fig.add_subplot(gs[:, -1])
-  fig.colorbar(img, cax=cax, orientation='vertical')
+  fig.colorbar(img, cax=cax, orientation='vertical')  # pyrefly: ignore[unbound-name]
 
   if save_path is not None:
     with fsspec.open(save_path, 'wb', auto_mkdir=True) as f:
