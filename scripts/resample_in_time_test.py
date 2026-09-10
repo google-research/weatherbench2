@@ -28,6 +28,57 @@ from . import resample_in_time
 class ResampleInTimeTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
+      ('Datetime', 'time', []),
+      ('LeadTime', 'prediction_timedelta', []),
+      ('SelectedHours', 'time', [0, 12]),
+  )
+  def test_right_labeled_rolling_preserves_timestamps(
+      self, time_dim, output_select_hours
+  ):
+    if time_dim == 'time':
+      times = pd.date_range('2023-01-01', periods=9, freq='6h')
+    else:
+      times = pd.timedelta_range('0h', periods=9, freq='6h')
+    input_ds = xr.Dataset(
+        {'temperature': (time_dim, np.arange(9, dtype=float))},
+        coords={time_dim: times},
+    )
+    input_path = self.create_tempdir('right_source').full_path
+    input_ds.to_zarr(input_path)
+    output_path = self.create_tempdir('right_rolling').full_path
+    with flagsaver.as_parsed(
+        input_path=input_path,
+        output_path=output_path,
+        method='rolling',
+        period='12h',
+        mean_vars='ALL',
+        label_side='right',
+        time_dim=time_dim,
+        output_select_hours=','.join(map(str, output_select_hours)),
+        runner='DirectRunner',
+    ):
+      resample_in_time.main([])
+    actual, _ = xarray_beam.open_zarr(output_path)
+    expected = xr.Dataset(
+        {
+            'temperature': (
+                time_dim, [np.nan, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]
+            )
+        },
+        coords={time_dim: times},
+    )
+    if output_select_hours:
+      expected = expected.sel(
+          time=expected.time.dt.hour.isin(output_select_hours)
+      )
+    xr.testing.assert_equal(actual, expected)
+    if time_dim == 'time':
+      resampled = input_ds.resample(
+          time='12h', label='right', closed='right'
+      ).mean().isel(time=slice(1, None))
+      xr.testing.assert_equal(actual.sel(time=resampled.time), resampled)
+
+  @parameterized.named_parameters(
       dict(testcase_name='NoNaN', insert_nan=False),
       dict(testcase_name='YesNaN', insert_nan=True),
   )
