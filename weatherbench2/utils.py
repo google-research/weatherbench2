@@ -190,7 +190,7 @@ def smooth_dayofyear_variable_with_rolling_window(
   half_window = window_size // 2
   stacked_rolling = xr.concat(
       [
-          obs_dayofyear.roll(dayofyear=i) * window_weights[i + half_window]
+          obs_dayofyear.roll(dayofyear=i) * window_weights[i + half_window]  # pyrefly: ignore[bad-argument-type]
           for i in np.arange(-half_window, window_size - half_window)
       ],
       dim='stack',

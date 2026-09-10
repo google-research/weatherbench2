@@ -468,10 +468,10 @@ def main(argv: abc.Sequence[str]) -> None:
                 time_dim=TIME_DIM.value,
                 method=METHOD.value,
                 period=period,
-                mean_vars=mean_vars,
-                min_vars=min_vars,
-                max_vars=max_vars,
-                sum_vars=sum_vars,
+                mean_vars=mean_vars,  # pyrefly: ignore[bad-argument-type]
+                min_vars=min_vars,  # pyrefly: ignore[bad-argument-type]
+                max_vars=max_vars,  # pyrefly: ignore[bad-argument-type]
+                sum_vars=sum_vars,  # pyrefly: ignore[bad-argument-type]
                 add_mean_suffix=ADD_MEAN_SUFFIX.value,
                 skipna=SKIPNA.value,
                 output_select_hours=output_select_hours,
