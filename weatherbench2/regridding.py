@@ -292,7 +292,7 @@ class BilinearRegridder(Regridder):
     )
     field = vec_lon_interp(lon_target, lon_source, field)
 
-    return field
+    return field  # pyrefly: ignore[bad-return]
 
 
 def _assert_increasing(x: np.ndarray) -> None:
