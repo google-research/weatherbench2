@@ -99,6 +99,53 @@ class WindSpeed(_WindVariable):
     return np.sqrt(u**2 + v**2)  # pyrefly: ignore[bad-return]
 
 
+@dataclasses.dataclass
+class MeanRadiationFlux(DerivedVariable):
+  """Convert an accumulated ERA5 radiation variable to a mean flux rate.
+
+  ERA5 stores radiation (and several other flux) variables as energy
+  accumulated over the preceding hour, in J m**-2. Dividing by the
+  accumulation period gives the mean flux rate in W m**-2. With
+  `negate=True` the sign is flipped to the outgoing-positive convention,
+  e.g. outgoing longwave radiation (OLR):
+
+    olr = -top_net_thermal_radiation / 3600
+
+  This class is intentionally NOT registered in `DERIVED_VARIABLE_DICT`:
+  the current WeatherBench 2 stores do not contain the raw accumulated
+  source fields (see the data guide's warning about all-NaN `mean_*`
+  radiation variables). It supports computing the mean fluxes from raw
+  ARCO ERA5 accumulations. The intended entry, once a store ingests the
+  raw fields, is e.g.:
+
+    'mean_top_net_long_wave_radiation_flux': MeanRadiationFlux(
+        raw_name='top_net_thermal_radiation', negate=True)
+
+  Attributes:
+    raw_name: Name of the accumulated source variable (J m**-2 per window).
+    accumulation_seconds: Length of the accumulation window (ERA5: 3600).
+    negate: If True, flip the sign (outgoing-positive convention).
+  """
+
+  raw_name: str
+  accumulation_seconds: float = 3600.0
+  negate: bool = False
+
+  @property
+  def base_variables(self) -> list[str]:
+    return [self.raw_name]
+
+  @property
+  def core_dims(self) -> t.Tuple[t.Tuple[t.List[str], ...], t.List[str]]:
+    return ([],), []
+
+  def compute(self, dataset: xr.Dataset) -> xr.DataArray:
+    flux = dataset[self.raw_name] / self.accumulation_seconds
+    if self.negate:
+      flux = -flux
+    return flux
+
+
 def _zero_poles(field: xr.Dataset, epsilon: float = 1e-6):
   cos_theta = np.cos(np.deg2rad(field.coords['latitude']))
   return field.where(cos_theta > epsilon, 0.0)
@@ -317,7 +364,9 @@ class AgeostrophicWindSpeed(_AgeostrophicWindVariable):
     u = dataset[self.u_name]
     v = dataset[self.v_name]
     u_geo, v_geo = _geostrophic_wind(dataset[self.geopotential_name])
-    return np.sqrt((u - u_geo) ** 2 + (v - v_geo) ** 2)  # pyrefly: ignore[bad-return]
+    return np.sqrt(
+        (u - u_geo) ** 2 + (v - v_geo) ** 2
+    )  # pyrefly: ignore[bad-return]
 
 
 class UComponentOfAgeostrophicWind(_AgeostrophicWindVariable):
@@ -427,7 +476,9 @@ class IntegratedWaterTransport(DerivedVariable):
         .sel(level=slice(self.level_min, self.level_max))
         .integrate('level')
     )
-    return (1 / g) * np.sqrt(u_integral**2 + v_integral**2)  # pyrefly: ignore[bad-return]
+    return (1 / g) * np.sqrt(
+        u_integral**2 + v_integral**2
+    )  # pyrefly: ignore[bad-return]
 
 
 @dataclasses.dataclass
@@ -672,7 +723,9 @@ def interpolate_spectral_frequencies(
             {wavenumber_dim: 'frequency'}
         )  # pytype: disable=wrong-arg-types
         .drop_vars(wavenumber_dim)
-        .interp(frequency=frequencies, method=method, **interp_kwargs)  # pyrefly: ignore[bad-argument-type]
+        .interp(
+            frequency=frequencies, method=method, **interp_kwargs
+        )  # pyrefly: ignore[bad-argument-type]
     )
     # Interp didn't deal well with the infinite wavelength, so just reset λ as..
     da['wavelength'] = 1 / da.frequency

@@ -100,6 +100,43 @@ class DerivedVariablesTest(absltest.TestCase):
     expected = xr.DataArray([0, 5, np.nan])
     xr.testing.assert_allclose(result, expected)
 
+  def testMeanRadiationFluxDefault(self):
+    dataset = xr.Dataset(
+        {
+            'surface_net_thermal_radiation': xr.DataArray(
+                [-864000.0, 0.0, np.nan]
+            )
+        }
+    )
+
+    derived_variable = dvs.MeanRadiationFlux(
+        raw_name='surface_net_thermal_radiation',
+    )
+
+    result = derived_variable.compute(dataset)
+
+    expected = xr.DataArray([-240.0, 0.0, np.nan])
+    xr.testing.assert_allclose(result, expected)
+
+  def testMeanRadiationFluxWithNegate(self):
+    dataset = xr.Dataset(
+        {
+            'top_net_thermal_radiation': xr.DataArray(
+                [-864000.0, -720000.0, np.nan]
+            )
+        }
+    )
+
+    derived_variable = dvs.MeanRadiationFlux(
+        raw_name='top_net_thermal_radiation',
+        negate=True,
+    )
+
+    result = derived_variable.compute(dataset)
+
+    expected = xr.DataArray([240.0, 200.0, np.nan])
+    xr.testing.assert_allclose(result, expected)
+
   def testRelativeHumidity(self):
     dataset = xr.Dataset(
         {
