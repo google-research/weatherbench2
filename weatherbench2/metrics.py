@@ -170,7 +170,7 @@ def _spatial_average_l2_norm(
     skipna: bool,
 ) -> xr.Dataset:
   """Helper function to compute sqrt(spatial_average(ds**2))."""
-  return np.sqrt(_spatial_average(dataset**2, region=region, skipna=skipna))
+  return np.sqrt(_spatial_average(dataset**2, region=region, skipna=skipna))  # pyrefly: ignore[bad-return]
 
 
 @dataclasses.dataclass
@@ -231,7 +231,7 @@ class WindVectorRMSESqrtBeforeTimeAvg(Metric):
     mse = WindVectorMSE(
         u_name=self.u_name, v_name=self.v_name, vector_name=self.vector_name
     ).compute_chunk(forecast, truth, region=region, skipna=skipna)
-    return np.sqrt(mse)
+    return np.sqrt(mse)  # pyrefly: ignore[bad-return]
 
 
 @dataclasses.dataclass
