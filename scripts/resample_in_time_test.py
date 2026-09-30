@@ -62,7 +62,8 @@ class ResampleInTimeTest(parameterized.TestCase):
     expected = xr.Dataset(
         {
             'temperature': (
-                time_dim, [np.nan, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]
+                time_dim,
+                [np.nan, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5],
             )
         },
         coords={time_dim: times},
@@ -73,9 +74,11 @@ class ResampleInTimeTest(parameterized.TestCase):
       )
     xr.testing.assert_equal(actual, expected)
     if time_dim == 'time':
-      resampled = input_ds.resample(
-          time='12h', label='right', closed='right'
-      ).mean().isel(time=slice(1, None))
+      resampled = (
+          input_ds.resample(time='12h', label='right', closed='right')
+          .mean()
+          .isel(time=slice(1, None))
+      )
       xr.testing.assert_equal(actual.sel(time=resampled.time), resampled)
 
   @parameterized.named_parameters(
