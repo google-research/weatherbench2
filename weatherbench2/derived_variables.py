@@ -597,8 +597,10 @@ class ZonalEnergySpectrum(DerivedVariable):
       f_k = np.fft.rfft(f_x, axis=-1, norm='forward')
       # freq > 0 should be counted twice in power since it accounts for both
       # positive and negative complex values.
-      one_and_many_twos = np.concatenate(([1], [2] * (f_k.shape[-1] - 1)))
-      return np.real(f_k * np.conj(f_k)) * one_and_many_twos
+      n = f_x.shape[-1]
+      doubling = np.ones(f_k.shape[-1])
+      doubling[1:(n + 1) // 2] = 2.0
+      return np.real(f_k * np.conj(f_k)) * doubling
 
     spectrum = xr.apply_ufunc(
         simple_power,
