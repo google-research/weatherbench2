@@ -555,7 +555,8 @@ def _debiased_ensemble_mean_mse(
     truth: A ground truth dataset.
     ensemble_dim: Dimension indexing ensembles in the forecast.
     skipna: Whether to skip NaN values in both forecasts and observations during
-      evaluation.
+      evaluation. Debiasing uses each variable's local count of available members.
+      Locations with fewer than two available members remain NaN.
 
   Returns:
     Dataset with debiased (forecast - truth)².
@@ -563,7 +564,12 @@ def _debiased_ensemble_mean_mse(
   forecast_mean = forecast.mean(ensemble_dim, skipna=skipna)
   forecast_var = forecast.var(ensemble_dim, skipna=skipna, ddof=1)
   biased_mse = (truth - forecast_mean) ** 2
-  return biased_mse - forecast_var / _get_n_ensemble(forecast, ensemble_dim)
+  n_ensemble = (
+      forecast.count(ensemble_dim).astype(forecast_var.dtypes)
+      if skipna
+      else _get_n_ensemble(forecast, ensemble_dim)
+  )
+  return biased_mse - forecast_var / n_ensemble
 
 
 def _get_n_ensemble(
