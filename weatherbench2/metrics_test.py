@@ -1436,5 +1436,131 @@ class SEEPSTest(absltest.TestCase):
     )
 
 
+class DebiasedMissingMemberTest(parameterized.TestCase):
+  """Debias with the number of available members at each output location."""
+
+  @parameterized.parameters(np.float32, np.float64)
+  def test_local_counts_preserve_floating_dtypes(self, dtype):
+    forecast = xr.Dataset(
+        {'x': ('realization', np.array([1.0, 3.0, np.nan], dtype=dtype))}
+    )
+    truth = xr.Dataset({'x': xr.DataArray(np.array(0.0, dtype=dtype))})
+    metric = metrics.DebiasedSpatialEnsembleMeanMSE()
+    for data in (forecast, forecast.chunk({'realization': 1})):
+      actual = metric.compute_chunk(data, truth, skipna=True).compute()
+      self.assertEqual(actual.x.dtype, np.dtype(dtype))
+      self.assertAlmostEqual(float(actual.x), 3.0)
+
+  @parameterized.product(
+      ensemble_dim=('realization', 'member'), skipna=(False, True)
+  )
+  def test_local_counts_and_single_member_controls(self, ensemble_dim, skipna):
+    values = np.array(
+        [
+            [1.0, 2.0, np.nan, 5.0],
+            [3.0, 4.0, np.nan, np.nan],
+            [np.nan, 8.0, np.nan, np.nan],
+            [np.nan, 10.0, np.nan, np.nan],
+        ]
+    )
+    forecast = xr.Dataset(
+        {'x': ((ensemble_dim, 'point'), values)},
+        coords={ensemble_dim: [2, 5, 9, 15], 'point': ['a', 'b', 'c', 'd']},
+    )
+    truth = xr.Dataset(
+        {'x': ('point', [0.0, 1.0, 0.0, 0.0])}, coords={'point': forecast.point}
+    )
+    original = forecast.copy(deep=True)
+    actual = metrics.DebiasedSpatialEnsembleMeanMSE(
+        ensemble_dim=ensemble_dim
+    ).compute_chunk(forecast, truth, skipna=skipna)
+    expected = []
+    for column, target in zip(values.T, truth.x.values):
+      available = column[~np.isnan(column)]
+      if len(available) < 2 or (not skipna and len(available) != len(column)):
+        expected.append(np.nan)
+      else:
+        mean = sum(available) / len(available)
+        variance = sum((available - mean) ** 2) / (len(available) - 1)
+        expected.append((mean - target) ** 2 - variance / len(available))
+    xr.testing.assert_allclose(
+        actual,
+        xr.Dataset(
+            {'x': ('point', expected)}, coords={'point': forecast.point}
+        ),
+    )
+    xr.testing.assert_identical(forecast, original)
+
+  @parameterized.parameters(False, True)
+  def test_extra_missing_members_do_not_change_scores(self, chunked):
+    forecast = xr.Dataset(
+        {'x': ('realization', [1.0, 3.0]), 'y': ('realization', [2.0, 6.0])},
+        coords={'realization': [0, 1]},
+    )
+    truth = xr.Dataset({'x': xr.DataArray(0.0), 'y': xr.DataArray(1.0)})
+    padded = forecast.reindex(realization=np.arange(7), fill_value=np.nan)
+    if chunked:
+      forecast = forecast.chunk({'realization': 1})
+      padded = padded.chunk({'realization': 2})
+    metric = metrics.DebiasedSpatialEnsembleMeanMSE()
+    actual = metric.compute_chunk(padded, truth, skipna=True).compute()
+    expected = metric.compute_chunk(forecast, truth, skipna=True).compute()
+    xr.testing.assert_identical(actual, expected)
+    self.assertAlmostEqual(float(actual.x), 3.0)
+    self.assertAlmostEqual(float(actual.y), 5.0)
+
+  def test_variable_specific_counts_survive_spatial_and_temporal_aggregation(
+      self,
+  ):
+    forecast = xr.Dataset(
+        {
+            'x': (
+                ('time', 'latitude', 'longitude', 'realization'),
+                np.array(
+                    [
+                        [[[1.0, 3.0, np.nan], [2.0, 4.0, 6.0]]],
+                        [[[2.0, 6.0, np.nan], [1.0, 5.0, 9.0]]],
+                    ]
+                ),
+            ),
+            'y': (
+                ('time', 'latitude', 'longitude', 'realization'),
+                np.array(
+                    [
+                        [[[0.0, 2.0, 4.0], [4.0, 8.0, np.nan]]],
+                        [[[1.0, 3.0, 5.0], [2.0, 8.0, np.nan]]],
+                    ]
+                ),
+            ),
+        },
+        coords={
+            'time': np.array(
+                ['2020-01-01', '2020-01-02'], dtype='datetime64[ns]'
+            ),
+            'latitude': [0.0],
+            'longitude': [0.0, 180.0],
+            'realization': [0, 1, 2],
+        },
+    )
+    truth = xr.zeros_like(forecast.isel(realization=0, drop=True))
+    expected = {}
+    for name in forecast:
+      outputs = []
+      for row in forecast[name].values.reshape(-1, 3):
+        row = row[~np.isnan(row)]
+        outputs.append(np.mean(row) ** 2 - np.var(row, ddof=1) / row.size)
+      expected[name] = np.asarray(outputs).reshape(2, 1, 2)
+    spatial = metrics.DebiasedSpatialEnsembleMeanMSE().compute_chunk(
+        forecast, truth, skipna=True
+    )
+    for name in expected:
+      np.testing.assert_allclose(spatial[name], expected[name])
+    averaged = metrics.DebiasedEnsembleMeanMSE().compute(
+        forecast, truth, skipna=True
+    )
+    for name in expected:
+      self.assertAlmostEqual(float(averaged[name]), expected[name].mean())
+
+
 if __name__ == '__main__':
   absltest.main()
