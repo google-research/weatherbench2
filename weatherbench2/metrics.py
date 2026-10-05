@@ -1051,11 +1051,10 @@ def _compute_gaussian_ignorance_score(
     norm_threshold = (threshold[var_name] - forecast[var_name]) / forecast[
         f"{var_name}_std"
     ]
-    cdf_value = xr.apply_ufunc(stats.norm.cdf, norm_threshold.load())
     log_realized_probability[var_name] = -xr.where(
         truth_probability[var_name],
-        xr.apply_ufunc(np.log, 1 - cdf_value),
-        xr.apply_ufunc(np.log, cdf_value),
+        xr.apply_ufunc(stats.norm.logsf, norm_threshold.load()),
+        xr.apply_ufunc(stats.norm.logcdf, norm_threshold.load()),
     )
 
   ignorance_score = xr.Dataset(log_realized_probability, coords=forecast.coords)
