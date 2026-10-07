@@ -273,7 +273,7 @@ def main(argv: list[str]) -> None:
           pcoll
           | beam.Filter(_is_precip)
           | 'RechunkIn'
-          >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
+          >> xbeam.Rechunk(
               source_dataset.sizes,  # pyrefly: ignore[bad-argument-type]
               source_chunks,
               working_chunks,
@@ -287,7 +287,7 @@ def main(argv: list[str]) -> None:
               )
           )
           | 'RechunkOut'
-          >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
+          >> xbeam.Rechunk(
               source_dataset.sizes,  # pyrefly: ignore[bad-argument-type]
               working_chunks,
               source_chunks,

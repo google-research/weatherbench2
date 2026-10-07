@@ -455,7 +455,7 @@ def main(argv: abc.Sequence[str]) -> None:
             ds, ds_chunks, split_vars=True, num_threads=NUM_THREADS.value
         )
         | 'RechunkToWorkingChunks'
-        >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
+        >> xbeam.Rechunk(
             ds.sizes,  # pyrefly: ignore[bad-argument-type]
             ds_chunks,
             working_chunks,
@@ -478,7 +478,7 @@ def main(argv: abc.Sequence[str]) -> None:
             )
         )
         | 'RechunkToOutputChunks'
-        >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
+        >> xbeam.Rechunk(
             rsmp_template.sizes,  # pyrefly: ignore[bad-argument-type]
             working_chunks,
             output_chunks,

@@ -223,13 +223,13 @@ def iter_padding_chunks(
 
   time_index = template.indexes[TIME]
   other_index = template.indexes[other_index_dim]
-  assert time_index.is_monotonic_increasing  # pytype: disable=attribute-error
-  assert other_index.is_monotonic_increasing  # pytype: disable=attribute-error
+  assert time_index.is_monotonic_increasing
+  assert other_index.is_monotonic_increasing
 
   def make_chunks(time, other):
     """Make all-NaN Chunks."""
-    i = time_index.get_loc(time)  # pytype: disable=attribute-error
-    j = other_index.get_loc(other)  # pytype: disable=attribute-error
+    i = time_index.get_loc(time)
+    j = other_index.get_loc(other)
     key = xarray_beam.Key({TIME: i, other_index_dim: j})
     chunk = base_chunk.assign_coords(
         {TIME: [time], other_index_dim: [other]},

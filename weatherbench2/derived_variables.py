@@ -112,7 +112,7 @@ def _d_dx(field: xr.DataArray) -> xr.DataArray:
   cos_theta = np.cos(np.deg2rad(latitude))
   # TODO(shoyer): use a custom calculation with roll() instead of
   # differentiate() to calculate rolling over 360 to 0 degrees properly.
-  return _zero_poles(  # pytype: disable=bad-return-type
+  return _zero_poles(
       field.differentiate('longitude') / cos_theta / _METERS_PER_DEGREE
   )
 
@@ -670,7 +670,7 @@ def interpolate_spectral_frequencies(
         da.squeeze('latitude')
         .swap_dims(
             {wavenumber_dim: 'frequency'}
-        )  # pytype: disable=wrong-arg-types
+        )
         .drop_vars(wavenumber_dim)
         .interp(frequency=frequencies, method=method, **interp_kwargs)  # pyrefly: ignore[bad-argument-type]
     )

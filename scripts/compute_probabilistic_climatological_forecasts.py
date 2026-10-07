@@ -337,7 +337,7 @@ def _independent_choice(x: np.ndarray, axis: int, n=None, seed=None):
           f'n must be None or in [1, x.shape[axis]] = [1, {x.shape[axis]}],'
           f' found {n=}'
       )
-    indices = np.take(indices, np.arange(n), axis=axis)  # pyrefly: ignore[no-matching-overload]
+    indices = np.take(indices, np.arange(n), axis=axis)
   return np.take_along_axis(x, indices, axis=axis)
 
 
@@ -680,7 +680,7 @@ def _get_sampled_init_times(
         dtype=np.int64,
     ).reshape(sampled_times.shape)
 
-    delta_days = np.take(delta_days, hold_idx, axis=1)  # pyrefly: ignore[no-matching-overload]
+    delta_days = np.take(delta_days, hold_idx, axis=1)
     sampled_times = output_times.values + np.array(
         delta_days, dtype='timedelta64[D]'
     )

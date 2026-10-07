@@ -242,7 +242,7 @@ def _get_selections(
         {dim: slice(*selector) if isinstance(selector, list) else selector}
     )
   logging.info(f'Deduced selections {selections=} from {flag_values=}')
-  return selections  # pytype: disable=bad-return-type
+  return selections
 
 
 def main(argv: abc.Sequence[str]) -> None:
@@ -288,7 +288,7 @@ def main(argv: abc.Sequence[str]) -> None:
         | xbeam.DatasetToChunks(
             ds, input_chunks, split_vars=True, num_threads=NUM_THREADS.value
         )
-        | xbeam.Rechunk(  # pytype: disable=wrong-arg-types
+        | xbeam.Rechunk(
             ds.sizes,  # pyrefly: ignore[bad-argument-type]
             input_chunks,
             output_chunks,

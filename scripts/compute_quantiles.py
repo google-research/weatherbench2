@@ -231,7 +231,7 @@ def main(argv: list[str]) -> None:
         # TODO(langmore) Write a xarray_beam quantile reducer to avoid this
         # rechunking.
         | 'RechunkToWorkingChunks'
-        >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
+        >> xbeam.Rechunk(
             source_ds.sizes,  # pyrefly: ignore[bad-argument-type]
             source_chunks,
             working_chunks,
@@ -239,7 +239,7 @@ def main(argv: list[str]) -> None:
         )
         | 'Compute_nan_fraction' >> beam.MapTuple(evaluate_chunk)
         | 'RechunkToOutputChunks'
-        >> xbeam.Rechunk(  # pytype: disable=wrong-arg-types
+        >> xbeam.Rechunk(
             template.sizes,  # pyrefly: ignore[bad-argument-type]
             # Want to inject -1 for new dims
             {k: working_chunks.get(k, -1) for k in output_chunks},  # pyrefly: ignore[bad-argument-type]

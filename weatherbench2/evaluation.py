@@ -159,8 +159,8 @@ def _impose_data_selection(
     dataset = dataset.sel({time_dim: selection.time_slice})
   _ensure_nonempty(
       dataset, message='Selection created empty dataset'
-  )  # pytype: disable=wrong-arg-types
-  return dataset  # pytype: disable=bad-return-type
+  )
+  return dataset
 
 
 def create_persistence_forecast(
@@ -291,7 +291,7 @@ def _select_analysis_init_time(
   # Need to select appropriate lead_times from forecasts
   # Corresponding to initialization interval
   forecast = forecast.isel(lead_time=slice(None, None, lead_per_init))
-  return forecast, analysis  # pytype: disable=bad-return-type
+  return forecast, analysis  # pyrefly: ignore[bad-return]
 
 
 def open_forecast_and_truth_datasets(
@@ -363,7 +363,7 @@ def open_forecast_and_truth_datasets(
   else:
     climatology = None
 
-  return (forecast, eval_truth, climatology)  # pytype: disable=bad-return-type
+  return (forecast, eval_truth, climatology)  # pyrefly: ignore[bad-return]
 
 
 def _get_output_path(
@@ -532,7 +532,7 @@ class _SaveOutputs(beam.PTransform):
     output_path = _get_output_path(
         self.data_config, self.eval_name, self.output_format
     )
-    _to_netcdf(combined, output_path)  # pytype: disable=bad-return-type
+    _to_netcdf(combined, output_path)  # pyrefly: ignore[bad-argument-type]
 
   def expand(self, pcoll: beam.PCollection) -> beam.PCollection:
     if self.output_format == 'netcdf':
