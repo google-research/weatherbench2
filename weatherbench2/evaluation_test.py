@@ -33,13 +33,13 @@ class EvaluationTest(absltest.TestCase):
         levels=[500, 700, 850],
         lat_slice=slice(None),
         lon_slice=slice(None),
-        time_slice=slice('2020-01-01', '2020-12-31'),
+        time_slice=slice('2020-01-01', '2020-01-10'),
     )
 
     truth = schema.mock_truth_data(
         variables_3d=['geopotential'],
-        time_start='2019-12-01',
-        time_stop='2021-01-04',
+        time_start='2019-12-30',
+        time_stop='2020-01-15',
         spatial_resolution_in_degrees=30,
         time_resolution='3 hours',
     )
@@ -47,16 +47,17 @@ class EvaluationTest(absltest.TestCase):
 
     forecast = schema.mock_forecast_data(
         variables_3d=['geopotential'],
-        time_start='2019-12-01',
-        time_stop='2021-01-01',
+        time_start='2019-12-30',
+        time_stop='2020-01-11',
         lead_stop='3 days',
         spatial_resolution_in_degrees=30,
     )
     forecast = utils.random_like(forecast, seed=1)
 
     climatology = schema.mock_hourly_climatology_data(
-        variables_3d=['geopotential', 'temperature'],
+        variables_3d=['geopotential'],
         spatial_resolution_in_degrees=30,
+        hour_interval=3,
     )
     climatology = utils.random_like(climatology, seed=2)
 
@@ -113,7 +114,7 @@ class EvaluationTest(absltest.TestCase):
     evaluation.evaluate_with_beam(
         data_config,
         eval_configs,
-        input_chunks={'init_time': 125},
+        input_chunks={'init_time': 3},
         runner='DirectRunner',
     )
 
