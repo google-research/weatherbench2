@@ -676,7 +676,7 @@ def _get_sampled_init_times(
 
     # Convert np datetimes into δ days, sample-hold, then add back to datetimes.
     delta_days = np.array(
-        pd.to_timedelta((sampled_times - output_times.values).ravel()).days,
+        pd.to_timedelta((sampled_times - output_times.values).ravel()).days,  # pyrefly: ignore[missing-attribute]
         dtype=np.int64,
     ).reshape(sampled_times.shape)
 
