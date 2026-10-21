@@ -381,12 +381,9 @@ def main(argv: abc.Sequence[str]) -> None:
       ds = ds.assign_coords(
           {TIME_DIM.value: ds[TIME_DIM.value] - period + delta_t}
       )
-    elif LABEL_SIDE.value == 'right':
-      # To ensure results at time T use data from (T-period, T],
-      # an offset needs to be added if the method is rolling.
-      ds = ds.assign_coords({TIME_DIM.value: ds[TIME_DIM.value] + delta_t})
-    else:
+    elif LABEL_SIDE.value != 'right':
       raise ValueError(f'Unhandled {LABEL_SIDE.value=}')
+    # Right-labeled rolling windows already end at the original timestamp.
   # Make the template
   if METHOD.value == 'resample':
     rsmp_times = resample_in_time_core(
