@@ -31,6 +31,72 @@ class ResampleInTimeTest(parameterized.TestCase):
       dict(testcase_name='NoNaN', insert_nan=False),
       dict(testcase_name='YesNaN', insert_nan=True),
   )
+  def test_demonstrating_resample_and_rolling_are_aligned_right(
+      self, insert_nan
+  ):
+    times = pd.DatetimeIndex(
+        [
+            '2023-01-01',
+            '2023-01-02',
+            '2023-01-03',
+            '2023-01-04',
+            '2023-01-05',
+            '2023-01-06',
+            '2023-01-07',
+            '2023-01-08',
+            '2023-01-09',
+            '2023-01-10',
+        ]
+    )
+    temperatures = np.arange(len(times)).astype(float)
+    if insert_nan:
+      temperatures[0] = np.nan
+    input_ds = xr.Dataset(
+        {
+            'temperature': xr.DataArray(
+                temperatures, coords=[times], dims=['time']
+            )
+        }
+    )
+    input_path = self.create_tempdir('source').full_path
+    input_ds.to_zarr(input_path)
+
+    resample_output_path = self.create_tempdir('resample').full_path
+    with flagsaver.as_parsed(
+        input_path=input_path,
+        output_path=resample_output_path,
+        method='resample',
+        period='3d',
+        mean_vars='ALL',
+        runner='DirectRunner',
+        label_side='right',
+    ):
+      resample_in_time.main([])
+    resample, _ = xarray_beam.open_zarr(resample_output_path)
+
+    rolling_output_path = self.create_tempdir('rolling').full_path
+    with flagsaver.as_parsed(
+        input_path=input_path,
+        output_path=rolling_output_path,
+        method='rolling',
+        period='3d',
+        mean_vars='ALL',
+        runner='DirectRunner',
+        label_side='right',
+    ):
+      resample_in_time.main([])
+    rolling, _ = xarray_beam.open_zarr(rolling_output_path)
+
+    common_times = pd.DatetimeIndex(['2023-01-04', '2023-01-07', '2023-01-10'])
+    xr.testing.assert_equal(
+        resample.sel(time=common_times),
+        rolling.sel(time=common_times),
+    )
+
+  @parameterized.named_parameters(
+      dict(testcase_name='NoNaN', insert_nan=False),
+      dict(testcase_name='YesNaN', insert_nan=True),
+  )
   def test_demonstrating_resample_and_rolling_are_aligned(self, insert_nan):
     # times = 10 days, starting at Jan 1
     times = pd.DatetimeIndex(
@@ -501,6 +567,159 @@ class ResampleInTimeTest(parameterized.TestCase):
         np.testing.assert_array_less(expected_mean[k], output_ds[k + '_max'])
 
     self.assertCountEqual(expected_varnames, output_ds.data_vars)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='Left_SkipnaFalse_Chunk3_Period5d',
+          label_side='left',
+          skipna=False,
+          time_chunk=3,
+          period='5d',
+      ),
+      dict(
+          testcase_name='Right_SkipnaFalse_Chunk4_Period7d',
+          label_side='right',
+          skipna=False,
+          time_chunk=4,
+          period='7d',
+      ),
+      dict(
+          testcase_name='Left_SkipnaTrue_Chunk3_Period5d',
+          label_side='left',
+          skipna=True,
+          time_chunk=3,
+          period='5d',
+      ),
+      dict(
+          testcase_name='Right_SkipnaTrue_Chunk4_Period6d',
+          label_side='right',
+          skipna=True,
+          time_chunk=4,
+          period='6d',
+      ),
+  )
+  def test_fast_resample_matches_rechunk_across_multiple_time_chunks(
+      self, label_side, skipna, time_chunk, period
+  ):
+    input_ds = utils.random_like(
+        schema.mock_truth_data(
+            variables_3d=['temperature', 'geopotential'],
+            time_start='2021-01-01',
+            time_stop='2021-02-15',
+            spatial_resolution_in_degrees=60.0,
+            time_resolution='1d',
+        )
+    )
+    temp_vals = input_ds['temperature'].values.copy()
+    # Insert partial NaNs in one chunk and an all-NaN window for another point.
+    temp_vals[1:4, 0, 0, 0] = np.nan
+    temp_vals[:15, 1, 0, 0] = np.nan
+    input_ds['temperature'] = (input_ds['temperature'].dims, temp_vals)
+
+    input_path = self.create_tempdir('source').full_path
+    fast_output_path = self.create_tempdir('fast_dest').full_path
+    slow_output_path = self.create_tempdir('slow_dest').full_path
+
+    input_chunks = {
+        'time': time_chunk,
+        'longitude': 3,
+        'latitude': 2,
+        'level': 2,
+    }
+    input_ds.chunk(input_chunks).to_zarr(input_path)
+
+    common_flags = dict(
+        input_path=input_path,
+        method='resample',
+        period=period,
+        label_side=label_side,
+        skipna=str(skipna),
+        mean_vars='temperature,geopotential',
+        min_vars='temperature',
+        max_vars='temperature',
+        sum_vars='geopotential',
+        sum_suffix='_accum',
+        add_mean_suffix='true',
+        time_start='2021-01-02',
+        time_stop='2021-02-10',
+        output_time_start='2021-01-05',
+        output_time_stop='2021-02-08',
+        working_chunks='level=1',
+        runner='DirectRunner',
+    )
+
+    with flagsaver.as_parsed(
+        output_path=fast_output_path,
+        use_fast_resample='true',
+        **common_flags,
+    ):
+      resample_in_time.main([])
+
+    with flagsaver.as_parsed(
+        output_path=slow_output_path,
+        use_fast_resample='false',
+        **common_flags,
+    ):
+      resample_in_time.main([])
+
+    fast_ds, fast_chunks = xarray_beam.open_zarr(fast_output_path)
+    slow_ds, slow_chunks = xarray_beam.open_zarr(slow_output_path)
+
+    self.assertEqual(fast_chunks, slow_chunks)
+    self.assertCountEqual(fast_ds.data_vars, slow_ds.data_vars)
+    xr.testing.assert_allclose(fast_ds, slow_ds)
+
+  def test_fast_resample_with_hour_filters(self):
+    input_ds = utils.random_like(
+        schema.mock_truth_data(
+            variables_3d=['temperature'],
+            time_start='2021-01-01',
+            time_stop='2021-01-10',
+            spatial_resolution_in_degrees=60.0,
+            time_resolution='6h',
+        )
+    )
+    input_path = self.create_tempdir('source').full_path
+    fast_output_path = self.create_tempdir('fast_dest').full_path
+    slow_output_path = self.create_tempdir('slow_dest').full_path
+
+    input_chunks = {
+        'time': 5,
+        'longitude': 3,
+        'latitude': 2,
+        'level': 2,
+    }
+    input_ds.chunk(input_chunks).to_zarr(input_path)
+
+    common_flags = dict(
+        input_path=input_path,
+        method='resample',
+        period='12h',
+        mean_vars='temperature',
+        input_select_hours=['0', '12'],
+        output_select_hours=['0'],
+        runner='DirectRunner',
+    )
+
+    with flagsaver.as_parsed(
+        output_path=fast_output_path,
+        use_fast_resample='true',
+        **common_flags,
+    ):
+      resample_in_time.main([])
+
+    with flagsaver.as_parsed(
+        output_path=slow_output_path,
+        use_fast_resample='false',
+        **common_flags,
+    ):
+      resample_in_time.main([])
+
+    fast_ds, fast_chunks = xarray_beam.open_zarr(fast_output_path)
+    slow_ds, slow_chunks = xarray_beam.open_zarr(slow_output_path)
+
+    self.assertEqual(fast_chunks, slow_chunks)
+    xr.testing.assert_allclose(fast_ds, slow_ds)
 
 
 if __name__ == '__main__':

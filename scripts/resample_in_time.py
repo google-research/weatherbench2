@@ -48,6 +48,7 @@ from collections import abc
 import functools
 import typing as t
 from typing import Optional
+import warnings
 
 from absl import app
 from absl import flags
@@ -119,9 +120,15 @@ SUM_VARS = flags.DEFINE_list(
     [],
     help=(
         'Comma-delimited list of variables to compute the sum of. Will result'
-        ' in "_sum" suffix added to variables. Setting --sum_vars=ALL is'
-        ' equivalent to listing every time dependent variable.'
+        ' in a suffix (default "_sum") added to variables. Setting'
+        ' --sum_vars=ALL is equivalent to listing every time dependent'
+        ' variable.'
     ),
+)
+SUM_SUFFIX = flags.DEFINE_string(
+    'sum_suffix',
+    '_sum',
+    help='Suffix to add to variable name when computing the sum.',
 )
 LABEL_SIDE = flags.DEFINE_enum(
     'label_side',
@@ -162,6 +169,19 @@ TIME_STOP = flags.DEFINE_string(
         ' use the last time in --input_path.'
     ),
 )
+OUTPUT_TIME_START = flags.DEFINE_string(
+    'output_time_start',
+    None,
+    help=(
+        'ISO 8601 timestamp (inclusive) at which to start saving the output. '
+        'Useful to trim initial NaNs when using rolling windows.'
+    ),
+)
+OUTPUT_TIME_STOP = flags.DEFINE_string(
+    'output_time_stop',
+    None,
+    help='ISO 8601 timestamp (inclusive) at which to stop saving the output.',
+)
 INPUT_SELECT_HOURS = flags.DEFINE_list(
     'input_select_hours',
     [],
@@ -198,13 +218,21 @@ OUTPUT_SELECT_HOURS = flags.DEFINE_list(
         ' resampling. E.g., --output_select_hours=0.'
     ),
 )
+USE_FAST_RESAMPLE = flags.DEFINE_bool(
+    'use_fast_resample',
+    True,
+    help=(
+        'Use map-side partial aggregation + CombinePerKey for method=resample '
+        'instead of full-timeseries xbeam.Rechunk.'
+    ),
+)
 
 _ALL = 'ALL'  # Sentinal for including all variables.
 
 
 def _get_vars(
-    list_of_vars: list[str], time_dependent_vars: list[t.Hashable]
-) -> list[t.Hashable]:
+    list_of_vars: list[str], time_dependent_vars: list[str]
+) -> list[str]:
   """Get variables for a particular statistic."""
   if not list_of_vars:
     return []
@@ -214,7 +242,7 @@ def _get_vars(
     raise ValueError(
         f'Cannot specify both {_ALL} and other variables. Found {list_of_vars}'
     )
-  return list_of_vars  # pyrefly: ignore[bad-return]
+  return list_of_vars
 
 
 def resample_in_time_chunk(
@@ -230,6 +258,9 @@ def resample_in_time_chunk(
     add_mean_suffix: bool,
     skipna: bool = False,
     output_select_hours: Optional[list[int]] = None,
+    sum_suffix: str = '_sum',
+    output_time_start: Optional[str] = None,
+    output_time_stop: Optional[str] = None,
 ) -> tuple[xbeam.Key, xr.Dataset]:
   """Resample a data chunk in time and return a requested time statistic.
 
@@ -249,6 +280,9 @@ def resample_in_time_chunk(
       evaluation.
     output_select_hours: List of hours to select from time dimension after
       resampling.
+    sum_suffix: Suffix to add to variables when computing the sum.
+    output_time_start: ISO 8601 timestamp to filter start of output.
+    output_time_stop: ISO 8601 timestamp to filter end of output.
 
   Returns:
     The resampled data chunk and its key.
@@ -282,13 +316,17 @@ def resample_in_time_chunk(
       rsmp_chunks.append(
           resample_in_time_core(
               chunk, method, period, 'sum', skipna=skipna
-          ).rename({chunk_var: f'{chunk_var}_sum'})
+          ).rename({chunk_var: f'{chunk_var}{sum_suffix}'})
       )
 
   merged_chunk = xr.merge(rsmp_chunks)
   if output_select_hours:
     merged_chunk = merged_chunk.sel(
         {time_dim: merged_chunk[time_dim].dt.hour.isin(output_select_hours)}
+    )
+  if output_time_start is not None or output_time_stop is not None:
+    merged_chunk = merged_chunk.sel(
+        {time_dim: slice(output_time_start, output_time_stop)}
     )
 
   return rsmp_key, merged_chunk
@@ -336,6 +374,370 @@ def resample_in_time_core(
   assert False  # Should not be reached
 
 
+def _emit_partial_resample(
+    key: xbeam.Key,
+    chunk: xr.Dataset,
+    *,
+    time_dim: str,
+    in_to_out_idx: np.ndarray,
+    out_t_chunk: int,
+    mean_vars: set[str],
+    min_vars: set[str],
+    max_vars: set[str],
+    sum_vars: set[str],
+    skipna: bool,
+) -> abc.Iterator[tuple[xbeam.Key, dict[int, dict[str, t.Any]]]]:
+  """Pre-aggregates an input chunk into partial stats keyed by output chunk."""
+  assert key.vars is not None
+  var_name = str(next(iter(key.vars)))
+  da = chunk[var_name]
+  time_axis = da.dims.index(time_dim)
+  t0 = key.offsets[time_dim]
+  t_len = da.sizes[time_dim]
+  out_ids = in_to_out_idx[t0 : t0 + t_len]
+  valid_out_ids = np.unique(out_ids[out_ids >= 0])
+  if valid_out_ids.size == 0:
+    return
+
+  arr = np.asarray(da.values)
+  need_sum = (var_name in mean_vars) or (var_name in sum_vars)
+  need_min = var_name in min_vars
+  need_max = var_name in max_vars
+
+  by_out_chunk: dict[int, dict[int, dict[str, t.Any]]] = {}
+  for out_idx_np in valid_out_ids:
+    out_idx = int(out_idx_np)
+    idxs = np.flatnonzero(out_ids == out_idx)
+    s_start, s_stop = int(idxs[0]), int(idxs[-1]) + 1
+    if s_stop - s_start == idxs.size:
+      slc: list[t.Any] = [slice(None)] * arr.ndim
+      slc[time_axis] = slice(s_start, s_stop)
+      sub = arr[tuple(slc)]
+    else:
+      sub = np.take(arr, idxs, axis=time_axis)
+
+    stats: dict[str, t.Any] = {}
+    if need_sum:
+      if skipna:
+        stats['sum'] = np.nansum(sub, axis=time_axis, dtype=np.float64)
+        stats['count'] = np.sum(~np.isnan(sub), axis=time_axis, dtype=np.int32)
+      else:
+        stats['sum'] = np.sum(sub, axis=time_axis, dtype=np.float64)
+        stats['count'] = int(idxs.size)
+    with warnings.catch_warnings():
+      warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+      if need_min:
+        stats['min'] = (np.nanmin if skipna else np.min)(sub, axis=time_axis)
+      if need_max:
+        stats['max'] = (np.nanmax if skipna else np.max)(sub, axis=time_axis)
+
+    out_chunk_offset = (out_idx // out_t_chunk) * out_t_chunk
+    slot = out_idx - out_chunk_offset
+    by_out_chunk.setdefault(out_chunk_offset, {})[slot] = stats
+
+  for out_chunk_offset, acc in by_out_chunk.items():
+    yield key.with_offsets(**{time_dim: out_chunk_offset}), acc
+
+
+class _ResampleCombineFn(beam.CombineFn):
+  """Combines partial per-slot statistics for an output Zarr chunk."""
+
+  def __init__(self, skipna: bool):
+    super().__init__()
+    self.skipna = skipna
+
+  def create_accumulator(self) -> dict[int, dict[str, t.Any]]:
+    return {}
+
+  def add_input(
+      self,
+      accumulator: dict[int, dict[str, t.Any]],
+      element: dict[int, dict[str, t.Any]],
+  ) -> dict[int, dict[str, t.Any]]:
+    return self.merge_accumulators([accumulator, element])
+
+  def merge_accumulators(
+      self, accumulators: abc.Iterable[dict[int, dict[str, t.Any]]]
+  ) -> dict[int, dict[str, t.Any]]:
+    merged: dict[int, dict[str, t.Any]] = {}
+    for acc in accumulators:
+      for slot, stats in acc.items():
+        if slot not in merged:
+          merged[slot] = {
+              k: v.copy() if isinstance(v, np.ndarray) else v
+              for k, v in stats.items()
+          }
+        else:
+          cur = merged[slot]
+          if 'sum' in stats:
+            cur['sum'] = cur['sum'] + stats['sum']
+            cur['count'] = cur['count'] + stats['count']
+          if 'min' in stats:
+            cur['min'] = (
+                np.fmin(cur['min'], stats['min'])
+                if self.skipna
+                else np.minimum(cur['min'], stats['min'])
+            )
+          if 'max' in stats:
+            cur['max'] = (
+                np.fmax(cur['max'], stats['max'])
+                if self.skipna
+                else np.maximum(cur['max'], stats['max'])
+            )
+    return merged
+
+  def extract_output(
+      self, accumulator: dict[int, dict[str, t.Any]]
+  ) -> dict[int, dict[str, t.Any]]:
+    return accumulator
+
+
+def _finalize_output_chunk(
+    key: xbeam.Key,
+    acc: dict[int, dict[str, t.Any]],
+    *,
+    time_dim: str,
+    rsmp_template: xr.Dataset,
+    output_chunks: dict[str, int],
+    mean_vars: set[str],
+    min_vars: set[str],
+    max_vars: set[str],
+    sum_vars: set[str],
+    add_mean_suffix: bool,
+    sum_suffix: str,
+    skipna: bool,
+) -> tuple[xbeam.Key, xr.Dataset]:
+  """Builds the final output Zarr chunk Dataset from combined slot stats."""
+  assert key.vars is not None
+  var_name = str(next(iter(key.vars)))
+  indexers = {
+      dim: slice(
+          offset, min(offset + output_chunks[dim], rsmp_template.sizes[dim])
+      )
+      for dim, offset in key.offsets.items()
+  }
+  chunk_tmpl = rsmp_template.isel(indexers)
+  out_t_len = chunk_tmpl.sizes[time_dim]
+
+  data_vars: dict[str, tuple[tuple[t.Hashable, ...], np.ndarray]] = {}
+  specs: list[tuple[str, str]] = []
+  if var_name in mean_vars:
+    specs.append(('mean', f'{var_name}_mean' if add_mean_suffix else var_name))
+  if var_name in min_vars:
+    specs.append(('min', f'{var_name}_min'))
+  if var_name in max_vars:
+    specs.append(('max', f'{var_name}_max'))
+  if var_name in sum_vars:
+    specs.append(('sum', f'{var_name}{sum_suffix}'))
+
+  for stat_kind, out_var_name in specs:
+    tmpl_da = chunk_tmpl[out_var_name]
+    time_axis = tmpl_da.dims.index(time_dim)
+    orig_dtype = tmpl_da.dtype
+    slice_shape = tuple(
+        s for i, s in enumerate(tmpl_da.shape) if i != time_axis
+    )
+    slots: list[np.ndarray] = []
+    for slot in range(out_t_len):
+      if slot not in acc:
+        slots.append(np.full(slice_shape, np.nan, dtype=orig_dtype))
+        continue
+      s = acc[slot]
+      if stat_kind == 'mean':
+        if skipna:
+          val = np.divide(
+              s['sum'],
+              s['count'],
+              out=np.full_like(s['sum'], np.nan),
+              where=s['count'] > 0,
+          ).astype(orig_dtype)
+        else:
+          val = (s['sum'] / s['count']).astype(orig_dtype)
+      elif stat_kind == 'sum':
+        val = s['sum'].astype(orig_dtype)
+      elif stat_kind == 'min':
+        val = s['min'].astype(orig_dtype)
+      elif stat_kind == 'max':
+        val = s['max'].astype(orig_dtype)
+      else:
+        raise ValueError(f'Unknown {stat_kind=}')
+      slots.append(val)
+    stacked = np.stack(slots, axis=time_axis)
+    data_vars[out_var_name] = (tmpl_da.dims, stacked)
+
+  out_ds = xr.Dataset(data_vars, coords=chunk_tmpl.coords)
+  return key.replace(vars=set(out_ds.data_vars)), out_ds
+
+
+def _compute_in_to_out_idx(
+    ds: xr.Dataset,
+    *,
+    time_dim: str,
+    method: str,
+    period: pd.Timedelta,
+    output_select_hours: list[int],
+    output_time_slice: Optional[slice],
+) -> np.ndarray:
+  """Computes mapping from each input time index to its output time index."""
+  idx_da = xr.DataArray(
+      np.arange(len(ds[time_dim]), dtype=np.float64),
+      coords={time_dim: ds[time_dim]},
+      dims=[time_dim],
+  )
+  min_idx_da = resample_in_time_core(idx_da, method, period, 'min', skipna=True)
+  max_idx_da = resample_in_time_core(idx_da, method, period, 'max', skipna=True)
+  if output_select_hours:
+    min_idx_da = min_idx_da.sel(
+        {time_dim: min_idx_da[time_dim].dt.hour.isin(output_select_hours)}
+    )
+    max_idx_da = max_idx_da.sel(
+        {time_dim: max_idx_da[time_dim].dt.hour.isin(output_select_hours)}
+    )
+  if output_time_slice is not None:
+    min_idx_da = min_idx_da.sel({time_dim: output_time_slice})
+    max_idx_da = max_idx_da.sel({time_dim: output_time_slice})
+  assert isinstance(min_idx_da, xr.DataArray)
+  assert isinstance(max_idx_da, xr.DataArray)
+  in_to_out_idx = np.full(len(ds[time_dim]), -1, dtype=np.int32)
+  for out_idx, (lo, hi) in enumerate(
+      zip(
+          np.asarray(min_idx_da.values),
+          np.asarray(max_idx_da.values),
+      )
+  ):
+    if not np.isnan(lo) and not np.isnan(hi):
+      in_to_out_idx[int(lo) : int(hi) + 1] = out_idx
+  return in_to_out_idx
+
+
+def _fast_resample_stages(
+    pcoll: beam.PCollection,
+    *,
+    time_dim: str,
+    in_to_out_idx: np.ndarray,
+    rsmp_template: xr.Dataset,
+    output_chunks: dict[str, int],
+    mean_vars: list[str],
+    min_vars: list[str],
+    max_vars: list[str],
+    sum_vars: list[str],
+    add_mean_suffix: bool,
+    sum_suffix: str,
+    skipna: bool,
+) -> beam.PCollection:
+  """Intermediate Beam stages for map-side partial aggregation + CombinePerKey."""
+  # Instead of rechunking the full time series onto single workers before
+  # computing resample statistics, this approach maps each input chunk into
+  # partial per-output-slot statistics keyed by output Zarr chunk offset,
+  # combines those partial statistics via CombinePerKey, and finalizes each
+  # output chunk directly.
+  mean_vars_set = {str(v) for v in mean_vars}
+  min_vars_set = {str(v) for v in min_vars}
+  max_vars_set = {str(v) for v in max_vars}
+  sum_vars_set = {str(v) for v in sum_vars}
+  out_t_chunk = max(1, int(output_chunks[time_dim]))
+  return (
+      pcoll
+      | 'PartialResample'
+      >> beam.FlatMapTuple(
+          functools.partial(
+              _emit_partial_resample,
+              time_dim=time_dim,
+              in_to_out_idx=in_to_out_idx,
+              out_t_chunk=out_t_chunk,
+              mean_vars=mean_vars_set,
+              min_vars=min_vars_set,
+              max_vars=max_vars_set,
+              sum_vars=sum_vars_set,
+              skipna=skipna,
+          )
+      )
+      | 'CombineResample'
+      >> beam.CombinePerKey(_ResampleCombineFn(skipna=skipna))
+      | 'FinalizeOutputChunk'
+      >> beam.MapTuple(
+          functools.partial(
+              _finalize_output_chunk,
+              time_dim=time_dim,
+              rsmp_template=rsmp_template,
+              output_chunks=output_chunks,
+              mean_vars=mean_vars_set,
+              min_vars=min_vars_set,
+              max_vars=max_vars_set,
+              sum_vars=sum_vars_set,
+              add_mean_suffix=add_mean_suffix,
+              sum_suffix=sum_suffix,
+              skipna=skipna,
+          )
+      )
+  )
+
+
+def _rechunk_resample_stages(
+    pcoll: beam.PCollection,
+    *,
+    ds: xr.Dataset,
+    ds_chunks: dict[str, int],
+    working_chunks: dict[str, int],
+    output_chunks: dict[str, int],
+    rsmp_template: xr.Dataset,
+    itemsize: int,
+    time_dim: str,
+    method: str,
+    period: pd.Timedelta,
+    mean_vars: list[str],
+    min_vars: list[str],
+    max_vars: list[str],
+    sum_vars: list[str],
+    add_mean_suffix: bool,
+    skipna: bool,
+    output_select_hours: list[int],
+    sum_suffix: str,
+    output_time_start: Optional[str],
+    output_time_stop: Optional[str],
+) -> beam.PCollection:
+  """Intermediate Beam stages using full-timeseries Rechunk before stats."""
+  # Rechunks input chunks to working_chunks spanning the full time dimension,
+  # computes rolling or resample statistics on each full time series via xarray,
+  # and rechunks back to output_chunks.
+  return (
+      pcoll
+      | 'RechunkToWorkingChunks'
+      >> xbeam.Rechunk(
+          {str(k): v for k, v in ds.sizes.items()},
+          ds_chunks,
+          working_chunks,
+          itemsize=itemsize,
+      )
+      | 'Stats'
+      >> beam.MapTuple(
+          functools.partial(
+              resample_in_time_chunk,
+              time_dim=time_dim,
+              method=method,
+              period=period,
+              mean_vars=mean_vars,
+              min_vars=min_vars,
+              max_vars=max_vars,
+              sum_vars=sum_vars,
+              add_mean_suffix=add_mean_suffix,
+              skipna=skipna,
+              output_select_hours=output_select_hours,
+              sum_suffix=sum_suffix,
+              output_time_start=output_time_start,
+              output_time_stop=output_time_stop,
+          )
+      )
+      | 'RechunkToOutputChunks'
+      >> xbeam.Rechunk(
+          {str(k): v for k, v in rsmp_template.sizes.items()},
+          working_chunks,
+          output_chunks,
+          itemsize=itemsize,
+      )
+  )
+
+
 def main(argv: abc.Sequence[str]) -> None:
 
   ds, input_chunks = xbeam.open_zarr(INPUT_PATH.value)
@@ -351,10 +753,15 @@ def main(argv: abc.Sequence[str]) -> None:
     )
 
   output_select_hours = [int(h) for h in OUTPUT_SELECT_HOURS.value]
+  output_time_slice = None
+  if OUTPUT_TIME_START.value is not None or OUTPUT_TIME_STOP.value is not None:
+    output_time_slice = slice(OUTPUT_TIME_START.value, OUTPUT_TIME_STOP.value)
 
   # Select the variables needed for statistics.
-  time_dependent_vars = [k for k, v in ds.items() if TIME_DIM.value in v.dims]
-  nontime_vars = set(ds).difference(time_dependent_vars)
+  time_dependent_vars = [
+      str(k) for k, v in ds.items() if TIME_DIM.value in v.dims
+  ]
+  nontime_vars = {str(k) for k in ds}.difference(time_dependent_vars)
   mean_vars = _get_vars(MEAN_VARS.value, time_dependent_vars)
   min_vars = _get_vars(MIN_VARS.value, time_dependent_vars)
   max_vars = _get_vars(MAX_VARS.value, time_dependent_vars)
@@ -383,8 +790,10 @@ def main(argv: abc.Sequence[str]) -> None:
       )
     elif LABEL_SIDE.value == 'right':
       # To ensure results at time T use data from (T-period, T],
-      # an offset needs to be added if the method is rolling.
-      ds = ds.assign_coords({TIME_DIM.value: ds[TIME_DIM.value] + delta_t})
+      # no offset needs to be added if the method is rolling, because
+      # rolling(center=False) evaluates the window [T-period+delta_t, T]
+      # and assigns it to T.
+      pass
     else:
       raise ValueError(f'Unhandled {LABEL_SIDE.value=}')
   # Make the template
@@ -405,6 +814,9 @@ def main(argv: abc.Sequence[str]) -> None:
         {TIME_DIM.value: rsmp_times.dt.hour.isin(output_select_hours)}
     )
 
+  if output_time_slice is not None:
+    rsmp_times = rsmp_times.sel({TIME_DIM.value: output_time_slice})
+
   assert isinstance(ds, xr.Dataset)  # To satisfy pytype.
   rsmp_template = (
       xbeam.make_template(ds)
@@ -424,7 +836,9 @@ def main(argv: abc.Sequence[str]) -> None:
   for var in max_vars:
     rsmp_template = rsmp_template.assign({f'{var}_max': template_copy[var]})
   for var in sum_vars:
-    rsmp_template = rsmp_template.assign({f'{var}_sum': template_copy[var]})
+    rsmp_template = rsmp_template.assign(
+        {f'{var}{SUM_SUFFIX.value}': template_copy[var]}
+    )
 
   # We've changed ds (e.g. dropped vars), so the dims may have changed.
   # Therefore, input_chunks may no longer be valid.
@@ -447,49 +861,64 @@ def main(argv: abc.Sequence[str]) -> None:
 
   itemsize = max(var.dtype.itemsize for var in rsmp_template.values())
 
+  in_to_out_idx = None
+  if METHOD.value == 'resample' and USE_FAST_RESAMPLE.value:
+    in_to_out_idx = _compute_in_to_out_idx(
+        ds,
+        time_dim=TIME_DIM.value,
+        method=METHOD.value,
+        period=period,
+        output_select_hours=output_select_hours,
+        output_time_slice=output_time_slice,
+    )
+
   with beam.Pipeline(runner=RUNNER.value, argv=argv) as root:
-    # Read, rechunk, compute stats
-    unused_pcoll = (
-        root
-        | xbeam.DatasetToChunks(
-            ds, ds_chunks, split_vars=True, num_threads=NUM_THREADS.value
-        )
-        | 'RechunkToWorkingChunks'
-        >> xbeam.Rechunk(
-            ds.sizes,  # pyrefly: ignore[bad-argument-type]
-            ds_chunks,
-            working_chunks,
-            itemsize=itemsize,
-        )
-        | 'Stats'
-        >> beam.MapTuple(
-            functools.partial(
-                resample_in_time_chunk,
-                time_dim=TIME_DIM.value,
-                method=METHOD.value,
-                period=period,
-                mean_vars=mean_vars,  # pyrefly: ignore[bad-argument-type]
-                min_vars=min_vars,  # pyrefly: ignore[bad-argument-type]
-                max_vars=max_vars,  # pyrefly: ignore[bad-argument-type]
-                sum_vars=sum_vars,  # pyrefly: ignore[bad-argument-type]
-                add_mean_suffix=ADD_MEAN_SUFFIX.value,
-                skipna=SKIPNA.value,
-                output_select_hours=output_select_hours,
-            )
-        )
-        | 'RechunkToOutputChunks'
-        >> xbeam.Rechunk(
-            rsmp_template.sizes,  # pyrefly: ignore[bad-argument-type]
-            working_chunks,
-            output_chunks,
-            itemsize=itemsize,
-        )
-        | xbeam.ChunksToZarr(
-            OUTPUT_PATH.value,
-            template=rsmp_template,
-            zarr_chunks=output_chunks,
-            num_threads=NUM_THREADS.value,
-        )
+    pcoll = root | xbeam.DatasetToChunks(
+        ds, ds_chunks, split_vars=True, num_threads=NUM_THREADS.value
+    )
+    if in_to_out_idx is not None:
+      pcoll = _fast_resample_stages(
+          pcoll,
+          time_dim=TIME_DIM.value,
+          in_to_out_idx=in_to_out_idx,
+          rsmp_template=rsmp_template,
+          output_chunks=output_chunks,
+          mean_vars=mean_vars,
+          min_vars=min_vars,
+          max_vars=max_vars,
+          sum_vars=sum_vars,
+          add_mean_suffix=ADD_MEAN_SUFFIX.value,
+          sum_suffix=SUM_SUFFIX.value,
+          skipna=SKIPNA.value,
+      )
+    else:
+      pcoll = _rechunk_resample_stages(
+          pcoll,
+          ds=ds,
+          ds_chunks=ds_chunks,
+          working_chunks=working_chunks,
+          output_chunks=output_chunks,
+          rsmp_template=rsmp_template,
+          itemsize=itemsize,
+          time_dim=TIME_DIM.value,
+          method=METHOD.value,
+          period=period,
+          mean_vars=mean_vars,
+          min_vars=min_vars,
+          max_vars=max_vars,
+          sum_vars=sum_vars,
+          add_mean_suffix=ADD_MEAN_SUFFIX.value,
+          skipna=SKIPNA.value,
+          output_select_hours=output_select_hours,
+          sum_suffix=SUM_SUFFIX.value,
+          output_time_start=OUTPUT_TIME_START.value,
+          output_time_stop=OUTPUT_TIME_STOP.value,
+      )
+    unused_pcoll = pcoll | xbeam.ChunksToZarr(
+        OUTPUT_PATH.value,
+        template=rsmp_template,
+        zarr_chunks=output_chunks,
+        num_threads=NUM_THREADS.value,
     )
 
 
