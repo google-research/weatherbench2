@@ -97,7 +97,7 @@ class SliceRegion(Region):
 
 @dataclasses.dataclass
 class ExtraTropicalRegion(Region):
-  """Latitude-longitude box selection."""
+  """Select latitudes whose absolute value is at least ``threshold_lat``."""
 
   threshold_lat: t.Optional[float] = 20
 
@@ -105,7 +105,9 @@ class ExtraTropicalRegion(Region):
       self, dataset: xr.Dataset, weights: xr.DataArray
   ) -> tuple[xr.Dataset, xr.DataArray]:
     """Returns weights multiplied with a boolean mask to exclude tropics."""
-    region_weights = (np.abs(dataset.latitude) >= 20).astype(float)
+    region_weights = (np.abs(dataset.latitude) >= self.threshold_lat).astype(
+        float
+    )
     return dataset, weights * region_weights
 
 
