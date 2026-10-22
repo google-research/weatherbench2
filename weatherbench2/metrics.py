@@ -645,8 +645,9 @@ class CRPS(EnsembleMetric):
   and CRPS are unbiased at each time. Therefore, assuming some ergodicity, one
   can average over many time points and obtain highly accurate estimates.
 
-  NaN values propagate through and result in NaN in the corresponding output
-  position.
+  By default, NaN values propagate to the corresponding output position.
+  With skipna=True, spread uses the non-missing ensemble count at each point.
+  A single remaining member has zero spread; entirely missing points stay NaN.
 
   References:
   [Gneiting & Raftery, 2012], Strictly Proper Scoring Rules, Prediction, and
@@ -803,15 +804,25 @@ def _pointwise_crps_spread(
   # O(M Log[M]) compute and O(M) memory usage, whereas the first is O(M²) in
   # compute and memory.
   rank = _rank_ds(forecast, ensemble_dim)
-  return (
+  if skipna:
+    # Missing members sort last; valid ranks run from 1 to the local count.
+    n_ensemble = forecast.count(ensemble_dim)
+    denominator = n_ensemble.where(n_ensemble > 1) - 1
+  else:
+    denominator = n_ensemble - 1
+  spread = (
       2
       * (
           ((2 * rank - n_ensemble - 1) * forecast).mean(
               ensemble_dim, skipna=skipna
           )
       )
-      / (n_ensemble - 1)
+      / denominator
   )
+  if skipna:
+    # Match the singleton-ensemble convention, retaining NaN for empty points.
+    spread = spread.where(n_ensemble != 1, 0.0)
+  return spread
 
 
 def _pointwise_crps_skill(
