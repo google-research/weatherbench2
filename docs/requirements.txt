@@ -16,3 +16,4 @@ xarray==2023.6.0
 pandas==2.0.3
 xarray-beam==0.6.2
 zarr==2.15.0
+numcodecs<0.16.0
