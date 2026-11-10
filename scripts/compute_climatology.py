@@ -146,7 +146,8 @@ class Quantile:
       weights: Optional[xr.Dataset] = None,
   ):
     if weights is not None:
-      ds = ds.weighted(weights)  # pyrefly: ignore[bad-argument-type, bad-assignment]
+      # pyrefly: ignore[bad-argument-type, bad-assignment]
+      ds = ds.weighted(weights)
     return ds.quantile(self.quantiles, dim=dim)
 
 
@@ -201,7 +202,8 @@ def compute_seeps_chunk(
   clim_key = clim_key.replace(
       vars={f'{var}_seeps_threshold', f'{var}_seeps_dry_fraction'}
   )
-  stat_fn = SEEPSThreshold(seeps_threshold_mm[var], var=var).compute  # pyrefly: ignore[unsupported-operation]
+  # pyrefly: ignore[unsupported-operation]
+  stat_fn = SEEPSThreshold(seeps_threshold_mm[var], var=var).compute
   if frequency == 'hourly':
     clim_chunk = utils.compute_hourly_stat(
         obs=obs_chunk,
@@ -242,12 +244,14 @@ def compute_stat_chunk(
   clim_key = obs_key.with_offsets(time=None, **offsets)
   if statistic != 'mean':
     clim_key = clim_key.replace(
-        vars={f'{var}_{statistic}' for var in clim_key.vars}  # pyrefly: ignore[not-iterable]
+        # pyrefly: ignore[not-iterable]
+        vars={f'{var}_{statistic}' for var in clim_key.vars}
     )
     for var in obs_chunk:
       obs_chunk = obs_chunk.rename({var: f'{var}_{statistic}'})
   if statistic == 'quantile':
-    statistic = Quantile(quantiles).compute  # pyrefly: ignore[bad-argument-type]
+    # pyrefly: ignore[bad-argument-type]
+    statistic = Quantile(quantiles).compute
   compute_kwargs = {
       'obs': obs_chunk,
       'window_size': window_size,
@@ -257,16 +261,23 @@ def compute_stat_chunk(
 
   if frequency == 'hourly' and METHOD.value == 'explicit':
     clim_chunk = utils.compute_hourly_stat(
-        **compute_kwargs, hour_interval=hour_interval  # pyrefly: ignore[bad-argument-type]
+        # pyrefly: ignore[bad-argument-type]
+        **compute_kwargs,
+        # pyrefly: ignore[bad-argument-type]
+        hour_interval=hour_interval,
     )
   elif frequency == 'hourly' and METHOD.value == 'fast':
     clim_chunk = utils.compute_hourly_stat_fast(
-        **compute_kwargs, hour_interval=hour_interval  # pyrefly: ignore[bad-argument-type]
+        # pyrefly: ignore[bad-argument-type]
+        **compute_kwargs,
+        # pyrefly: ignore[bad-argument-type]
+        hour_interval=hour_interval,
     )
   elif frequency == 'daily' and METHOD.value == 'explicit':
     clim_chunk = utils.compute_daily_stat(**compute_kwargs)
   elif frequency == 'daily' and METHOD.value == 'fast':
-    clim_chunk = utils.compute_daily_stat_fast(**compute_kwargs)  # pyrefly: ignore[bad-argument-type]
+    # pyrefly: ignore[bad-argument-type]
+    clim_chunk = utils.compute_daily_stat_fast(**compute_kwargs)
   else:
     raise NotImplementedError(
         f'method {METHOD.value} for climatological frequency {frequency}'

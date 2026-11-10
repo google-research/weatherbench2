@@ -176,7 +176,8 @@ def _impose_data_selection(
       TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value),
   }
   if 'level' in source.dims:
-    selection['level'] = [int(level) for level in LEVELS.value]  # pyrefly: ignore[unsupported-operation]
+    # pyrefly: ignore[unsupported-operation]
+    selection['level'] = [int(level) for level in LEVELS.value]
   source = source.sel({k: v for k, v in selection.items() if k in source.dims})
   source_chunks = {  # Remove dims that disappeared after data selection
       k: v for k, v in source_chunks.items() if k in source.dims

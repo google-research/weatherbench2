@@ -133,7 +133,8 @@ def resample_in_time_chunk(
     for var in rsmp_chunk:
       rsmp_chunk = rsmp_chunk.rename({var: f'{var}_{statistic}'})
     rsmp_key = rsmp_key.replace(
-        vars={f'{var}_{statistic}' for var in rsmp_key.vars}  # pyrefly: ignore[not-iterable]
+        # pyrefly: ignore[not-iterable]
+        vars={f'{var}_{statistic}' for var in rsmp_key.vars}
     )
   return rsmp_key, rsmp_chunk
 
@@ -258,7 +259,11 @@ def main(argv: abc.Sequence[str]) -> None:
         )
         | 'RechunkIn'
         >> xbeam.Rechunk(
-            obs.sizes, input_chunks, in_working_chunks, itemsize=itemsize  # pyrefly: ignore[bad-argument-type]
+            # pyrefly: ignore[bad-argument-type]
+            obs.sizes,
+            input_chunks,
+            in_working_chunks,
+            itemsize=itemsize,
         )
     )
 
