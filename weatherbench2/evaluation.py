@@ -157,9 +157,7 @@ def _impose_data_selection(
     dataset = dataset.sel(level=selection.levels)
   if select_time:
     dataset = dataset.sel({time_dim: selection.time_slice})
-  _ensure_nonempty(
-      dataset, message='Selection created empty dataset'
-  )
+  _ensure_nonempty(dataset, message='Selection created empty dataset')
   return dataset
 
 
@@ -452,7 +450,8 @@ def _evaluate_all_metrics(
 
   if eval_config.evaluate_climatology:
     time_dim = 'valid_time' if data_config.by_init else 'time'
-    forecast = climatology[list(forecast.keys())].sel(  # pyrefly: ignore[unsupported-operation]
+    # pyrefly: ignore[unsupported-operation]
+    forecast = climatology[list(forecast.keys())].sel(
         dayofyear=forecast[time_dim].dt.dayofyear,
         hour=forecast[time_dim].dt.hour,
     )
@@ -527,7 +526,8 @@ class _SaveOutputs(beam.PTransform):
   output_format: str
   num_threads: Optional[int] = None
 
-  def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:  # pyrefly: ignore[bad-return]
+  # pyrefly: ignore[bad-return]
+  def _write_netcdf(self, datasets: list[xr.Dataset]) -> xr.Dataset:
     combined = xr.combine_by_coords(datasets)
     output_path = _get_output_path(
         self.data_config, self.eval_name, self.output_format
@@ -753,7 +753,8 @@ class _EvaluateAllMetrics(beam.PTransform):
     logging.info(
         f'forecast={forecast}, truth={truth}, climatology={climatology}'
     )
-    return pcoll | self._evaluate(forecast, truth, climatology)  # pyrefly: ignore[bad-argument-type]
+    # pyrefly: ignore[bad-argument-type]
+    return pcoll | self._evaluate(forecast, truth, climatology)
 
 
 def evaluate_with_beam(

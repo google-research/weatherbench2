@@ -194,8 +194,7 @@ def plot_timeseries(
     if (
         not relative
         and metric in ['crps', 'rmse', 'spread&skill', 'rms_bias']
-        and variable
-        in [
+        and variable in [
             'specific_humidity',
             'total_precipitation_6hr',
             'total_precipitation_24hr',
@@ -233,7 +232,8 @@ def plot_timeseries(
             marker=marker,
             markersize=markersize,
         )
-      datetime_to_xticks(da.lead_time, ax, xlim=xlim)  # pyrefly: ignore[bad-argument-type]
+      # pyrefly: ignore[bad-argument-type]
+      datetime_to_xticks(da.lead_time, ax, xlim=xlim)
     else:
       ax.axhline(da, label=label, color=colors[name] if colors else None)
   if add_legend:
@@ -283,7 +283,9 @@ def visualize_timeseries(
         title=panel_config.title,
         xlabel=panel_config.xlabel,
         ylabel=panel_config.ylabel,
+        # pyrefly: ignore[bad-argument-type]
         ylim=panel_config.ylim,
+        # pyrefly: ignore[bad-argument-type]
         xlim=panel_config.xlim,
         labels=viz_config.labels,
         legend_position=legend_position,
@@ -314,7 +316,8 @@ def visualize_scorecard(
     cmap_scale: float = 100,
 ) -> None:
   """Plot relative scorecard."""
-  matplotlib.rcParams.update(matplotlib.rcParamsDefault)  # pyrefly: ignore[missing-attribute]
+  # pyrefly: ignore[missing-attribute]
+  matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 
   # Compute relative
   results = load_results(viz_config.results)
@@ -324,9 +327,11 @@ def visualize_scorecard(
     relative = relative.sel(region=region)
 
   if vars_3d is None:
-    vars_3d = [var for var in relative if hasattr(relative[var], 'level')]  # pyrefly: ignore[bad-assignment]
+    # pyrefly: ignore[bad-assignment]
+    vars_3d = [var for var in relative if hasattr(relative[var], 'level')]
   if vars_2d is None:
-    vars_2d = [var for var in relative if not hasattr(relative[var], 'level')]  # pyrefly: ignore[bad-assignment]
+    # pyrefly: ignore[bad-assignment]
+    vars_2d = [var for var in relative if not hasattr(relative[var], 'level')]
 
   def set_x_labels(ax, dataset):
     lead_time_h = int(dataset.lead_time[1] / np.timedelta64(1, 'h'))
@@ -417,7 +422,8 @@ def visualize_scorecard(
   )
 
   cax = fig.add_subplot(gs[:, -1])
-  fig.colorbar(img, cax=cax, orientation='vertical')  # pyrefly: ignore[unbound-name]
+  # pyrefly: ignore[unbound-name]
+  fig.colorbar(img, cax=cax, orientation='vertical')
 
   if save_path is not None:
     with fsspec.open(save_path, 'wb', auto_mkdir=True) as f:
