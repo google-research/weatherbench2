@@ -606,7 +606,8 @@ def _get_sampled_init_times(
       )
     # End of get sampled years and day_perturbations.
 
-  dayofyears = output_times.dayofyear.values + day_perturbations  # pyrefly: ignore[missing-attribute, unbound-name]
+  # pyrefly: ignore[missing-attribute, unbound-name]
+  dayofyears = output_times.dayofyear.values + day_perturbations
 
   if initial_time_edge_behavior == WRAP_YEAR:
     for year_in_sample in np.unique(years):
@@ -651,7 +652,8 @@ def _get_sampled_init_times(
       # Add daysofyears - 1 to year, since e.g. if dayofyear = 1, then we will
       # add 0 to the year, which results in the first day of the year.
       + np.array(dayofyears - 1, dtype='timedelta64[D]')
-      + np.array(output_times.hour, dtype='timedelta64[h]')  # pyrefly: ignore[missing-attribute]
+      # pyrefly: ignore[missing-attribute]
+      + np.array(output_times.hour, dtype='timedelta64[h]')
   ).astype('datetime64[ns]')
 
   if sample_hold_days:
@@ -676,7 +678,8 @@ def _get_sampled_init_times(
 
     # Convert np datetimes into δ days, sample-hold, then add back to datetimes.
     delta_days = np.array(
-        pd.to_timedelta((sampled_times - output_times.values).ravel()).days,  # pyrefly: ignore[missing-attribute]
+        # pyrefly: ignore[missing-attribute]
+        pd.to_timedelta((sampled_times - output_times.values).ravel()).days,
         dtype=np.int64,
     ).reshape(sampled_times.shape)
 

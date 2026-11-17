@@ -170,7 +170,8 @@ def _spatial_average_l2_norm(
     skipna: bool,
 ) -> xr.Dataset:
   """Helper function to compute sqrt(spatial_average(ds**2))."""
-  return np.sqrt(_spatial_average(dataset**2, region=region, skipna=skipna))  # pyrefly: ignore[bad-return]
+  # pyrefly: ignore[bad-return]
+  return np.sqrt(_spatial_average(dataset**2, region=region, skipna=skipna))
 
 
 @dataclasses.dataclass
@@ -196,7 +197,8 @@ class WindVectorMSE(Metric):
   ) -> xr.Dataset:
     diff = forecast - truth
     result = _spatial_average(
-        diff[self.u_name] ** 2 + diff[self.v_name] ** 2,  # pyrefly: ignore[bad-argument-type]
+        # pyrefly: ignore[bad-argument-type]
+        diff[self.u_name] ** 2 + diff[self.v_name] ** 2,
         region=region,
         skipna=skipna,
     )
@@ -2034,7 +2036,8 @@ class RankHistogram(EnsembleMetric):
       # order of the truth realization.
       # ranks has the same dims as forecast, with ensemble_dim dropped.
       ranks = order.argmin(self.ensemble_dim)
-      ranks = self._bin_ranks(ensemble_size, ranks)  # pyrefly: ignore[bad-argument-type]
+      # pyrefly: ignore[bad-argument-type]
+      ranks = self._bin_ranks(ensemble_size, ranks)
       return ranks.expand_dims(bins=np.arange(num_bins), axis=-1).copy(
           # data will have shape ranks.shape + [num_bins].
           data=np.eye(num_bins)[ranks],

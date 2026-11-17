@@ -12,20 +12,22 @@ on:
 jobs:
   build:
     name: "python ${{ matrix.python-version }} tests"
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.12"]
     steps:
     - name: Cancel previous
-      uses: styfle/cancel-workflow-action@0.7.0
+      uses: styfle/cancel-workflow-action@d7e57e26a6f753933f8ef746a37097a61375236b  # 0.7.0
       with:
         access_token: ${{ github.token }}
       if: ${{github.ref != 'refs/head/main'}}
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c  # v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Get pip cache dir
@@ -34,7 +36,7 @@ jobs:
         python -m pip install --upgrade pip wheel
         echo "::set-output name=dir::$(pip cache dir)"
     - name: pip cache
-      uses: actions/cache@v4
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
       with:
         path: ${{ steps.pip-cache.outputs.dir }}
         key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}

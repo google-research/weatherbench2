@@ -26,7 +26,8 @@ base_requires = [
     'scikit-learn',
     'xarray>=2024.11.0',
     'xarray-beam',
-    'zarr',
+    'zarr>=3.4.2',
+    'numcodecs>=0.17.1',
 ]
 
 docs_requires = [
@@ -41,8 +42,6 @@ tests_requires = [
     'absl-py',
     'pytest',
     'pyink',
-    # work around https://github.com/zarr-developers/zarr-python/issues/2963
-    'numcodecs<0.16.0',
 ]
 
 gcp_requires = [
@@ -65,5 +64,5 @@ setuptools.setup(
     },
     url='https://github.com/google-research/weatherbench2',
     packages=setuptools.find_packages(exclude=['notebooks', 'scripts']),
-    python_requires='>=3',
+    python_requires='>=3.12',
 )

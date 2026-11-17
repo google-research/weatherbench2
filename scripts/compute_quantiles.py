@@ -148,7 +148,8 @@ def _impose_data_selection(
       TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value),
   }
   if LEVELS.value:
-    selection['level'] = [float(l) for l in LEVELS.value]  # pyrefly: ignore[unsupported-operation]
+    # pyrefly: ignore[unsupported-operation]
+    selection['level'] = [float(l) for l in LEVELS.value]
   ds = ds.sel({k: v for k, v in selection.items() if k in ds.dims})
   chunks = {k: v for k, v in chunks.items() if k in ds.dims}
   return ds, chunks
@@ -173,13 +174,15 @@ def _evaluate_chunk_core(chunk: xr.Dataset) -> xr.Dataset:
         f' {preserve_dims} , not being a subset of {set(chunk.dims)=}'
     )
 
-  quantiles = [float(q) for q in QUANTILES.value]  # pyrefly: ignore[not-iterable]
+  # pyrefly: ignore[not-iterable]
+  quantiles = [float(q) for q in QUANTILES.value]
   if any(q < 0 or q > 1 for q in quantiles):
     raise ValueError(
         f'Expected all quantiles to be in [0, 1]. Found {quantiles=}'
     )
   values = chunk.quantile(quantiles, dim=DIM.value, skipna=SKIPNA.value)
-  return values.rename_vars({v: v + NAME_SUFFIX.value for v in values})  # pyrefly: ignore[unsupported-operation]
+  # pyrefly: ignore[unsupported-operation]
+  return values.rename_vars({v: v + NAME_SUFFIX.value for v in values})
 
 
 def main(argv: list[str]) -> None:
@@ -202,7 +205,8 @@ def main(argv: list[str]) -> None:
     else:
       working_chunks[k] = -1
   output_chunks = {
-      k: OUTPUT_CHUNKS.value.get(k, source_chunks[k])  # pyrefly: ignore[bad-index]
+      # pyrefly: ignore[bad-index]
+      k: OUTPUT_CHUNKS.value.get(k, source_chunks[k])
       for k in preserve_dims.intersection(source_chunks)
   }
   output_chunks.setdefault('quantile', -1)
@@ -242,7 +246,8 @@ def main(argv: list[str]) -> None:
         >> xbeam.Rechunk(
             template.sizes,  # pyrefly: ignore[bad-argument-type]
             # Want to inject -1 for new dims
-            {k: working_chunks.get(k, -1) for k in output_chunks},  # pyrefly: ignore[bad-argument-type]
+            # pyrefly: ignore[bad-argument-type]
+            {k: working_chunks.get(k, -1) for k in output_chunks},
             output_chunks,  # pyrefly: ignore[bad-argument-type]
             itemsize=itemsize,
         )

@@ -317,7 +317,8 @@ class AgeostrophicWindSpeed(_AgeostrophicWindVariable):
     u = dataset[self.u_name]
     v = dataset[self.v_name]
     u_geo, v_geo = _geostrophic_wind(dataset[self.geopotential_name])
-    return np.sqrt((u - u_geo) ** 2 + (v - v_geo) ** 2)  # pyrefly: ignore[bad-return]
+    # pyrefly: ignore[bad-return]
+    return np.sqrt((u - u_geo) ** 2 + (v - v_geo) ** 2)
 
 
 class UComponentOfAgeostrophicWind(_AgeostrophicWindVariable):
@@ -427,7 +428,8 @@ class IntegratedWaterTransport(DerivedVariable):
         .sel(level=slice(self.level_min, self.level_max))
         .integrate('level')
     )
-    return (1 / g) * np.sqrt(u_integral**2 + v_integral**2)  # pyrefly: ignore[bad-return]
+    # pyrefly: ignore[bad-return]
+    return (1 / g) * np.sqrt(u_integral**2 + v_integral**2)
 
 
 @dataclasses.dataclass
@@ -663,16 +665,16 @@ def interpolate_spectral_frequencies(
     )
   frequencies = np.asarray(frequencies)  # pyrefly: ignore[bad-assignment]
   if frequencies.ndim != 1:  # pyrefly: ignore[missing-attribute]
-    raise ValueError(f'Expected 1-D frequencies, found {frequencies.shape=}')  # pyrefly: ignore[missing-attribute]
+    # pyrefly: ignore[missing-attribute]
+    raise ValueError(f'Expected 1-D frequencies, found {frequencies.shape=}')
 
   def interp_at_one_lat(da: xr.DataArray) -> xr.DataArray:
     da = (
         da.squeeze('latitude')
-        .swap_dims(
-            {wavenumber_dim: 'frequency'}
-        )
+        .swap_dims({wavenumber_dim: 'frequency'})
         .drop_vars(wavenumber_dim)
-        .interp(frequency=frequencies, method=method, **interp_kwargs)  # pyrefly: ignore[bad-argument-type]
+        # pyrefly: ignore[bad-argument-type]
+        .interp(frequency=frequencies, method=method, **interp_kwargs)
     )
     # Interp didn't deal well with the infinite wavelength, so just reset λ as..
     da['wavelength'] = 1 / da.frequency

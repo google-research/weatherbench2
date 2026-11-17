@@ -118,7 +118,8 @@ def _impose_data_selection(
       TIME_DIM.value: slice(TIME_START.value, TIME_STOP.value),
   }
   if LEVELS.value:
-    selection['level'] = [float(l) for l in LEVELS.value]  # pyrefly: ignore[unsupported-operation]
+    # pyrefly: ignore[unsupported-operation]
+    selection['level'] = [float(l) for l in LEVELS.value]
   ds = ds.sel({k: v for k, v in selection.items() if k in ds.dims})
   return ds, {k: v for k, v in source_chunks.items() if k in ds.dims}
 
@@ -129,10 +130,17 @@ def main(argv: list[str]):
       source_dataset, source_chunks
   )
   template = xbeam.make_template(
-      source_dataset.isel({d: 0 for d in AVERAGING_DIMS.value}, drop=True)  # pyrefly: ignore[not-iterable]
+      source_dataset.isel(
+          # pyrefly: ignore[not-iterable]
+          {d: 0 for d in AVERAGING_DIMS.value},
+          drop=True,
+      )
   )
   target_chunks = {
-      k: v for k, v in source_chunks.items() if k not in AVERAGING_DIMS.value  # pyrefly: ignore[not-iterable]
+      k: v
+      for k, v in source_chunks.items()
+      # pyrefly: ignore[not-iterable]
+      if k not in AVERAGING_DIMS.value
   }
 
   if 'latitude' in AVERAGING_DIMS.value:  # pyrefly: ignore[not-iterable]
@@ -156,7 +164,10 @@ def main(argv: list[str]):
     (
         chunked
         | xbeam.Mean(
-            AVERAGING_DIMS.value, skipna=SKIPNA.value, fanout=FANOUT.value  # pyrefly: ignore[bad-argument-type]
+            # pyrefly: ignore[bad-argument-type]
+            AVERAGING_DIMS.value,
+            skipna=SKIPNA.value,
+            fanout=FANOUT.value,
         )
         | xbeam.ChunksToZarr(
             OUTPUT_PATH.value,
